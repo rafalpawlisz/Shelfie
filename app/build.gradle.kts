@@ -6,9 +6,7 @@ plugins {
 android {
     namespace = "io.github.rafalpawlisz.shelfie"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
@@ -24,7 +22,7 @@ android {
     buildTypes {
         release {
             optimization {
-                enable = false
+                enable = true
             }
         }
     }
