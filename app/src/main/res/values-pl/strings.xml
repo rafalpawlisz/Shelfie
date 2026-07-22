@@ -1,6 +1,12 @@
 <resources>
     <string name="empty_state_title">Twoja spiżarnia jest pusta</string>
     <string name="empty_state_message">Dotknij +, aby dodać pierwszy produkt</string>
+    <string name="empty_state_go_to_products">Najpierw dodaj produkty w zakładce Produkty</string>
+    <string name="tab_products">Produkty</string>
+    <string name="tab_shopping">Zakupy</string>
+    <string name="tab_use_up">Zużycie</string>
+    <string name="shopping_hint">Dotknij produktu, aby dodać 1</string>
+    <string name="use_up_hint">Dotknij produktu, aby odjąć 1</string>
     <string name="add_product">Dodaj produkt</string>
     <string name="product_name_label">Nazwa</string>
     <string name="product_quantity_label">Ilość</string>

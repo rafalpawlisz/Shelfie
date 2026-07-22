@@ -2,6 +2,12 @@
     <string name="app_name">Shelfie</string>
     <string name="empty_state_title">Your pantry is empty</string>
     <string name="empty_state_message">Tap + to add your first product</string>
+    <string name="empty_state_go_to_products">Add products in the Products tab first</string>
+    <string name="tab_products">Products</string>
+    <string name="tab_shopping">Shopping</string>
+    <string name="tab_use_up">Use up</string>
+    <string name="shopping_hint">Tap a product to add one</string>
+    <string name="use_up_hint">Tap a product to remove one</string>
     <string name="add_product">Add product</string>
     <string name="product_name_label">Name</string>
     <string name="product_quantity_label">Quantity</string>

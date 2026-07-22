@@ -4,9 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.rafalpawlisz.shelfie.ui.pantry.PantryScreen
-import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
+import io.github.rafalpawlisz.shelfie.ui.ShelfieApp
 import io.github.rafalpawlisz.shelfie.ui.theme.ShelfieTheme
 
 class MainActivity : ComponentActivity() {
@@ -15,7 +13,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ShelfieTheme {
-                PantryScreen(viewModel = viewModel(factory = PantryViewModel.Factory))
+                ShelfieApp()
             }
         }
     }
