@@ -1,0 +1,13 @@
+<resources>
+    <string name="empty_state_title">Twoja spiżarnia jest pusta</string>
+    <string name="empty_state_message">Dotknij +, aby dodać pierwszy produkt</string>
+    <string name="add_product">Dodaj produkt</string>
+    <string name="product_name_label">Nazwa</string>
+    <string name="product_quantity_label">Ilość</string>
+    <string name="product_unit_label">Jednostka (opcjonalnie)</string>
+    <string name="action_add">Dodaj</string>
+    <string name="action_cancel">Anuluj</string>
+    <string name="cd_increase_quantity">Zwiększ ilość produktu %1$s</string>
+    <string name="cd_decrease_quantity">Zmniejsz ilość produktu %1$s</string>
+    <string name="cd_delete_product">Usuń %1$s</string>
+</resources>
