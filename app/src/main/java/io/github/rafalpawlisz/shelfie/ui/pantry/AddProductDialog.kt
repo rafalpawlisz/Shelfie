@@ -25,7 +25,7 @@ fun AddProductDialog(
     onDismiss: () -> Unit,
 ) {
     var name by rememberSaveable { mutableStateOf("") }
-    var quantityText by rememberSaveable { mutableStateOf("1") }
+    var quantityText by rememberSaveable { mutableStateOf("0") }
     var unit by rememberSaveable { mutableStateOf("") }
 
     val quantity = quantityText.toIntOrNull()
