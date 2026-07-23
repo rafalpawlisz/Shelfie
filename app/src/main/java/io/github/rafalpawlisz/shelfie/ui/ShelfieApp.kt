@@ -73,11 +73,13 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                     )
                 }
                 ShelfieTab.SHOPPING ->
-                    FloatingActionButton(onClick = { showAddToListDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = stringResource(R.string.add_to_shopping_list),
-                        )
+                    if (state.selectedListId != null) {
+                        FloatingActionButton(onClick = { showAddToListDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = stringResource(R.string.add_to_shopping_list),
+                            )
+                        }
                     }
                 ShelfieTab.USE_UP -> Unit
             }
@@ -92,7 +94,13 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                         onProductClick = { editedProductId = it },
                     )
                     ShelfieTab.SHOPPING -> ShoppingScreen(
+                        lists = state.lists,
+                        selectedListId = state.selectedListId,
                         items = state.shoppingList,
+                        onSelectList = viewModel::selectList,
+                        onCreateList = viewModel::createList,
+                        onRenameList = viewModel::renameList,
+                        onDeleteList = viewModel::deleteList,
                         onToggle = viewModel::setShoppingItemChecked,
                         onRemove = viewModel::removeShoppingItem,
                         onFinishShopping = viewModel::finishShopping,

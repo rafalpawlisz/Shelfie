@@ -14,6 +14,17 @@
     <string name="finish_shopping_message">Dodać %1$d pozycji do spiżarni i zakończyć zakupy?</string>
     <string name="action_finish">Zakończ</string>
     <string name="cd_remove_from_list">Usuń %1$s z listy zakupów</string>
+    <string name="shopping_no_lists_title">Brak list zakupów</string>
+    <string name="shopping_no_lists_message">Dotknij +, aby utworzyć pierwszą listę sklepu</string>
+    <string name="create_list">Nowa lista</string>
+    <string name="list_name_label">Nazwa listy</string>
+    <string name="action_create">Utwórz</string>
+    <string name="rename_list">Zmień nazwę listy</string>
+    <string name="action_rename">Zmień nazwę</string>
+    <string name="action_delete_list">Usuń listę</string>
+    <string name="delete_list_message">Usunąć „%1$s” wraz z zawartością?</string>
+    <string name="action_delete">Usuń</string>
+    <string name="cd_list_menu">Opcje listy %1$s</string>
     <string name="use_up_hint">Dotknij produktu, aby odjąć 1</string>
     <string name="use_up_empty_title">Nie ma czego zużyć</string>
     <string name="use_up_empty_message">Produkty, które masz w zapasie, pojawią się tutaj</string>

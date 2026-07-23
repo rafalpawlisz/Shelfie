@@ -1,5 +1,6 @@
 package io.github.rafalpawlisz.shelfie.ui.pantry
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,16 +13,25 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,31 +45,207 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 
 @Composable
 fun ShoppingScreen(
+    lists: List<ShoppingList>,
+    selectedListId: String?,
+    items: List<ShoppingListItem>,
+    onSelectList: (String) -> Unit,
+    onCreateList: (String) -> Unit,
+    onRenameList: (id: String, name: String) -> Unit,
+    onDeleteList: (id: String) -> Unit,
+    onToggle: (id: String, checked: Boolean) -> Unit,
+    onRemove: (id: String) -> Unit,
+    onFinishShopping: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        ListChipsRow(
+            lists = lists,
+            selectedListId = selectedListId,
+            onSelectList = onSelectList,
+            onCreateList = onCreateList,
+            onRenameList = onRenameList,
+            onDeleteList = onDeleteList,
+        )
+        when {
+            lists.isEmpty() -> Box(modifier = Modifier.fillMaxSize()) {
+                EmptyState(
+                    title = stringResource(R.string.shopping_no_lists_title),
+                    message = stringResource(R.string.shopping_no_lists_message),
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+            items.isEmpty() -> Box(modifier = Modifier.fillMaxSize()) {
+                EmptyState(
+                    title = stringResource(R.string.shopping_empty_title),
+                    message = stringResource(R.string.shopping_empty_message),
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+            else -> ListItems(
+                items = items,
+                onToggle = onToggle,
+                onRemove = onRemove,
+                onFinishShopping = onFinishShopping,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ListChipsRow(
+    lists: List<ShoppingList>,
+    selectedListId: String?,
+    onSelectList: (String) -> Unit,
+    onCreateList: (String) -> Unit,
+    onRenameList: (id: String, name: String) -> Unit,
+    onDeleteList: (id: String) -> Unit,
+) {
+    var menuListId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showCreateDialog by rememberSaveable { mutableStateOf(false) }
+    var renamingListId by rememberSaveable { mutableStateOf<String?>(null) }
+    var deletingListId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        items(lists, key = { it.id }) { list ->
+            val selected = list.id == selectedListId
+            Box {
+                FilterChip(
+                    selected = selected,
+                    onClick = { onSelectList(list.id) },
+                    label = { Text(list.name) },
+                    trailingIcon = if (selected) {
+                        {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.cd_list_menu, list.name),
+                                modifier = Modifier.clickable { menuListId = list.id },
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                )
+                DropdownMenu(
+                    expanded = menuListId == list.id,
+                    onDismissRequest = { menuListId = null },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_rename)) },
+                        onClick = { menuListId = null; renamingListId = list.id },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_delete_list)) },
+                        onClick = { menuListId = null; deletingListId = list.id },
+                    )
+                }
+            }
+        }
+        item {
+            AssistChip(
+                onClick = { showCreateDialog = true },
+                label = {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.create_list),
+                    )
+                },
+            )
+        }
+    }
+
+    if (showCreateDialog) {
+        ListNameDialog(
+            title = stringResource(R.string.create_list),
+            initialName = "",
+            confirmLabel = stringResource(R.string.action_create),
+            onConfirm = { onCreateList(it); showCreateDialog = false },
+            onDismiss = { showCreateDialog = false },
+        )
+    }
+
+    val renaming = lists.firstOrNull { it.id == renamingListId }
+    if (renaming != null) {
+        ListNameDialog(
+            title = stringResource(R.string.rename_list),
+            initialName = renaming.name,
+            confirmLabel = stringResource(R.string.action_save),
+            onConfirm = { onRenameList(renaming.id, it); renamingListId = null },
+            onDismiss = { renamingListId = null },
+        )
+    }
+
+    val deleting = lists.firstOrNull { it.id == deletingListId }
+    if (deleting != null) {
+        AlertDialog(
+            onDismissRequest = { deletingListId = null },
+            confirmButton = {
+                TextButton(onClick = { onDeleteList(deleting.id); deletingListId = null }) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingListId = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+            text = { Text(stringResource(R.string.delete_list_message, deleting.name)) },
+        )
+    }
+}
+
+@Composable
+private fun ListNameDialog(
+    title: String,
+    initialName: String,
+    confirmLabel: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by rememberSaveable { mutableStateOf(initialName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.list_name_label)) },
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = name.isNotBlank(), onClick = { onConfirm(name.trim()) }) {
+                Text(confirmLabel)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun ListItems(
     items: List<ShoppingListItem>,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
     onFinishShopping: () -> Unit,
 ) {
-    if (items.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            EmptyState(
-                title = stringResource(R.string.shopping_empty_title),
-                message = stringResource(R.string.shopping_empty_message),
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
-        return
-    }
-
     val checkedCount = items.count { it.isChecked }
     var showFinishDialog by rememberSaveable { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Hint and the (conditional) clear action share one fixed-height row so
+        // Hint and the (conditional) finish action share one fixed-height row so
         // the button appearing/disappearing never shifts the list below.
         Row(
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 16.dp),
