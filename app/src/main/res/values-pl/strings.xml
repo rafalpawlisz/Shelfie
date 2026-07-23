@@ -5,7 +5,13 @@
     <string name="tab_products">Produkty</string>
     <string name="tab_shopping">Zakupy</string>
     <string name="tab_use_up">Zużycie</string>
-    <string name="shopping_hint">Dotknij produktu, aby dodać 1</string>
+    <string name="shopping_hint">Dotknij pozycji, aby oznaczyć jako kupioną</string>
+    <string name="shopping_empty_title">Lista zakupów jest pusta</string>
+    <string name="shopping_empty_message">Dotknij +, aby dodać coś do kupienia</string>
+    <string name="add_to_shopping_list">Dodaj do listy zakupów</string>
+    <string name="shopping_amount_label">Ilość do kupienia</string>
+    <string name="clear_purchased">Usuń kupione (%1$d)</string>
+    <string name="cd_remove_from_list">Usuń %1$s z listy zakupów</string>
     <string name="use_up_hint">Dotknij produktu, aby odjąć 1</string>
     <string name="add_product">Dodaj produkt</string>
     <string name="edit_product">Edytuj produkt</string>

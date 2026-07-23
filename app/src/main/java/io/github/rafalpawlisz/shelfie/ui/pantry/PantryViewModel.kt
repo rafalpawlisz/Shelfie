@@ -73,10 +73,6 @@ class PantryViewModel(
         }
     }
 
-    fun increment(id: String) {
-        viewModelScope.launch { repository.adjustQuantity(id, delta = 1) }
-    }
-
     fun decrement(id: String) {
         viewModelScope.launch { repository.adjustQuantity(id, delta = -1) }
     }

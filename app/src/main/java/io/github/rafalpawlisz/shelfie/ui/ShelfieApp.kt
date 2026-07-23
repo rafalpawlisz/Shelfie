@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.ui.pantry.AddShoppingItemDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
 import io.github.rafalpawlisz.shelfie.ui.pantry.ProductFormDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.ProductsScreen
@@ -45,6 +46,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var currentTab by rememberSaveable { mutableStateOf(ShelfieTab.PRODUCTS) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    var showAddToListDialog by rememberSaveable { mutableStateOf(false) }
     var editedProductId by rememberSaveable { mutableStateOf<String?>(null) }
 
     Scaffold(
@@ -63,13 +65,21 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
             }
         },
         floatingActionButton = {
-            if (currentTab == ShelfieTab.PRODUCTS) {
-                FloatingActionButton(onClick = { showAddDialog = true }) {
+            when (currentTab) {
+                ShelfieTab.PRODUCTS -> FloatingActionButton(onClick = { showAddDialog = true }) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = stringResource(R.string.add_product),
                     )
                 }
+                ShelfieTab.SHOPPING ->
+                    FloatingActionButton(onClick = { showAddToListDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = stringResource(R.string.add_to_shopping_list),
+                        )
+                    }
+                ShelfieTab.USE_UP -> Unit
             }
         },
     ) { innerPadding ->
@@ -82,8 +92,10 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                         onProductClick = { editedProductId = it },
                     )
                     ShelfieTab.SHOPPING -> ShoppingScreen(
-                        products = state.products,
-                        onIncrement = viewModel::increment,
+                        items = state.shoppingList,
+                        onToggle = viewModel::setShoppingItemChecked,
+                        onRemove = viewModel::removeShoppingItem,
+                        onClearPurchased = viewModel::clearPurchased,
                     )
                     ShelfieTab.USE_UP -> UseUpScreen(
                         products = state.products,
@@ -103,6 +115,17 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },
+        )
+    }
+
+    if (showAddToListDialog) {
+        AddShoppingItemDialog(
+            products = state.products,
+            onConfirm = { productId, amount ->
+                viewModel.addToShoppingList(productId, amount)
+                showAddToListDialog = false
+            },
+            onDismiss = { showAddToListDialog = false },
         )
     }
 

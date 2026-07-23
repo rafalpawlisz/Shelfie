@@ -6,7 +6,15 @@
     <string name="tab_products">Products</string>
     <string name="tab_shopping">Shopping</string>
     <string name="tab_use_up">Use up</string>
-    <string name="shopping_hint">Tap a product to add one</string>
+    <string name="shopping_hint">Tap an item to mark it as bought</string>
+    <string name="shopping_empty_title">Shopping list is empty</string>
+    <string name="shopping_empty_message">Tap + to add something to buy</string>
+    <string name="add_to_shopping_list">Add to shopping list</string>
+    <string name="shopping_amount_label">Amount to buy</string>
+    <string name="shopping_amount">×%1$d</string>
+    <string name="shopping_amount_with_unit">×%1$d %2$s</string>
+    <string name="clear_purchased">Clear purchased (%1$d)</string>
+    <string name="cd_remove_from_list">Remove %1$s from the shopping list</string>
     <string name="use_up_hint">Tap a product to remove one</string>
     <string name="add_product">Add product</string>
     <string name="edit_product">Edit product</string>
