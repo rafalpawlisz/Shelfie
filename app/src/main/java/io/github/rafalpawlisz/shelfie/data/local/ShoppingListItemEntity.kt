@@ -51,6 +51,8 @@ data class ShoppingListItemRow(
     val productName: String,
     val productEmoji: String?,
     val productUnit: String?,
+    // From the LEFT JOIN on product_list_order; COALESCE'd to 0.0 when absent.
+    val position: Double,
 )
 
 fun ShoppingListItemRow.toDomain(): ShoppingListItem = ShoppingListItem(
@@ -61,4 +63,5 @@ fun ShoppingListItemRow.toDomain(): ShoppingListItem = ShoppingListItem(
     productName = productName,
     productEmoji = productEmoji,
     productUnit = productUnit,
+    position = position,
 )

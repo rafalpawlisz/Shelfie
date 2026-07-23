@@ -28,13 +28,14 @@ interface ShoppingListDao {
     @Query(
         "SELECT i.id AS id, i.productId AS productId, i.amount AS amount, " +
             "i.checkedAt AS checkedAt, p.name AS productName, p.emoji AS productEmoji, " +
-            "p.unit AS productUnit " +
+            "p.unit AS productUnit, COALESCE(o.position, 0.0) AS position " +
             "FROM shopping_list_items i " +
             "JOIN products p ON p.id = i.productId " +
+            "LEFT JOIN product_list_order o ON o.listId = i.listId AND o.productId = i.productId " +
             "WHERE i.listId = :listId AND p.archivedAt IS NULL"
     )
-    // Ordering (unchecked first, then by name) is applied in the repository
-    // with a locale-aware Collator.
+    // Ordering (manual position, then name) is applied in the repository with a
+    // locale-aware Collator.
     fun observeItems(listId: String): Flow<List<ShoppingListItemRow>>
 
     @Query("SELECT * FROM shopping_list_items WHERE listId = :listId AND productId = :productId LIMIT 1")
@@ -84,8 +85,28 @@ interface ShoppingListDao {
         deleteChecked(listId)
     }
 
+    // --- Manual order (persisted per list+product, survives item removal) ---
+
+    // First time a product joins a list, append it at the end; an existing slot
+    // is left untouched (INSERT OR IGNORE), so re-adding a product keeps its
+    // place. Positions are never deleted on checkout/removal, only by cascade.
+    @Query(
+        "INSERT OR IGNORE INTO product_list_order (listId, productId, position, updatedAt) " +
+            "VALUES (:listId, :productId, " +
+            "COALESCE((SELECT MAX(position) FROM product_list_order WHERE listId = :listId), 0.0) + 1.0, " +
+            ":timestamp)"
+    )
+    suspend fun ensurePosition(listId: String, productId: String, timestamp: Long)
+
+    @Query(
+        "UPDATE product_list_order SET position = :position, updatedAt = :timestamp " +
+            "WHERE listId = :listId AND productId = :productId"
+    )
+    suspend fun setPosition(listId: String, productId: String, position: Double, timestamp: Long)
+
     @Transaction
     suspend fun addOrMerge(listId: String, productId: String, amount: Int, newId: String, timestamp: Long) {
+        ensurePosition(listId, productId, timestamp)
         val existing = findByProduct(listId, productId)
         when {
             existing == null -> insert(

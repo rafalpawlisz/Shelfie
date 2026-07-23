@@ -38,9 +38,10 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
         dao.observeItems(listId).map { rows ->
             val collator = nameCollator()
             rows.map(ShoppingListItemRow::toDomain).sortedWith { a, b ->
-                // Unchecked (to buy) first, then name — locale-aware.
-                val byChecked = a.isChecked.compareTo(b.isChecked)
-                if (byChecked != 0) byChecked else collator.compare(a.productName, b.productName)
+                // Manual order (persisted position); name as a stable, locale-aware
+                // tiebreak. Checked items stay in place — no pushing them to the bottom.
+                val byPosition = a.position.compareTo(b.position)
+                if (byPosition != 0) byPosition else collator.compare(a.productName, b.productName)
             }
         }
 
@@ -65,5 +66,9 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
 
     override suspend fun finishShopping(listId: String) {
         dao.checkout(listId, System.currentTimeMillis())
+    }
+
+    override suspend fun setItemPosition(listId: String, productId: String, position: Double) {
+        dao.setPosition(listId, productId, position, System.currentTimeMillis())
     }
 }

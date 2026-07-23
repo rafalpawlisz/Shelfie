@@ -306,8 +306,10 @@ class ShoppingListViewModelTest {
         assertEquals(1, viewModel.uiState.value.shoppingList.size)
     }
 
+    // --- Manual order (drag to reorder; persisted per list+product) ---
+
     @Test
-    fun `unchecked items sort before checked ones, alphabetical within groups`() = runTest {
+    fun `items keep insertion order and checking does not move them`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Apples", quantity = 0, unit = null)
         repository.addProduct(name = "Bread", quantity = 0, unit = null)
@@ -315,14 +317,127 @@ class ShoppingListViewModelTest {
         val viewModel = makeViewModel(repository)
         observe(viewModel)
         viewModel.createList("Lidl")
-        viewModel.uiState.value.products.forEach { viewModel.addToShoppingList(it.id, 1) }
+        fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
+        // Add in a non-alphabetical order to prove it's insertion order, not name.
+        listOf("Cheese", "Apples", "Bread").forEach { viewModel.addToShoppingList(pid(it), 1) }
+
+        // Checking a middle item must not reorder the list.
         val apples = viewModel.uiState.value.shoppingList.first { it.productName == "Apples" }
         viewModel.setShoppingItemChecked(apples.id, checked = true)
 
-        val names = viewModel.uiState.value.shoppingList.map { it.productName to it.isChecked }
         assertEquals(
-            listOf("Bread" to false, "Cheese" to false, "Apples" to true),
-            names,
+            listOf("Cheese" to false, "Apples" to true, "Bread" to false),
+            viewModel.uiState.value.shoppingList.map { it.productName to it.isChecked },
+        )
+    }
+
+    @Test
+    fun `moveShoppingItem reorders the list`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Apples", quantity = 0, unit = null)
+        repository.addProduct(name = "Bread", quantity = 0, unit = null)
+        repository.addProduct(name = "Cheese", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
+        listOf("Apples", "Bread", "Cheese").forEach { viewModel.addToShoppingList(pid(it), 1) }
+
+        // Drag Cheese (index 2) to the front.
+        viewModel.moveShoppingItem(fromIndex = 2, toIndex = 0)
+
+        assertEquals(
+            listOf("Cheese", "Apples", "Bread"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
+    @Test
+    fun `a removed and re-added product returns to its manual position`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Apples", quantity = 0, unit = null)
+        repository.addProduct(name = "Bread", quantity = 0, unit = null)
+        repository.addProduct(name = "Cheese", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
+        listOf("Apples", "Bread", "Cheese").forEach { viewModel.addToShoppingList(pid(it), 1) }
+        viewModel.moveShoppingItem(fromIndex = 2, toIndex = 0) // [Cheese, Apples, Bread]
+
+        val cheese = viewModel.uiState.value.shoppingList.first { it.productName == "Cheese" }
+        viewModel.removeShoppingItem(cheese.id)
+        assertEquals(
+            listOf("Apples", "Bread"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+
+        viewModel.addToShoppingList(pid("Cheese"), 1)
+
+        // Back at the front (its remembered slot), not appended at the end.
+        assertEquals(
+            listOf("Cheese", "Apples", "Bread"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
+    @Test
+    fun `finishShopping keeps positions so re-added items return to their slot`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Apples", quantity = 0, unit = null)
+        repository.addProduct(name = "Bread", quantity = 0, unit = null)
+        repository.addProduct(name = "Cheese", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
+        listOf("Apples", "Bread", "Cheese").forEach { viewModel.addToShoppingList(pid(it), 1) }
+        viewModel.moveShoppingItem(fromIndex = 2, toIndex = 0) // [Cheese, Apples, Bread]
+
+        val cheese = viewModel.uiState.value.shoppingList.first { it.productName == "Cheese" }
+        viewModel.setShoppingItemChecked(cheese.id, checked = true)
+        viewModel.finishShopping() // Cheese banked into stock and removed from the list.
+        assertEquals(
+            listOf("Apples", "Bread"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+
+        viewModel.addToShoppingList(pid("Cheese"), 1)
+
+        assertEquals(
+            listOf("Cheese", "Apples", "Bread"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
+    @Test
+    fun `reordering one list does not affect another`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = null)
+        repository.addProduct(name = "Bread", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.addToShoppingList(pid("Milk"), 1)
+        viewModel.addToShoppingList(pid("Bread"), 1)
+        viewModel.createList("Auchan") // becomes selected
+        viewModel.addToShoppingList(pid("Milk"), 1)
+        viewModel.addToShoppingList(pid("Bread"), 1)
+
+        // On Auchan, drag Bread (index 1) to the front.
+        viewModel.moveShoppingItem(fromIndex = 1, toIndex = 0)
+        assertEquals(
+            listOf("Bread", "Milk"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+
+        // Lidl keeps its own order.
+        viewModel.selectList(lidl)
+        assertEquals(
+            listOf("Milk", "Bread"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
         )
     }
 

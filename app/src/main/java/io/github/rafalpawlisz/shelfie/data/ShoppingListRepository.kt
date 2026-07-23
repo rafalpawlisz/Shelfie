@@ -18,4 +18,8 @@ interface ShoppingListRepository {
     suspend fun setChecked(id: String, checked: Boolean)
     suspend fun removeItem(id: String)
     suspend fun finishShopping(listId: String)
+
+    // Manual reorder: persist a product's sort position within the list. The
+    // position lives in its own table, so it survives the item being removed.
+    suspend fun setItemPosition(listId: String, productId: String, position: Double)
 }

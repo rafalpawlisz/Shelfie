@@ -8,4 +8,6 @@ data class ShoppingListItem(
     val productName: String,
     val productEmoji: String?,
     val productUnit: String?,
+    // Manual sort position within the list (persisted per list+product).
+    val position: Double,
 )

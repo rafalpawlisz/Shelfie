@@ -25,6 +25,12 @@ class FakeShoppingListRepository(
 
     private val lists = MutableStateFlow<List<ListEntry>>(emptyList())
     private val items = MutableStateFlow<List<Item>>(emptyList())
+
+    // Persistent manual order per (listId, productId). Mirrors product_list_order:
+    // it survives removeItem/finishShopping and is cleared only when the list is
+    // deleted, so re-adding a product restores its slot.
+    private val positions = MutableStateFlow<Map<Pair<String, String>, Double>>(emptyMap())
+
     private var nextListId = 1
     private var nextId = 1
 
@@ -46,12 +52,13 @@ class FakeShoppingListRepository(
 
     override suspend fun deleteList(id: String) {
         lists.update { list -> list.filterNot { it.id == id } }
-        // Mirror the FK CASCADE: dropping a list drops its items.
+        // Mirror the FK CASCADE: dropping a list drops its items and order rows.
         items.update { list -> list.filterNot { it.listId == id } }
+        positions.update { map -> map.filterKeys { it.first != id } }
     }
 
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
-        combine(items, products.observeProducts()) { list, active ->
+        combine(items, products.observeProducts(), positions) { list, active, pos ->
             list.filter { it.listId == listId }.mapNotNull { item ->
                 val product = active.firstOrNull { it.id == item.productId }
                     ?: return@mapNotNull null
@@ -63,11 +70,13 @@ class FakeShoppingListRepository(
                     productName = product.name,
                     productEmoji = product.emoji,
                     productUnit = product.unit,
+                    position = pos[listId to item.productId] ?: 0.0,
                 )
-            }.sortedWith(compareBy({ it.isChecked }, { it.productName.lowercase() }))
+            }.sortedWith(compareBy({ it.position }, { it.productName.lowercase() }))
         }
 
     override suspend fun addItem(listId: String, productId: String, amount: Int) {
+        ensurePosition(listId, productId)
         val existing = items.value.firstOrNull { it.listId == listId && it.productId == productId }
         when {
             existing == null -> items.update {
@@ -104,12 +113,26 @@ class FakeShoppingListRepository(
     }
 
     override suspend fun removeItem(id: String) {
+        // The order row persists (mirrors the real DB), so re-adding restores the slot.
         items.update { list -> list.filterNot { it.id == id } }
     }
 
     override suspend fun finishShopping(listId: String) {
         items.value.filter { it.listId == listId && it.checked }
             .forEach { products.adjustQuantity(it.productId, it.amount) }
+        // Checked items are removed but their order rows persist.
         items.update { list -> list.filterNot { it.listId == listId && it.checked } }
+    }
+
+    override suspend fun setItemPosition(listId: String, productId: String, position: Double) {
+        positions.update { it + ((listId to productId) to position) }
+    }
+
+    // Append at the end the first time a product joins a list; keep an existing slot.
+    private fun ensurePosition(listId: String, productId: String) {
+        val key = listId to productId
+        if (positions.value.containsKey(key)) return
+        val max = positions.value.filterKeys { it.first == listId }.values.maxOrNull() ?: 0.0
+        positions.update { it + (key to max + 1.0) }
     }
 }

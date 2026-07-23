@@ -196,6 +196,31 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.finishShopping(listId) }
     }
 
+    /**
+     * Persist a manual reorder: move the item at [fromIndex] to [toIndex] within
+     * the current sorted shopping list. Only the moved item's position changes —
+     * it's set to the midpoint between its new neighbours (fractional indexing),
+     * so absent products keep their remembered slots.
+     */
+    fun moveShoppingItem(fromIndex: Int, toIndex: Int) {
+        val listId = selectedListId.value ?: return
+        val items = uiState.value.shoppingList
+        if (fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) return
+        val moved = items[fromIndex]
+        val without = items.toMutableList().apply { removeAt(fromIndex) }
+        val prev = without.getOrNull(toIndex - 1)?.position
+        val next = without.getOrNull(toIndex)?.position
+        val newPosition = when {
+            prev == null && next == null -> moved.position
+            prev == null -> next!! - 1.0
+            next == null -> prev + 1.0
+            else -> (prev + next) / 2.0
+        }
+        viewModelScope.launch {
+            shoppingListRepository.setItemPosition(listId, moved.productId, newPosition)
+        }
+    }
+
     fun archive(id: String) {
         viewModelScope.launch { repository.archiveProduct(id) }
     }
