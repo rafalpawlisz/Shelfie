@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.rafalpawlisz.shelfie.ShelfieApplication
+import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.ProductRepository
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.model.Product
@@ -20,12 +21,14 @@ data class PantryUiState(
     val products: List<Product> = emptyList(),
     val archivedProducts: List<Product> = emptyList(),
     val shoppingList: List<ShoppingListItem> = emptyList(),
+    val barcodesByProduct: Map<String, List<String>> = emptyMap(),
     val isLoading: Boolean = true,
 )
 
 class PantryViewModel(
     private val repository: ProductRepository,
     private val shoppingListRepository: ShoppingListRepository,
+    private val barcodeRepository: BarcodeRepository,
 ) : ViewModel() {
 
     val uiState: StateFlow<PantryUiState> =
@@ -33,11 +36,13 @@ class PantryViewModel(
             repository.observeProducts(),
             repository.observeArchivedProducts(),
             shoppingListRepository.observeItems(),
-        ) { active, archived, shopping ->
+            barcodeRepository.observeBarcodes(),
+        ) { active, archived, shopping, barcodes ->
             PantryUiState(
                 products = active,
                 archivedProducts = archived,
                 shoppingList = shopping,
+                barcodesByProduct = barcodes.groupBy({ it.productId }, { it.barcode }),
                 isLoading = false,
             )
         }.stateIn(
@@ -93,6 +98,14 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.finishShopping() }
     }
 
+    fun addBarcode(productId: String, barcode: String) {
+        viewModelScope.launch { barcodeRepository.addBarcode(productId, barcode) }
+    }
+
+    fun removeBarcode(barcode: String) {
+        viewModelScope.launch { barcodeRepository.removeBarcode(barcode) }
+    }
+
     fun archive(id: String) {
         viewModelScope.launch { repository.archiveProduct(id) }
     }
@@ -109,6 +122,7 @@ class PantryViewModel(
                 PantryViewModel(
                     app.container.productRepository,
                     app.container.shoppingListRepository,
+                    app.container.barcodeRepository,
                 )
             }
         }

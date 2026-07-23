@@ -19,7 +19,7 @@ class PantryViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private fun makeViewModel(repository: FakeProductRepository) =
-        PantryViewModel(repository, FakeShoppingListRepository(repository))
+        PantryViewModel(repository, FakeShoppingListRepository(repository), FakeBarcodeRepository())
 
     @Test
     fun `uiState maps repository products and clears loading`() = runTest {

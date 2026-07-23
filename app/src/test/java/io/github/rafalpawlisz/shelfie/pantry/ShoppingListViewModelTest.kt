@@ -19,7 +19,7 @@ class ShoppingListViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private fun makeViewModel(repository: FakeProductRepository) =
-        PantryViewModel(repository, FakeShoppingListRepository(repository))
+        PantryViewModel(repository, FakeShoppingListRepository(repository), FakeBarcodeRepository())
 
     @Test
     fun `addToShoppingList creates an unchecked item with product data`() = runTest {
