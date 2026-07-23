@@ -34,12 +34,27 @@ class PantryViewModel(private val repository: ProductRepository) : ViewModel() {
             initialValue = PantryUiState(isLoading = true),
         )
 
-    fun addProduct(name: String, quantity: Int, unit: String?) {
-        viewModelScope.launch { repository.addProduct(name, quantity, unit) }
+    fun addProduct(
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int? = null,
+        notes: String? = null,
+    ) {
+        viewModelScope.launch { repository.addProduct(name, quantity, unit, minQuantity, notes) }
     }
 
-    fun updateProduct(id: String, name: String, quantity: Int, unit: String?) {
-        viewModelScope.launch { repository.updateProduct(id, name, quantity, unit) }
+    fun updateProduct(
+        id: String,
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int? = null,
+        notes: String? = null,
+    ) {
+        viewModelScope.launch {
+            repository.updateProduct(id, name, quantity, unit, minQuantity, notes)
+        }
     }
 
     fun increment(id: String) {

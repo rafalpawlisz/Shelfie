@@ -1,5 +1,6 @@
 package io.github.rafalpawlisz.shelfie.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import io.github.rafalpawlisz.shelfie.model.Product
@@ -14,6 +15,11 @@ data class ProductEntity(
     val updatedAt: Long,
     // Soft delete: null = active. Kept as a tombstone for future sync.
     val archivedAt: Long? = null,
+    // defaultValue matches the DEFAULT used by MIGRATION_2_3's ALTER TABLE.
+    @ColumnInfo(defaultValue = "0") val createdAt: Long,
+    // Restock threshold; null = feature off for this product.
+    val minQuantity: Int? = null,
+    val notes: String? = null,
 )
 
 fun ProductEntity.toDomain(): Product = Product(
@@ -21,4 +27,6 @@ fun ProductEntity.toDomain(): Product = Product(
     name = name,
     quantity = quantity,
     unit = unit,
+    minQuantity = minQuantity,
+    notes = notes,
 )

@@ -14,6 +14,8 @@
     <string name="product_name_label">Name</string>
     <string name="product_quantity_label">Quantity</string>
     <string name="product_unit_label">Unit (optional)</string>
+    <string name="product_min_quantity_label">Minimum quantity (optional)</string>
+    <string name="product_notes_label">Notes (optional)</string>
     <string name="action_add">Add</string>
     <string name="action_save">Save</string>
     <string name="action_archive">Archive</string>

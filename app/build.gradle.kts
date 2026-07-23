@@ -43,6 +43,11 @@ android {
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
+    // Aligns transitive kotlinx-serialization (1.7.3 via savedstate) with what
+    // room-testing 2.8.4 was compiled against; older cores lack an internal
+    // method room's serializers need (AbstractMethodError in migration tests).
+    implementation(platform(libs.kotlinx.serialization.bom))
+    androidTestImplementation(platform(libs.kotlinx.serialization.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
@@ -61,6 +66,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

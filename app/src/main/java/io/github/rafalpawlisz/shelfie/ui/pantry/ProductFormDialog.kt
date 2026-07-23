@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -34,11 +36,13 @@ import io.github.rafalpawlisz.shelfie.R
 fun ProductFormDialog(
     title: String,
     confirmLabel: String,
-    onConfirm: (name: String, quantity: Int, unit: String?) -> Unit,
+    onConfirm: (name: String, quantity: Int, unit: String?, minQuantity: Int?, notes: String?) -> Unit,
     onDismiss: () -> Unit,
     initialName: String = "",
     initialQuantity: Int = 0,
     initialUnit: String? = null,
+    initialMinQuantity: Int? = null,
+    initialNotes: String? = null,
     stateKey: Any? = null,
     onArchive: (() -> Unit)? = null,
     onRestore: (() -> Unit)? = null,
@@ -46,14 +50,20 @@ fun ProductFormDialog(
     var name by rememberSaveable(stateKey) { mutableStateOf(initialName) }
     var quantityText by rememberSaveable(stateKey) { mutableStateOf(initialQuantity.toString()) }
     var unit by rememberSaveable(stateKey) { mutableStateOf(initialUnit.orEmpty()) }
+    var minQuantityText by rememberSaveable(stateKey) {
+        mutableStateOf(initialMinQuantity?.toString().orEmpty())
+    }
+    var notes by rememberSaveable(stateKey) { mutableStateOf(initialNotes.orEmpty()) }
 
     val quantity = quantityText.toIntOrNull()
-    val isValid = name.isNotBlank() && quantity != null && quantity >= 0
+    val minQuantity = minQuantityText.trim().ifBlank { null }?.toIntOrNull()
+    val minQuantityValid = minQuantityText.isBlank() || (minQuantity != null && minQuantity >= 0)
+    val isValid = name.isNotBlank() && quantity != null && quantity >= 0 && minQuantityValid
 
     Dialog(onDismissRequest = onDismiss) {
         Card {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
@@ -83,6 +93,21 @@ fun ProductFormDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = minQuantityText,
+                    onValueChange = { minQuantityText = it },
+                    label = { Text(stringResource(R.string.product_min_quantity_label)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text(stringResource(R.string.product_notes_label)) },
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     if (onArchive != null) {
                         TextButton(
@@ -106,7 +131,13 @@ fun ProductFormDialog(
                     TextButton(
                         enabled = isValid,
                         onClick = {
-                            onConfirm(name.trim(), quantity ?: 0, unit.trim().ifBlank { null })
+                            onConfirm(
+                                name.trim(),
+                                quantity ?: 0,
+                                unit.trim().ifBlank { null },
+                                minQuantity,
+                                notes.trim().ifBlank { null },
+                            )
                         },
                     ) {
                         Text(confirmLabel)

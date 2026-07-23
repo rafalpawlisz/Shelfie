@@ -20,17 +20,45 @@ class FakeProductRepository : ProductRepository {
     override fun observeArchivedProducts(): Flow<List<Product>> =
         entries.map { list -> list.filter { it.archived }.map { it.product } }
 
-    override suspend fun addProduct(name: String, quantity: Int, unit: String?) {
+    override suspend fun addProduct(
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int?,
+        notes: String?,
+    ) {
         entries.update {
             it + Entry(
-                product = Product(id = "id-${nextId++}", name = name, quantity = quantity, unit = unit),
+                product = Product(
+                    id = "id-${nextId++}",
+                    name = name,
+                    quantity = quantity,
+                    unit = unit,
+                    minQuantity = minQuantity,
+                    notes = notes,
+                ),
                 archived = false,
             )
         }
     }
 
-    override suspend fun updateProduct(id: String, name: String, quantity: Int, unit: String?) {
-        mapProduct(id) { it.copy(name = name.trim(), quantity = quantity, unit = unit) }
+    override suspend fun updateProduct(
+        id: String,
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int?,
+        notes: String?,
+    ) {
+        mapProduct(id) {
+            it.copy(
+                name = name.trim(),
+                quantity = quantity,
+                unit = unit,
+                minQuantity = minQuantity,
+                notes = notes,
+            )
+        }
     }
 
     override suspend fun adjustQuantity(id: String, delta: Int) {

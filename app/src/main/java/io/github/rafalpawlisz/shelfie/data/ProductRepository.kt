@@ -9,9 +9,22 @@ interface ProductRepository {
 
     fun observeArchivedProducts(): Flow<List<Product>>
 
-    suspend fun addProduct(name: String, quantity: Int, unit: String?)
+    suspend fun addProduct(
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int? = null,
+        notes: String? = null,
+    )
 
-    suspend fun updateProduct(id: String, name: String, quantity: Int, unit: String?)
+    suspend fun updateProduct(
+        id: String,
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int? = null,
+        notes: String? = null,
+    )
 
     suspend fun adjustQuantity(id: String, delta: Int)
 

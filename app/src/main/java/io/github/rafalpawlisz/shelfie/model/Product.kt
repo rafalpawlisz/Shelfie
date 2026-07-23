@@ -5,4 +5,6 @@ data class Product(
     val name: String,
     val quantity: Int,
     val unit: String?,
+    val minQuantity: Int?,
+    val notes: String?,
 )

@@ -27,9 +27,17 @@ interface ProductDao {
 
     @Query(
         "UPDATE products SET name = :name, quantity = :quantity, unit = :unit, " +
-            "updatedAt = :updatedAt WHERE id = :id"
+            "minQuantity = :minQuantity, notes = :notes, updatedAt = :updatedAt WHERE id = :id"
     )
-    suspend fun update(id: String, name: String, quantity: Int, unit: String?, updatedAt: Long)
+    suspend fun update(
+        id: String,
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int?,
+        notes: String?,
+        updatedAt: Long,
+    )
 
     @Query("UPDATE products SET archivedAt = :timestamp, updatedAt = :timestamp WHERE id = :id")
     suspend fun archive(id: String, timestamp: Long)

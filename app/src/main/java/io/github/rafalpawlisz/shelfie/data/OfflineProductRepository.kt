@@ -16,24 +16,43 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
     override fun observeArchivedProducts(): Flow<List<Product>> =
         dao.observeArchived().map { entities -> entities.map(ProductEntity::toDomain) }
 
-    override suspend fun addProduct(name: String, quantity: Int, unit: String?) {
+    override suspend fun addProduct(
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int?,
+        notes: String?,
+    ) {
+        val now = System.currentTimeMillis()
         dao.upsert(
             ProductEntity(
                 id = UUID.randomUUID().toString(),
                 name = name.trim(),
                 quantity = quantity,
                 unit = unit,
-                updatedAt = System.currentTimeMillis(),
+                updatedAt = now,
+                createdAt = now,
+                minQuantity = minQuantity,
+                notes = notes,
             )
         )
     }
 
-    override suspend fun updateProduct(id: String, name: String, quantity: Int, unit: String?) {
+    override suspend fun updateProduct(
+        id: String,
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int?,
+        notes: String?,
+    ) {
         dao.update(
             id = id,
             name = name.trim(),
             quantity = quantity,
             unit = unit,
+            minQuantity = minQuantity,
+            notes = notes,
             updatedAt = System.currentTimeMillis(),
         )
     }
