@@ -9,13 +9,16 @@
     <string name="shopping_hint">Tap a product to add one</string>
     <string name="use_up_hint">Tap a product to remove one</string>
     <string name="add_product">Add product</string>
+    <string name="edit_product">Edit product</string>
+    <string name="products_hint">Tap a product to edit it</string>
     <string name="product_name_label">Name</string>
     <string name="product_quantity_label">Quantity</string>
     <string name="product_unit_label">Unit (optional)</string>
     <string name="action_add">Add</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
     <string name="action_cancel">Cancel</string>
     <string name="cd_increase_quantity">Increase quantity of %1$s</string>
     <string name="cd_decrease_quantity">Decrease quantity of %1$s</string>
-    <string name="cd_delete_product">Delete %1$s</string>
     <string name="quantity_with_unit">%1$d %2$s</string>
 </resources>

@@ -27,8 +27,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rafalpawlisz.shelfie.R
-import io.github.rafalpawlisz.shelfie.ui.pantry.AddProductDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
+import io.github.rafalpawlisz.shelfie.ui.pantry.ProductFormDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.ProductsScreen
 import io.github.rafalpawlisz.shelfie.ui.pantry.ShoppingScreen
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScreen
@@ -45,6 +45,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var currentTab by rememberSaveable { mutableStateOf(ShelfieTab.PRODUCTS) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    var editedProductId by rememberSaveable { mutableStateOf<String?>(null) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -77,7 +78,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                 when (currentTab) {
                     ShelfieTab.PRODUCTS -> ProductsScreen(
                         products = state.products,
-                        onDelete = viewModel::delete,
+                        onProductClick = { editedProductId = it },
                     )
                     ShelfieTab.SHOPPING -> ShoppingScreen(
                         products = state.products,
@@ -93,12 +94,35 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     }
 
     if (showAddDialog) {
-        AddProductDialog(
+        ProductFormDialog(
+            title = stringResource(R.string.add_product),
+            confirmLabel = stringResource(R.string.action_add),
             onConfirm = { name, quantity, unit ->
                 viewModel.addProduct(name, quantity, unit)
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },
+        )
+    }
+
+    val editedProduct = state.products.firstOrNull { it.id == editedProductId }
+    if (editedProduct != null) {
+        ProductFormDialog(
+            title = stringResource(R.string.edit_product),
+            confirmLabel = stringResource(R.string.action_save),
+            initialName = editedProduct.name,
+            initialQuantity = editedProduct.quantity,
+            initialUnit = editedProduct.unit,
+            stateKey = editedProduct.id,
+            onConfirm = { name, quantity, unit ->
+                viewModel.updateProduct(editedProduct.id, name, quantity, unit)
+                editedProductId = null
+            },
+            onDismiss = { editedProductId = null },
+            onDelete = {
+                viewModel.delete(editedProduct.id)
+                editedProductId = null
+            },
         )
     }
 }
