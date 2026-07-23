@@ -171,6 +171,9 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
             } else {
                 null
             },
+            barcodes = state.barcodesByProduct[editedProduct.id].orEmpty(),
+            onAddBarcode = { viewModel.addBarcode(editedProduct.id, it) },
+            onRemoveBarcode = viewModel::removeBarcode,
         )
     }
 }

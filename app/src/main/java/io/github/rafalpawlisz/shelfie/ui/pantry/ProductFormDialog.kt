@@ -9,9 +9,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -20,12 +25,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.ui.scanBarcode
 
 /**
  * Shared add/edit product form. [onArchive] renders a destructive Archive
@@ -54,6 +62,10 @@ fun ProductFormDialog(
     stateKey: Any? = null,
     onArchive: (() -> Unit)? = null,
     onRestore: (() -> Unit)? = null,
+    // Non-null only in edit mode (an existing product owns the codes).
+    barcodes: List<String>? = null,
+    onAddBarcode: ((String) -> Unit)? = null,
+    onRemoveBarcode: ((String) -> Unit)? = null,
 ) {
     var name by rememberSaveable(stateKey) { mutableStateOf(initialName) }
     var quantityText by rememberSaveable(stateKey) { mutableStateOf(initialQuantity.toString()) }
@@ -124,6 +136,42 @@ fun ProductFormDialog(
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (barcodes != null && onAddBarcode != null) {
+                    val context = LocalContext.current
+                    Text(
+                        text = stringResource(R.string.product_barcodes_label),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    barcodes.forEach { code ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = code,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (onRemoveBarcode != null) {
+                                IconButton(onClick = { onRemoveBarcode(code) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription =
+                                            stringResource(R.string.cd_remove_barcode, code),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { scanBarcode(context) { onAddBarcode(it) } },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.scan_barcode))
+                    }
+                }
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     if (onArchive != null) {
                         TextButton(
