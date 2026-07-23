@@ -8,10 +8,12 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ProductDao {
 
-    @Query("SELECT * FROM products WHERE archivedAt IS NULL ORDER BY name COLLATE NOCASE ASC")
+    // Ordering is done in the repository with a locale-aware Collator
+    // (SQLite COLLATE NOCASE is ASCII-only and misplaces Polish letters).
+    @Query("SELECT * FROM products WHERE archivedAt IS NULL")
     fun observeActive(): Flow<List<ProductEntity>>
 
-    @Query("SELECT * FROM products WHERE archivedAt IS NOT NULL ORDER BY name COLLATE NOCASE ASC")
+    @Query("SELECT * FROM products WHERE archivedAt IS NOT NULL")
     fun observeArchived(): Flow<List<ProductEntity>>
 
     @Upsert

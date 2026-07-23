@@ -11,10 +11,15 @@ import kotlinx.coroutines.flow.map
 class OfflineProductRepository(private val dao: ProductDao) : ProductRepository {
 
     override fun observeProducts(): Flow<List<Product>> =
-        dao.observeActive().map { entities -> entities.map(ProductEntity::toDomain) }
+        dao.observeActive().map { entities -> entities.map(ProductEntity::toDomain).sortedByName() }
 
     override fun observeArchivedProducts(): Flow<List<Product>> =
-        dao.observeArchived().map { entities -> entities.map(ProductEntity::toDomain) }
+        dao.observeArchived().map { entities -> entities.map(ProductEntity::toDomain).sortedByName() }
+
+    private fun List<Product>.sortedByName(): List<Product> {
+        val collator = nameCollator()
+        return sortedWith { a, b -> collator.compare(a.name, b.name) }
+    }
 
     override suspend fun addProduct(
         name: String,

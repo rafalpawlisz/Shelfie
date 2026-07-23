@@ -15,9 +15,10 @@ interface ShoppingListDao {
             "p.unit AS productUnit " +
             "FROM shopping_list_items i " +
             "JOIN products p ON p.id = i.productId " +
-            "WHERE p.archivedAt IS NULL " +
-            "ORDER BY (i.checkedAt IS NOT NULL) ASC, p.name COLLATE NOCASE ASC"
+            "WHERE p.archivedAt IS NULL"
     )
+    // Ordering (unchecked first, then by name) is applied in the repository
+    // with a locale-aware Collator.
     fun observeItems(): Flow<List<ShoppingListItemRow>>
 
     @Query("SELECT * FROM shopping_list_items WHERE productId = :productId LIMIT 1")

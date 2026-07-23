@@ -11,7 +11,14 @@ import kotlinx.coroutines.flow.map
 class OfflineShoppingListRepository(private val dao: ShoppingListDao) : ShoppingListRepository {
 
     override fun observeItems(): Flow<List<ShoppingListItem>> =
-        dao.observeItems().map { rows -> rows.map(ShoppingListItemRow::toDomain) }
+        dao.observeItems().map { rows ->
+            val collator = nameCollator()
+            rows.map(ShoppingListItemRow::toDomain).sortedWith { a, b ->
+                // Unchecked (to buy) first, then name — locale-aware.
+                val byChecked = a.isChecked.compareTo(b.isChecked)
+                if (byChecked != 0) byChecked else collator.compare(a.productName, b.productName)
+            }
+        }
 
     override suspend fun addItem(productId: String, amount: Int) {
         dao.addOrMerge(
