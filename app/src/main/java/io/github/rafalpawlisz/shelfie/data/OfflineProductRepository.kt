@@ -11,7 +11,10 @@ import kotlinx.coroutines.flow.map
 class OfflineProductRepository(private val dao: ProductDao) : ProductRepository {
 
     override fun observeProducts(): Flow<List<Product>> =
-        dao.observeAll().map { entities -> entities.map(ProductEntity::toDomain) }
+        dao.observeActive().map { entities -> entities.map(ProductEntity::toDomain) }
+
+    override fun observeArchivedProducts(): Flow<List<Product>> =
+        dao.observeArchived().map { entities -> entities.map(ProductEntity::toDomain) }
 
     override suspend fun addProduct(name: String, quantity: Int, unit: String?) {
         dao.upsert(
@@ -39,7 +42,11 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
         dao.adjustQuantity(id = id, delta = delta, updatedAt = System.currentTimeMillis())
     }
 
-    override suspend fun deleteProduct(id: String) {
-        dao.deleteById(id)
+    override suspend fun archiveProduct(id: String) {
+        dao.archive(id = id, timestamp = System.currentTimeMillis())
+    }
+
+    override suspend fun restoreProduct(id: String) {
+        dao.restore(id = id, timestamp = System.currentTimeMillis())
     }
 }

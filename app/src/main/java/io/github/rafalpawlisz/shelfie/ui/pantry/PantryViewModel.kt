@@ -10,20 +10,25 @@ import io.github.rafalpawlisz.shelfie.data.ProductRepository
 import io.github.rafalpawlisz.shelfie.model.Product
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class PantryUiState(
     val products: List<Product> = emptyList(),
+    val archivedProducts: List<Product> = emptyList(),
     val isLoading: Boolean = true,
 )
 
 class PantryViewModel(private val repository: ProductRepository) : ViewModel() {
 
-    val uiState: StateFlow<PantryUiState> = repository.observeProducts()
-        .map { products -> PantryUiState(products = products, isLoading = false) }
-        .stateIn(
+    val uiState: StateFlow<PantryUiState> =
+        combine(
+            repository.observeProducts(),
+            repository.observeArchivedProducts(),
+        ) { active, archived ->
+            PantryUiState(products = active, archivedProducts = archived, isLoading = false)
+        }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = PantryUiState(isLoading = true),
@@ -45,8 +50,12 @@ class PantryViewModel(private val repository: ProductRepository) : ViewModel() {
         viewModelScope.launch { repository.adjustQuantity(id, delta = -1) }
     }
 
-    fun delete(id: String) {
-        viewModelScope.launch { repository.deleteProduct(id) }
+    fun archive(id: String) {
+        viewModelScope.launch { repository.archiveProduct(id) }
+    }
+
+    fun restore(id: String) {
+        viewModelScope.launch { repository.restoreProduct(id) }
     }
 
     companion object {

@@ -78,6 +78,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                 when (currentTab) {
                     ShelfieTab.PRODUCTS -> ProductsScreen(
                         products = state.products,
+                        archivedProducts = state.archivedProducts,
                         onProductClick = { editedProductId = it },
                     )
                     ShelfieTab.SHOPPING -> ShoppingScreen(
@@ -105,7 +106,14 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
         )
     }
 
-    val editedProduct = state.products.firstOrNull { it.id == editedProductId }
+    val editedActive = state.products.firstOrNull { it.id == editedProductId }
+    val editedArchived =
+        if (editedActive == null) {
+            state.archivedProducts.firstOrNull { it.id == editedProductId }
+        } else {
+            null
+        }
+    val editedProduct = editedActive ?: editedArchived
     if (editedProduct != null) {
         ProductFormDialog(
             title = stringResource(R.string.edit_product),
@@ -119,9 +127,21 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                 editedProductId = null
             },
             onDismiss = { editedProductId = null },
-            onDelete = {
-                viewModel.delete(editedProduct.id)
-                editedProductId = null
+            onArchive = if (editedActive != null) {
+                {
+                    viewModel.archive(editedProduct.id)
+                    editedProductId = null
+                }
+            } else {
+                null
+            },
+            onRestore = if (editedArchived != null) {
+                {
+                    viewModel.restore(editedProduct.id)
+                    editedProductId = null
+                }
+            } else {
+                null
             },
         )
     }

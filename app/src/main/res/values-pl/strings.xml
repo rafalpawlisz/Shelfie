@@ -15,8 +15,10 @@
     <string name="product_unit_label">Jednostka (opcjonalnie)</string>
     <string name="action_add">Dodaj</string>
     <string name="action_save">Zapisz</string>
-    <string name="action_delete">Usuń</string>
+    <string name="action_archive">Archiwizuj</string>
+    <string name="action_restore">Przywróć</string>
     <string name="action_cancel">Anuluj</string>
+    <string name="archived_section">Zarchiwizowane (%1$d)</string>
     <string name="cd_increase_quantity">Zwiększ ilość produktu %1$s</string>
     <string name="cd_decrease_quantity">Zmniejsz ilość produktu %1$s</string>
 </resources>

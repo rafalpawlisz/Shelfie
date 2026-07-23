@@ -12,7 +12,11 @@ class AppContainer(context: Context) {
         context = context.applicationContext,
         klass = ShelfieDatabase::class.java,
         name = "shelfie.db",
-    ).build()
+    )
+        // Pre-release: wipe on schema change instead of writing migrations.
+        // Replace with real Migration objects once user data matters.
+        .fallbackToDestructiveMigration(dropAllTables = true)
+        .build()
 
     val productRepository: ProductRepository by lazy {
         OfflineProductRepository(database.productDao())

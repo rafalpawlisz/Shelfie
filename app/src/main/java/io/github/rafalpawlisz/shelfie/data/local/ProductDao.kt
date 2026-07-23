@@ -8,8 +8,11 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ProductDao {
 
-    @Query("SELECT * FROM products ORDER BY name COLLATE NOCASE ASC")
-    fun observeAll(): Flow<List<ProductEntity>>
+    @Query("SELECT * FROM products WHERE archivedAt IS NULL ORDER BY name COLLATE NOCASE ASC")
+    fun observeActive(): Flow<List<ProductEntity>>
+
+    @Query("SELECT * FROM products WHERE archivedAt IS NOT NULL ORDER BY name COLLATE NOCASE ASC")
+    fun observeArchived(): Flow<List<ProductEntity>>
 
     @Upsert
     suspend fun upsert(product: ProductEntity)
@@ -28,6 +31,9 @@ interface ProductDao {
     )
     suspend fun update(id: String, name: String, quantity: Int, unit: String?, updatedAt: Long)
 
-    @Query("DELETE FROM products WHERE id = :id")
-    suspend fun deleteById(id: String)
+    @Query("UPDATE products SET archivedAt = :timestamp, updatedAt = :timestamp WHERE id = :id")
+    suspend fun archive(id: String, timestamp: Long)
+
+    @Query("UPDATE products SET archivedAt = NULL, updatedAt = :timestamp WHERE id = :id")
+    suspend fun restore(id: String, timestamp: Long)
 }

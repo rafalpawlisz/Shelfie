@@ -82,15 +82,32 @@ class PantryViewModelTest {
     }
 
     @Test
-    fun `delete removes the product`() = runTest {
+    fun `archive moves the product to the archived list`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Flour", quantity = 1, unit = "kg")
         val viewModel = PantryViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         val id = viewModel.uiState.value.products.single().id
 
-        viewModel.delete(id)
+        viewModel.archive(id)
 
         assertTrue(viewModel.uiState.value.products.isEmpty())
+        assertEquals("Flour", viewModel.uiState.value.archivedProducts.single().name)
+    }
+
+    @Test
+    fun `restore moves the product back to the active list`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Rice", quantity = 2, unit = "kg")
+        val viewModel = PantryViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.archive(id)
+        assertTrue(viewModel.uiState.value.products.isEmpty())
+
+        viewModel.restore(id)
+
+        assertTrue(viewModel.uiState.value.archivedProducts.isEmpty())
+        assertEquals("Rice", viewModel.uiState.value.products.single().name)
     }
 }

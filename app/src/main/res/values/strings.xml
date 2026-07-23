@@ -16,8 +16,10 @@
     <string name="product_unit_label">Unit (optional)</string>
     <string name="action_add">Add</string>
     <string name="action_save">Save</string>
-    <string name="action_delete">Delete</string>
+    <string name="action_archive">Archive</string>
+    <string name="action_restore">Restore</string>
     <string name="action_cancel">Cancel</string>
+    <string name="archived_section">Archived (%1$d)</string>
     <string name="cd_increase_quantity">Increase quantity of %1$s</string>
     <string name="cd_decrease_quantity">Decrease quantity of %1$s</string>
     <string name="quantity_with_unit">%1$d %2$s</string>

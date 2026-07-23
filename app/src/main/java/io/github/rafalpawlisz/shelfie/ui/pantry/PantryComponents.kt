@@ -45,9 +45,12 @@ internal fun ProductListItem(
     product: Product,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    dimmed: Boolean = false,
     onClick: (() -> Unit)? = null,
     trailingContent: @Composable () -> Unit = {},
 ) {
+    val textColor =
+        if (dimmed) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
     val content: @Composable () -> Unit = {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -57,12 +60,14 @@ internal fun ProductListItem(
                 Text(
                     text = product.name,
                     style = MaterialTheme.typography.titleMedium,
+                    color = textColor,
                 )
                 Text(
                     text = product.unit
                         ?.let { stringResource(R.string.quantity_with_unit, product.quantity, it) }
                         ?: product.quantity.toString(),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = textColor,
                 )
             }
             trailingContent()

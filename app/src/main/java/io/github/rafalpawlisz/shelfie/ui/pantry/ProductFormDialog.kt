@@ -26,9 +26,9 @@ import androidx.compose.ui.window.Dialog
 import io.github.rafalpawlisz.shelfie.R
 
 /**
- * Shared add/edit product form. [onDelete] non-null renders a destructive
- * Delete action (edit mode); [stateKey] resets the fields when the edited
- * product changes.
+ * Shared add/edit product form. [onArchive] renders a destructive Archive
+ * action (active products), [onRestore] a Restore action (archived ones);
+ * [stateKey] resets the fields when the edited product changes.
  */
 @Composable
 fun ProductFormDialog(
@@ -40,7 +40,8 @@ fun ProductFormDialog(
     initialQuantity: Int = 0,
     initialUnit: String? = null,
     stateKey: Any? = null,
-    onDelete: (() -> Unit)? = null,
+    onArchive: (() -> Unit)? = null,
+    onRestore: (() -> Unit)? = null,
 ) {
     var name by rememberSaveable(stateKey) { mutableStateOf(initialName) }
     var quantityText by rememberSaveable(stateKey) { mutableStateOf(initialQuantity.toString()) }
@@ -83,14 +84,19 @@ fun ProductFormDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    if (onDelete != null) {
+                    if (onArchive != null) {
                         TextButton(
-                            onClick = onDelete,
+                            onClick = onArchive,
                             colors = ButtonDefaults.textButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error,
                             ),
                         ) {
-                            Text(stringResource(R.string.action_delete))
+                            Text(stringResource(R.string.action_archive))
+                        }
+                    }
+                    if (onRestore != null) {
+                        TextButton(onClick = onRestore) {
+                            Text(stringResource(R.string.action_restore))
                         }
                     }
                     Spacer(modifier = Modifier.weight(1f))
