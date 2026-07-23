@@ -2,6 +2,8 @@ package io.github.rafalpawlisz.shelfie.di
 
 import android.content.Context
 import androidx.room.Room
+import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
+import io.github.rafalpawlisz.shelfie.data.OfflineBarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.OfflineProductRepository
 import io.github.rafalpawlisz.shelfie.data.OfflineShoppingListRepository
 import io.github.rafalpawlisz.shelfie.data.ProductRepository
@@ -27,5 +29,9 @@ class AppContainer(context: Context) {
 
     val shoppingListRepository: ShoppingListRepository by lazy {
         OfflineShoppingListRepository(database.shoppingListDao())
+    }
+
+    val barcodeRepository: BarcodeRepository by lazy {
+        OfflineBarcodeRepository(database.productBarcodeDao())
     }
 }
