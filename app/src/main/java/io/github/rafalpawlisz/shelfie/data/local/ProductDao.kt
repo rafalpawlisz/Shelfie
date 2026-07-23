@@ -22,6 +22,12 @@ interface ProductDao {
     )
     suspend fun adjustQuantity(id: String, delta: Int, updatedAt: Long)
 
+    @Query(
+        "UPDATE products SET name = :name, quantity = :quantity, unit = :unit, " +
+            "updatedAt = :updatedAt WHERE id = :id"
+    )
+    suspend fun update(id: String, name: String, quantity: Int, unit: String?, updatedAt: Long)
+
     @Query("DELETE FROM products WHERE id = :id")
     suspend fun deleteById(id: String)
 }

@@ -25,6 +25,16 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
         )
     }
 
+    override suspend fun updateProduct(id: String, name: String, quantity: Int, unit: String?) {
+        dao.update(
+            id = id,
+            name = name.trim(),
+            quantity = quantity,
+            unit = unit,
+            updatedAt = System.currentTimeMillis(),
+        )
+    }
+
     override suspend fun adjustQuantity(id: String, delta: Int) {
         dao.adjustQuantity(id = id, delta = delta, updatedAt = System.currentTimeMillis())
     }

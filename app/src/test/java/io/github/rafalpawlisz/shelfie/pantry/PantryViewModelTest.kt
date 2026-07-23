@@ -65,6 +65,23 @@ class PantryViewModelTest {
     }
 
     @Test
+    fun `updateProduct changes name quantity and unit`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Mlik", quantity = 1, unit = null)
+        val viewModel = PantryViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val id = viewModel.uiState.value.products.single().id
+
+        viewModel.updateProduct(id = id, name = "Milk", quantity = 3, unit = "l")
+
+        val product = viewModel.uiState.value.products.single()
+        assertEquals("Milk", product.name)
+        assertEquals(3, product.quantity)
+        assertEquals("l", product.unit)
+        assertEquals(id, product.id)
+    }
+
+    @Test
     fun `delete removes the product`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Flour", quantity = 1, unit = "kg")

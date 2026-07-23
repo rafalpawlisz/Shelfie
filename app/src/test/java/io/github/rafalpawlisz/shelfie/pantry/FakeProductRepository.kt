@@ -17,6 +17,18 @@ class FakeProductRepository : ProductRepository {
         products.update { it + Product(id = "id-${nextId++}", name = name, quantity = quantity, unit = unit) }
     }
 
+    override suspend fun updateProduct(id: String, name: String, quantity: Int, unit: String?) {
+        products.update { list ->
+            list.map { product ->
+                if (product.id == id) {
+                    product.copy(name = name.trim(), quantity = quantity, unit = unit)
+                } else {
+                    product
+                }
+            }
+        }
+    }
+
     override suspend fun adjustQuantity(id: String, delta: Int) {
         products.update { list ->
             list.map { product ->

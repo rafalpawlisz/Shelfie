@@ -33,6 +33,10 @@ class PantryViewModel(private val repository: ProductRepository) : ViewModel() {
         viewModelScope.launch { repository.addProduct(name, quantity, unit) }
     }
 
+    fun updateProduct(id: String, name: String, quantity: Int, unit: String?) {
+        viewModelScope.launch { repository.updateProduct(id, name, quantity, unit) }
+    }
+
     fun increment(id: String) {
         viewModelScope.launch { repository.adjustQuantity(id, delta = 1) }
     }
