@@ -13,7 +13,9 @@
     <string name="shopping_amount_label">Amount to buy</string>
     <string name="shopping_amount">×%1$d</string>
     <string name="shopping_amount_with_unit">×%1$d %2$s</string>
-    <string name="clear_purchased">Clear purchased (%1$d)</string>
+    <string name="finish_shopping">Finish shopping (%1$d)</string>
+    <string name="finish_shopping_message">Add %1$d item(s) to your pantry and finish shopping?</string>
+    <string name="action_finish">Finish</string>
     <string name="cd_remove_from_list">Remove %1$s from the shopping list</string>
     <string name="use_up_hint">Tap a product to remove one</string>
     <string name="add_product">Add product</string>

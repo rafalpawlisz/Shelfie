@@ -14,8 +14,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
@@ -24,6 +25,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -37,7 +42,7 @@ fun ShoppingScreen(
     items: List<ShoppingListItem>,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
-    onClearPurchased: () -> Unit,
+    onFinishShopping: () -> Unit,
 ) {
     if (items.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -51,6 +56,7 @@ fun ShoppingScreen(
     }
 
     val checkedCount = items.count { it.isChecked }
+    var showFinishDialog by rememberSaveable { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Hint and the (conditional) clear action share one fixed-height row so
@@ -66,9 +72,9 @@ fun ShoppingScreen(
                 modifier = Modifier.weight(1f),
             )
             if (checkedCount > 0) {
-                TextButton(onClick = onClearPurchased) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = null)
-                    Text(text = stringResource(R.string.clear_purchased, checkedCount))
+                TextButton(onClick = { showFinishDialog = true }) {
+                    Icon(imageVector = Icons.Default.Check, contentDescription = null)
+                    Text(text = stringResource(R.string.finish_shopping, checkedCount))
                 }
             }
         }
@@ -86,6 +92,28 @@ fun ShoppingScreen(
                 )
             }
         }
+    }
+
+    if (showFinishDialog) {
+        AlertDialog(
+            onDismissRequest = { showFinishDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showFinishDialog = false
+                        onFinishShopping()
+                    },
+                ) {
+                    Text(stringResource(R.string.action_finish))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFinishDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+            text = { Text(stringResource(R.string.finish_shopping_message, checkedCount)) },
+        )
     }
 }
 

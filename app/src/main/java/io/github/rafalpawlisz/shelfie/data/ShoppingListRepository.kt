@@ -13,5 +13,5 @@ interface ShoppingListRepository {
 
     suspend fun removeItem(id: String)
 
-    suspend fun clearPurchased()
+    suspend fun finishShopping()
 }

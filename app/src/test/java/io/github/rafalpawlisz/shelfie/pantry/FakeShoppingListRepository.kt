@@ -57,19 +57,18 @@ class FakeShoppingListRepository(
     }
 
     override suspend fun setChecked(id: String, checked: Boolean) {
-        val item = items.value.firstOrNull { it.id == id } ?: return
-        if (item.checked == checked) return
         items.update { list ->
             list.map { if (it.id == id) it.copy(checked = checked) else it }
         }
-        products.adjustQuantity(item.productId, if (checked) item.amount else -item.amount)
     }
 
     override suspend fun removeItem(id: String) {
         items.update { list -> list.filterNot { it.id == id } }
     }
 
-    override suspend fun clearPurchased() {
+    override suspend fun finishShopping() {
+        items.value.filter { it.checked }
+            .forEach { products.adjustQuantity(it.productId, it.amount) }
         items.update { list -> list.filterNot { it.checked } }
     }
 }

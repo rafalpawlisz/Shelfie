@@ -38,40 +38,32 @@ interface ShoppingListDao {
     @Query("DELETE FROM shopping_list_items WHERE checkedAt IS NOT NULL")
     suspend fun deleteChecked()
 
-    // Guarded flips: the state predicate makes a repeated identical toggle a
-    // no-op. The Int result (rows affected) gates the quantity side effect.
-    @Query(
-        "UPDATE shopping_list_items SET checkedAt = :timestamp, updatedAt = :timestamp " +
-            "WHERE id = :id AND checkedAt IS NULL"
-    )
-    suspend fun markChecked(id: String, timestamp: Long): Int
+    // Pure in-cart marker: checkedAt = timestamp (in cart) or null (back to buy).
+    // No product-quantity side effect — stock is applied only at checkout().
+    @Query("UPDATE shopping_list_items SET checkedAt = :checkedAt, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setChecked(id: String, checkedAt: Long?, updatedAt: Long)
 
+    // Adds every checked item's amount to its product. The unique index on
+    // productId means the correlated subquery matches at most one row, so no
+    // aggregation is needed; the WHERE keeps us from writing NULL into the
+    // quantity of products with no checked item. Amounts are > 0, so quantity
+    // only grows — no MAX(0, ...) clamp needed.
     @Query(
-        "UPDATE shopping_list_items SET checkedAt = NULL, updatedAt = :timestamp " +
-            "WHERE id = :id AND checkedAt IS NOT NULL"
-    )
-    suspend fun markUnchecked(id: String, timestamp: Long): Int
-
-    // sign = +1 (checked: bought) or -1 (unchecked: reverted).
-    @Query(
-        "UPDATE products SET quantity = MAX(0, quantity + :sign * " +
-            "(SELECT amount FROM shopping_list_items WHERE id = :itemId)), " +
+        "UPDATE products SET quantity = quantity + " +
+            "(SELECT i.amount FROM shopping_list_items i " +
+            "WHERE i.productId = products.id AND i.checkedAt IS NOT NULL), " +
             "updatedAt = :timestamp " +
-            "WHERE id = (SELECT productId FROM shopping_list_items WHERE id = :itemId)"
+            "WHERE id IN (SELECT productId FROM shopping_list_items WHERE checkedAt IS NOT NULL)"
     )
-    suspend fun applyItemAmountToProduct(itemId: String, sign: Int, timestamp: Long)
+    suspend fun applyCheckedAmountsToProducts(timestamp: Long)
 
+    // "Finish shopping": bank every checked item into its product, then drop
+    // the checked rows. Unchecked items remain. Apply-before-delete matters —
+    // deleteChecked() removes the rows the subquery reads.
     @Transaction
-    suspend fun setChecked(itemId: String, checked: Boolean, timestamp: Long) {
-        val flipped =
-            if (checked) markChecked(itemId, timestamp) else markUnchecked(itemId, timestamp)
-        if (flipped == 1) {
-            applyItemAmountToProduct(
-                itemId = itemId,
-                sign = if (checked) 1 else -1,
-                timestamp = timestamp,
-            )
-        }
+    suspend fun checkout(timestamp: Long) {
+        applyCheckedAmountsToProducts(timestamp)
+        deleteChecked()
     }
 
     @Transaction
@@ -90,8 +82,8 @@ interface ShoppingListDao {
             )
             existing.checkedAt == null -> increaseAmount(existing.id, amount, timestamp)
             else -> {
-                // Stale checked entry from a past trip: its quantity effect
-                // stays applied; replace it with a fresh unchecked item.
+                // Existing checked entry (in cart, not yet checked out):
+                // replace it with a fresh unchecked item at the new amount.
                 delete(existing.id)
                 insert(
                     ShoppingListItemEntity(

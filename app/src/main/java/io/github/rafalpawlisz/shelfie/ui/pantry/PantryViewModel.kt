@@ -89,8 +89,8 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.removeItem(id) }
     }
 
-    fun clearPurchased() {
-        viewModelScope.launch { shoppingListRepository.clearPurchased() }
+    fun finishShopping() {
+        viewModelScope.launch { shoppingListRepository.finishShopping() }
     }
 
     fun archive(id: String) {

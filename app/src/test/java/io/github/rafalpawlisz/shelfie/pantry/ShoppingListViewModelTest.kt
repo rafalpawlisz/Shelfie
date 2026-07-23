@@ -57,7 +57,7 @@ class ShoppingListViewModelTest {
     }
 
     @Test
-    fun `adding over a checked item replaces it without touching quantity`() = runTest {
+    fun `adding over a checked item replaces it and leaves quantity untouched`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 0, unit = "l")
         val viewModel = makeViewModel(repository)
@@ -66,18 +66,18 @@ class ShoppingListViewModelTest {
         viewModel.addToShoppingList(productId, amount = 3)
         val firstItemId = viewModel.uiState.value.shoppingList.single().id
         viewModel.setShoppingItemChecked(firstItemId, checked = true)
-        assertEquals(3, viewModel.uiState.value.products.single().quantity)
+        assertEquals(0, viewModel.uiState.value.products.single().quantity)
 
         viewModel.addToShoppingList(productId, amount = 2)
 
         val item = viewModel.uiState.value.shoppingList.single()
         assertFalse(item.isChecked)
         assertEquals(2, item.amount)
-        assertEquals(3, viewModel.uiState.value.products.single().quantity)
+        assertEquals(0, viewModel.uiState.value.products.single().quantity)
     }
 
     @Test
-    fun `checking an item applies its amount and keeps it visible`() = runTest {
+    fun `checking an item does not change quantity and keeps it visible`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 1, unit = "l")
         val viewModel = makeViewModel(repository)
@@ -88,13 +88,12 @@ class ShoppingListViewModelTest {
 
         viewModel.setShoppingItemChecked(itemId, checked = true)
 
-        assertEquals(5, viewModel.uiState.value.products.single().quantity)
-        val item = viewModel.uiState.value.shoppingList.single()
-        assertTrue(item.isChecked)
+        assertEquals(1, viewModel.uiState.value.products.single().quantity)
+        assertTrue(viewModel.uiState.value.shoppingList.single().isChecked)
     }
 
     @Test
-    fun `checking an already checked item is a no-op`() = runTest {
+    fun `checking an already checked item keeps it checked and does not change quantity`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 0, unit = "l")
         val viewModel = makeViewModel(repository)
@@ -106,50 +105,71 @@ class ShoppingListViewModelTest {
         viewModel.setShoppingItemChecked(itemId, checked = true)
         viewModel.setShoppingItemChecked(itemId, checked = true)
 
-        assertEquals(2, viewModel.uiState.value.products.single().quantity)
+        assertEquals(0, viewModel.uiState.value.products.single().quantity)
+        assertTrue(viewModel.uiState.value.shoppingList.single().isChecked)
     }
 
     @Test
-    fun `unchecking reverts the quantity with a clamp at zero`() = runTest {
+    fun `unchecking an item does not change quantity`() = runTest {
         val repository = FakeProductRepository()
-        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        repository.addProduct(name = "Milk", quantity = 5, unit = "l")
         val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         val productId = viewModel.uiState.value.products.single().id
         viewModel.addToShoppingList(productId, amount = 3)
         val itemId = viewModel.uiState.value.shoppingList.single().id
         viewModel.setShoppingItemChecked(itemId, checked = true)
-        assertEquals(3, viewModel.uiState.value.products.single().quantity)
-
-        // Someone used up part of the stock before the uncheck.
-        viewModel.decrement(productId)
-        assertEquals(2, viewModel.uiState.value.products.single().quantity)
+        assertEquals(5, viewModel.uiState.value.products.single().quantity)
 
         viewModel.setShoppingItemChecked(itemId, checked = false)
 
-        assertEquals(0, viewModel.uiState.value.products.single().quantity)
+        assertEquals(5, viewModel.uiState.value.products.single().quantity)
         assertFalse(viewModel.uiState.value.shoppingList.single().isChecked)
     }
 
     @Test
-    fun `clearPurchased removes only checked items and keeps quantities`() = runTest {
+    fun `finishShopping applies all checked amounts, removes them, and keeps unchecked`() = runTest {
         val repository = FakeProductRepository()
-        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        repository.addProduct(name = "Milk", quantity = 1, unit = "l")
+        repository.addProduct(name = "Cheese", quantity = 0, unit = null)
         repository.addProduct(name = "Bread", quantity = 0, unit = null)
         val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
-        val milk = viewModel.uiState.value.products.first { it.name == "Milk" }
-        val bread = viewModel.uiState.value.products.first { it.name == "Bread" }
-        viewModel.addToShoppingList(milk.id, amount = 2)
-        viewModel.addToShoppingList(bread.id, amount = 1)
-        val milkItem = viewModel.uiState.value.shoppingList.first { it.productId == milk.id }
-        viewModel.setShoppingItemChecked(milkItem.id, checked = true)
+        fun product(name: String) = viewModel.uiState.value.products.first { it.name == name }
+        viewModel.addToShoppingList(product("Milk").id, amount = 2)
+        viewModel.addToShoppingList(product("Cheese").id, amount = 3)
+        viewModel.addToShoppingList(product("Bread").id, amount = 1)
+        val shopping = viewModel.uiState.value.shoppingList
+        viewModel.setShoppingItemChecked(shopping.first { it.productName == "Milk" }.id, checked = true)
+        viewModel.setShoppingItemChecked(shopping.first { it.productName == "Cheese" }.id, checked = true)
+        // Nothing applied yet.
+        assertEquals(1, product("Milk").quantity)
+        assertEquals(0, product("Cheese").quantity)
 
-        viewModel.clearPurchased()
+        viewModel.finishShopping()
 
+        assertEquals(3, product("Milk").quantity)
+        assertEquals(3, product("Cheese").quantity)
+        assertEquals(0, product("Bread").quantity)
         val remaining = viewModel.uiState.value.shoppingList.single()
-        assertEquals(bread.id, remaining.productId)
-        assertEquals(2, viewModel.uiState.value.products.first { it.name == "Milk" }.quantity)
+        assertEquals("Bread", remaining.productName)
+        assertFalse(remaining.isChecked)
+    }
+
+    @Test
+    fun `finishShopping with nothing checked leaves items and quantities unchanged`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 1, unit = "l")
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.addToShoppingList(productId, amount = 2)
+
+        viewModel.finishShopping()
+
+        assertEquals(1, viewModel.uiState.value.products.single().quantity)
+        assertEquals(1, viewModel.uiState.value.shoppingList.size)
+        assertFalse(viewModel.uiState.value.shoppingList.single().isChecked)
     }
 
     @Test

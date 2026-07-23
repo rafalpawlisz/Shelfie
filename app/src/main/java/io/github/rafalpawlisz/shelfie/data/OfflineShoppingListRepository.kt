@@ -23,14 +23,15 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
     }
 
     override suspend fun setChecked(id: String, checked: Boolean) {
-        dao.setChecked(itemId = id, checked = checked, timestamp = System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        dao.setChecked(id = id, checkedAt = if (checked) now else null, updatedAt = now)
     }
 
     override suspend fun removeItem(id: String) {
         dao.delete(id)
     }
 
-    override suspend fun clearPurchased() {
-        dao.deleteChecked()
+    override suspend fun finishShopping() {
+        dao.checkout(System.currentTimeMillis())
     }
 }

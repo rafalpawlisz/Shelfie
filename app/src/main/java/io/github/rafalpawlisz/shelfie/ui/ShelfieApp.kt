@@ -95,7 +95,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                         items = state.shoppingList,
                         onToggle = viewModel::setShoppingItemChecked,
                         onRemove = viewModel::removeShoppingItem,
-                        onClearPurchased = viewModel::clearPurchased,
+                        onFinishShopping = viewModel::finishShopping,
                     )
                     ShelfieTab.USE_UP -> UseUpScreen(
                         products = state.products,

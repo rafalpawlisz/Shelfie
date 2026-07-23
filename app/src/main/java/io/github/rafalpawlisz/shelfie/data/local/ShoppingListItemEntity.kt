@@ -24,8 +24,8 @@ data class ShoppingListItemEntity(
     val productId: String,
     // How many to buy; always > 0 (enforced by the dialog and merge logic).
     val amount: Int,
-    // null = still to buy; non-null = in the cart, amount already applied
-    // to the product's quantity.
+    // null = still to buy; non-null = in the cart (marked bought). The amount
+    // is applied to the product's quantity only at checkout(), not when checked.
     val checkedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
