@@ -28,6 +28,9 @@
     <string name="use_up_hint">Dotknij produktu, aby odjąć 1</string>
     <string name="use_up_empty_title">Nie ma czego zużyć</string>
     <string name="use_up_empty_message">Produkty, które masz w zapasie, pojawią się tutaj</string>
+    <string name="use_up_scanned">Zużyto: %1$s</string>
+    <string name="use_up_scan_out_of_stock">%1$s: brak zapasu</string>
+    <string name="use_up_scan_unknown">Nieznany kod</string>
     <string name="add_product">Dodaj produkt</string>
     <string name="edit_product">Edytuj produkt</string>
     <string name="products_hint">Dotknij produktu, aby go edytować</string>

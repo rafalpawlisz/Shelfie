@@ -22,4 +22,7 @@ class FakeBarcodeRepository : BarcodeRepository {
     override suspend fun removeBarcode(barcode: String) {
         barcodes.update { list -> list.filterNot { it.barcode == barcode } }
     }
+
+    override suspend fun findProductId(barcode: String): String? =
+        barcodes.value.firstOrNull { it.barcode == barcode }?.productId
 }

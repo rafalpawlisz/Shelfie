@@ -14,15 +14,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -32,6 +37,7 @@ import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
 import io.github.rafalpawlisz.shelfie.ui.pantry.ProductFormDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.ProductsScreen
 import io.github.rafalpawlisz.shelfie.ui.pantry.ShoppingScreen
+import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScanResult
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScreen
 
 enum class ShelfieTab(@field:StringRes val labelRes: Int, val icon: ImageVector) {
@@ -49,8 +55,25 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     var showAddToListDialog by rememberSaveable { mutableStateOf(false) }
     var editedProductId by rememberSaveable { mutableStateOf<String?>(null) }
 
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) {
+        viewModel.scanEvents.collect { result ->
+            val message = when (result) {
+                is UseUpScanResult.Used ->
+                    context.getString(R.string.use_up_scanned, result.productName)
+                is UseUpScanResult.OutOfStock ->
+                    context.getString(R.string.use_up_scan_out_of_stock, result.productName)
+                UseUpScanResult.UnknownCode ->
+                    context.getString(R.string.use_up_scan_unknown)
+            }
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = { TopAppBar(title = { Text(stringResource(currentTab.labelRes)) }) },
         bottomBar = {
             NavigationBar {
@@ -81,7 +104,15 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                             )
                         }
                     }
-                ShelfieTab.USE_UP -> Unit
+                ShelfieTab.USE_UP ->
+                    FloatingActionButton(
+                        onClick = { scanBarcode(context) { viewModel.useUpByBarcode(it) } },
+                    ) {
+                        Icon(
+                            imageVector = BarcodeIcon,
+                            contentDescription = stringResource(R.string.scan_barcode),
+                        )
+                    }
             }
         },
     ) { innerPadding ->

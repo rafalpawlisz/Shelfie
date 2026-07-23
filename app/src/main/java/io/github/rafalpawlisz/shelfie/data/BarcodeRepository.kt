@@ -10,4 +10,6 @@ interface BarcodeRepository {
     suspend fun addBarcode(productId: String, barcode: String)
 
     suspend fun removeBarcode(barcode: String)
+
+    suspend fun findProductId(barcode: String): String?
 }

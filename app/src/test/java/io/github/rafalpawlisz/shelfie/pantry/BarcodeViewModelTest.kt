@@ -2,12 +2,14 @@ package io.github.rafalpawlisz.shelfie.pantry
 
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
+import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScanResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -65,6 +67,56 @@ class BarcodeViewModelTest {
         viewModel.updateProduct(id = id, name = "Milk", quantity = 0, unit = "l", barcodes = emptyList())
 
         assertNull(viewModel.uiState.value.barcodesByProduct[id])
+    }
+
+    @Test
+    fun `scanning a known code on use-up decrements the product and reports Used`() = runTest {
+        val products = FakeProductRepository()
+        products.addProduct(name = "Milk", quantity = 2, unit = "l")
+        val viewModel = makeViewModel(products)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val events = mutableListOf<UseUpScanResult>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.scanEvents.collect { events += it } }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.addProduct(name = "ignored", quantity = 0, unit = null) // noise product
+        viewModel.updateProduct(id = id, name = "Milk", quantity = 2, unit = "l", barcodes = listOf("5901234123457"))
+
+        viewModel.useUpByBarcode("5901234123457")
+
+        assertEquals(1, viewModel.uiState.value.products.first { it.name == "Milk" }.quantity)
+        assertEquals(UseUpScanResult.Used("Milk"), events.last())
+    }
+
+    @Test
+    fun `scanning a code of a zero-stock product reports OutOfStock and does not go negative`() = runTest {
+        val products = FakeProductRepository()
+        products.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(products)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val events = mutableListOf<UseUpScanResult>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.scanEvents.collect { events += it } }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.updateProduct(id = id, name = "Milk", quantity = 0, unit = "l", barcodes = listOf("5901234123457"))
+
+        viewModel.useUpByBarcode("5901234123457")
+
+        assertEquals(0, viewModel.uiState.value.products.single().quantity)
+        assertEquals(UseUpScanResult.OutOfStock("Milk"), events.last())
+    }
+
+    @Test
+    fun `scanning an unknown code reports UnknownCode and changes nothing`() = runTest {
+        val products = FakeProductRepository()
+        products.addProduct(name = "Milk", quantity = 2, unit = "l")
+        val viewModel = makeViewModel(products)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val events = mutableListOf<UseUpScanResult>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.scanEvents.collect { events += it } }
+
+        viewModel.useUpByBarcode("0000000000000")
+
+        assertEquals(2, viewModel.uiState.value.products.single().quantity)
+        assertTrue(events.last() is UseUpScanResult.UnknownCode)
     }
 
     @Test

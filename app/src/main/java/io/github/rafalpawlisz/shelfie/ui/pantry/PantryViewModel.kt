@@ -13,14 +13,23 @@ import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** One-shot outcome of scanning a barcode on the Use up tab. */
+sealed interface UseUpScanResult {
+    data class Used(val productName: String) : UseUpScanResult
+    data class OutOfStock(val productName: String) : UseUpScanResult
+    data object UnknownCode : UseUpScanResult
+}
 
 data class PantryUiState(
     val products: List<Product> = emptyList(),
@@ -47,6 +56,10 @@ class PantryViewModel(
         selectedListId.flatMapLatest { id ->
             if (id == null) flowOf(emptyList()) else shoppingListRepository.observeItems(id)
         }
+
+    // One-shot feedback for barcode scans on the Use up tab.
+    private val scanChannel = Channel<UseUpScanResult>(Channel.BUFFERED)
+    val scanEvents = scanChannel.receiveAsFlow()
 
     val uiState: StateFlow<PantryUiState> =
         combine(
@@ -124,6 +137,23 @@ class PantryViewModel(
 
     fun decrement(id: String) {
         viewModelScope.launch { repository.adjustQuantity(id, delta = -1) }
+    }
+
+    fun useUpByBarcode(code: String) {
+        viewModelScope.launch {
+            val productId = barcodeRepository.findProductId(code)
+            // Only active products can be used up; archived/unknown → UnknownCode.
+            val product = productId?.let { id -> uiState.value.products.firstOrNull { it.id == id } }
+            val result = when {
+                product == null -> UseUpScanResult.UnknownCode
+                product.quantity > 0 -> {
+                    repository.adjustQuantity(product.id, delta = -1)
+                    UseUpScanResult.Used(product.name)
+                }
+                else -> UseUpScanResult.OutOfStock(product.name)
+            }
+            scanChannel.send(result)
+        }
     }
 
     fun selectList(id: String) {

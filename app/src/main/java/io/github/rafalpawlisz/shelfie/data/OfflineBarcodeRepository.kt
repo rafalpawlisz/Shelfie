@@ -25,4 +25,7 @@ class OfflineBarcodeRepository(private val dao: ProductBarcodeDao) : BarcodeRepo
     override suspend fun removeBarcode(barcode: String) {
         dao.delete(barcode)
     }
+
+    override suspend fun findProductId(barcode: String): String? =
+        dao.findProductId(barcode.trim())
 }

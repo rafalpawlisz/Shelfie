@@ -17,6 +17,9 @@ interface ProductBarcodeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: ProductBarcodeEntity)
 
+    @Query("SELECT productId FROM product_barcodes WHERE barcode = :barcode")
+    suspend fun findProductId(barcode: String): String?
+
     @Query("DELETE FROM product_barcodes WHERE barcode = :barcode")
     suspend fun delete(barcode: String)
 }
