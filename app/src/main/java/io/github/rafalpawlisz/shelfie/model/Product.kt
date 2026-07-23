@@ -7,4 +7,5 @@ data class Product(
     val unit: String?,
     val minQuantity: Int?,
     val notes: String?,
+    val emoji: String?,
 )

@@ -98,8 +98,8 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
         ProductFormDialog(
             title = stringResource(R.string.add_product),
             confirmLabel = stringResource(R.string.action_add),
-            onConfirm = { name, quantity, unit, minQuantity, notes ->
-                viewModel.addProduct(name, quantity, unit, minQuantity, notes)
+            onConfirm = { name, quantity, unit, minQuantity, notes, emoji ->
+                viewModel.addProduct(name, quantity, unit, minQuantity, notes, emoji)
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },
@@ -123,9 +123,12 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
             initialUnit = editedProduct.unit,
             initialMinQuantity = editedProduct.minQuantity,
             initialNotes = editedProduct.notes,
+            initialEmoji = editedProduct.emoji,
             stateKey = editedProduct.id,
-            onConfirm = { name, quantity, unit, minQuantity, notes ->
-                viewModel.updateProduct(editedProduct.id, name, quantity, unit, minQuantity, notes)
+            onConfirm = { name, quantity, unit, minQuantity, notes, emoji ->
+                viewModel.updateProduct(
+                    editedProduct.id, name, quantity, unit, minQuantity, notes, emoji,
+                )
                 editedProductId = null
             },
             onDismiss = { editedProductId = null },

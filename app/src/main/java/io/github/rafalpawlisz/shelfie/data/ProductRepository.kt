@@ -15,6 +15,7 @@ interface ProductRepository {
         unit: String?,
         minQuantity: Int? = null,
         notes: String? = null,
+        emoji: String? = null,
     )
 
     suspend fun updateProduct(
@@ -24,6 +25,7 @@ interface ProductRepository {
         unit: String?,
         minQuantity: Int? = null,
         notes: String? = null,
+        emoji: String? = null,
     )
 
     suspend fun adjustQuantity(id: String, delta: Int)

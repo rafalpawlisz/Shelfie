@@ -26,6 +26,7 @@ class FakeProductRepository : ProductRepository {
         unit: String?,
         minQuantity: Int?,
         notes: String?,
+        emoji: String?,
     ) {
         entries.update {
             it + Entry(
@@ -36,6 +37,7 @@ class FakeProductRepository : ProductRepository {
                     unit = unit,
                     minQuantity = minQuantity,
                     notes = notes,
+                    emoji = emoji,
                 ),
                 archived = false,
             )
@@ -49,6 +51,7 @@ class FakeProductRepository : ProductRepository {
         unit: String?,
         minQuantity: Int?,
         notes: String?,
+        emoji: String?,
     ) {
         mapProduct(id) {
             it.copy(
@@ -57,6 +60,7 @@ class FakeProductRepository : ProductRepository {
                 unit = unit,
                 minQuantity = minQuantity,
                 notes = notes,
+                emoji = emoji,
             )
         }
     }

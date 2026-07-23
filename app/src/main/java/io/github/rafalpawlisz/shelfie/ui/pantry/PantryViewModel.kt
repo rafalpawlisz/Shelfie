@@ -40,8 +40,11 @@ class PantryViewModel(private val repository: ProductRepository) : ViewModel() {
         unit: String?,
         minQuantity: Int? = null,
         notes: String? = null,
+        emoji: String? = null,
     ) {
-        viewModelScope.launch { repository.addProduct(name, quantity, unit, minQuantity, notes) }
+        viewModelScope.launch {
+            repository.addProduct(name, quantity, unit, minQuantity, notes, emoji)
+        }
     }
 
     fun updateProduct(
@@ -51,9 +54,10 @@ class PantryViewModel(private val repository: ProductRepository) : ViewModel() {
         unit: String?,
         minQuantity: Int? = null,
         notes: String? = null,
+        emoji: String? = null,
     ) {
         viewModelScope.launch {
-            repository.updateProduct(id, name, quantity, unit, minQuantity, notes)
+            repository.updateProduct(id, name, quantity, unit, minQuantity, notes, emoji)
         }
     }
 

@@ -15,6 +15,7 @@
     <string name="product_unit_label">Jednostka (opcjonalnie)</string>
     <string name="product_min_quantity_label">Ilość minimalna (opcjonalnie)</string>
     <string name="product_notes_label">Notatki (opcjonalnie)</string>
+    <string name="product_emoji_label">Emoji (opcjonalnie)</string>
     <string name="action_add">Dodaj</string>
     <string name="action_save">Zapisz</string>
     <string name="action_archive">Archiwizuj</string>

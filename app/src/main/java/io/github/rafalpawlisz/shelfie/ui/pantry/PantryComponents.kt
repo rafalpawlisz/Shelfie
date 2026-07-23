@@ -58,7 +58,7 @@ internal fun ProductListItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = product.name,
+                    text = listOfNotNull(product.emoji, product.name).joinToString(" "),
                     style = MaterialTheme.typography.titleMedium,
                     color = textColor,
                 )

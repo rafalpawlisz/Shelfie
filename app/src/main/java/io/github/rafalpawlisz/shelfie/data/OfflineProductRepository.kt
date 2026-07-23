@@ -22,6 +22,7 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
         unit: String?,
         minQuantity: Int?,
         notes: String?,
+        emoji: String?,
     ) {
         val now = System.currentTimeMillis()
         dao.upsert(
@@ -34,6 +35,7 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
                 createdAt = now,
                 minQuantity = minQuantity,
                 notes = notes,
+                emoji = emoji,
             )
         )
     }
@@ -45,6 +47,7 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
         unit: String?,
         minQuantity: Int?,
         notes: String?,
+        emoji: String?,
     ) {
         dao.update(
             id = id,
@@ -53,6 +56,7 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
             unit = unit,
             minQuantity = minQuantity,
             notes = notes,
+            emoji = emoji,
             updatedAt = System.currentTimeMillis(),
         )
     }

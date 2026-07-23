@@ -36,13 +36,21 @@ import io.github.rafalpawlisz.shelfie.R
 fun ProductFormDialog(
     title: String,
     confirmLabel: String,
-    onConfirm: (name: String, quantity: Int, unit: String?, minQuantity: Int?, notes: String?) -> Unit,
+    onConfirm: (
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int?,
+        notes: String?,
+        emoji: String?,
+    ) -> Unit,
     onDismiss: () -> Unit,
     initialName: String = "",
     initialQuantity: Int = 0,
     initialUnit: String? = null,
     initialMinQuantity: Int? = null,
     initialNotes: String? = null,
+    initialEmoji: String? = null,
     stateKey: Any? = null,
     onArchive: (() -> Unit)? = null,
     onRestore: (() -> Unit)? = null,
@@ -54,6 +62,7 @@ fun ProductFormDialog(
         mutableStateOf(initialMinQuantity?.toString().orEmpty())
     }
     var notes by rememberSaveable(stateKey) { mutableStateOf(initialNotes.orEmpty()) }
+    var emoji by rememberSaveable(stateKey) { mutableStateOf(initialEmoji.orEmpty()) }
 
     val quantity = quantityText.toIntOrNull()
     val minQuantity = minQuantityText.trim().ifBlank { null }?.toIntOrNull()
@@ -75,6 +84,13 @@ fun ProductFormDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text(stringResource(R.string.product_name_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = emoji,
+                    onValueChange = { emoji = it },
+                    label = { Text(stringResource(R.string.product_emoji_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -137,6 +153,7 @@ fun ProductFormDialog(
                                 unit.trim().ifBlank { null },
                                 minQuantity,
                                 notes.trim().ifBlank { null },
+                                emoji.trim().ifBlank { null },
                             )
                         },
                     ) {

@@ -20,6 +20,8 @@ data class ProductEntity(
     // Restock threshold; null = feature off for this product.
     val minQuantity: Int? = null,
     val notes: String? = null,
+    // Visual marker shown before the name on lists.
+    val emoji: String? = null,
 )
 
 fun ProductEntity.toDomain(): Product = Product(
@@ -29,4 +31,5 @@ fun ProductEntity.toDomain(): Product = Product(
     unit = unit,
     minQuantity = minQuantity,
     notes = notes,
+    emoji = emoji,
 )

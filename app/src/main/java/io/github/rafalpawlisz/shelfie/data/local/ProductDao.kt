@@ -27,7 +27,8 @@ interface ProductDao {
 
     @Query(
         "UPDATE products SET name = :name, quantity = :quantity, unit = :unit, " +
-            "minQuantity = :minQuantity, notes = :notes, updatedAt = :updatedAt WHERE id = :id"
+            "minQuantity = :minQuantity, notes = :notes, emoji = :emoji, " +
+            "updatedAt = :updatedAt WHERE id = :id"
     )
     suspend fun update(
         id: String,
@@ -36,6 +37,7 @@ interface ProductDao {
         unit: String?,
         minQuantity: Int?,
         notes: String?,
+        emoji: String?,
         updatedAt: Long,
     )
 
