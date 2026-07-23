@@ -27,11 +27,12 @@ class FakeProductRepository : ProductRepository {
         minQuantity: Int?,
         notes: String?,
         emoji: String?,
-    ) {
+    ): String {
+        val id = "id-${nextId++}"
         entries.update {
             it + Entry(
                 product = Product(
-                    id = "id-${nextId++}",
+                    id = id,
                     name = name,
                     quantity = quantity,
                     unit = unit,
@@ -42,6 +43,7 @@ class FakeProductRepository : ProductRepository {
                 archived = false,
             )
         }
+        return id
     }
 
     override suspend fun updateProduct(

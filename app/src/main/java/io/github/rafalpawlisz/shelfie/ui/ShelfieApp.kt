@@ -110,8 +110,8 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
         ProductFormDialog(
             title = stringResource(R.string.add_product),
             confirmLabel = stringResource(R.string.action_add),
-            onConfirm = { name, quantity, unit, minQuantity, notes, emoji ->
-                viewModel.addProduct(name, quantity, unit, minQuantity, notes, emoji)
+            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, barcodes ->
+                viewModel.addProduct(name, quantity, unit, minQuantity, notes, emoji, barcodes)
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },
@@ -147,10 +147,11 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
             initialMinQuantity = editedProduct.minQuantity,
             initialNotes = editedProduct.notes,
             initialEmoji = editedProduct.emoji,
+            initialBarcodes = state.barcodesByProduct[editedProduct.id].orEmpty(),
             stateKey = editedProduct.id,
-            onConfirm = { name, quantity, unit, minQuantity, notes, emoji ->
+            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, barcodes ->
                 viewModel.updateProduct(
-                    editedProduct.id, name, quantity, unit, minQuantity, notes, emoji,
+                    editedProduct.id, name, quantity, unit, minQuantity, notes, emoji, barcodes,
                 )
                 editedProductId = null
             },
@@ -171,9 +172,6 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
             } else {
                 null
             },
-            barcodes = state.barcodesByProduct[editedProduct.id].orEmpty(),
-            onAddBarcode = { viewModel.addBarcode(editedProduct.id, it) },
-            onRemoveBarcode = viewModel::removeBarcode,
         )
     }
 }

@@ -9,6 +9,7 @@ interface ProductRepository {
 
     fun observeArchivedProducts(): Flow<List<Product>>
 
+    /** Returns the id of the newly created product. */
     suspend fun addProduct(
         name: String,
         quantity: Int,
@@ -16,7 +17,7 @@ interface ProductRepository {
         minQuantity: Int? = null,
         notes: String? = null,
         emoji: String? = null,
-    )
+    ): String
 
     suspend fun updateProduct(
         id: String,

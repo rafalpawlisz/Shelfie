@@ -58,9 +58,11 @@ class PantryViewModel(
         minQuantity: Int? = null,
         notes: String? = null,
         emoji: String? = null,
+        barcodes: List<String> = emptyList(),
     ) {
         viewModelScope.launch {
-            repository.addProduct(name, quantity, unit, minQuantity, notes, emoji)
+            val id = repository.addProduct(name, quantity, unit, minQuantity, notes, emoji)
+            barcodes.forEach { barcodeRepository.addBarcode(id, it) }
         }
     }
 
@@ -72,9 +74,14 @@ class PantryViewModel(
         minQuantity: Int? = null,
         notes: String? = null,
         emoji: String? = null,
+        barcodes: List<String> = emptyList(),
     ) {
         viewModelScope.launch {
             repository.updateProduct(id, name, quantity, unit, minQuantity, notes, emoji)
+            val current = uiState.value.barcodesByProduct[id].orEmpty().toSet()
+            val target = barcodes.toSet()
+            (target - current).forEach { barcodeRepository.addBarcode(id, it) }
+            (current - target).forEach { barcodeRepository.removeBarcode(it) }
         }
     }
 
@@ -96,14 +103,6 @@ class PantryViewModel(
 
     fun finishShopping() {
         viewModelScope.launch { shoppingListRepository.finishShopping() }
-    }
-
-    fun addBarcode(productId: String, barcode: String) {
-        viewModelScope.launch { barcodeRepository.addBarcode(productId, barcode) }
-    }
-
-    fun removeBarcode(barcode: String) {
-        viewModelScope.launch { barcodeRepository.removeBarcode(barcode) }
     }
 
     fun archive(id: String) {

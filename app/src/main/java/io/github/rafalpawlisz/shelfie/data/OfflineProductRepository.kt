@@ -23,11 +23,12 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
         minQuantity: Int?,
         notes: String?,
         emoji: String?,
-    ) {
+    ): String {
         val now = System.currentTimeMillis()
+        val id = UUID.randomUUID().toString()
         dao.upsert(
             ProductEntity(
-                id = UUID.randomUUID().toString(),
+                id = id,
                 name = name.trim(),
                 quantity = quantity,
                 unit = unit,
@@ -38,6 +39,7 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
                 emoji = emoji,
             )
         )
+        return id
     }
 
     override suspend fun updateProduct(

@@ -17,69 +17,69 @@ class BarcodeViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private fun makeViewModel(
-        products: FakeProductRepository,
-        barcodes: FakeBarcodeRepository,
-    ) = PantryViewModel(products, FakeShoppingListRepository(products), barcodes)
+    private fun makeViewModel(products: FakeProductRepository) =
+        PantryViewModel(products, FakeShoppingListRepository(products), FakeBarcodeRepository())
 
     @Test
-    fun `addBarcode surfaces the code under its product`() = runTest {
+    fun `adding a product with barcodes stores them under the new product`() = runTest {
         val products = FakeProductRepository()
-        products.addProduct(name = "Milk", quantity = 0, unit = "l")
-        val viewModel = makeViewModel(products, FakeBarcodeRepository())
+        val viewModel = makeViewModel(products)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+
+        viewModel.addProduct(
+            name = "Milk",
+            quantity = 0,
+            unit = "l",
+            barcodes = listOf("5900000000001", "5900000000002"),
+        )
+
         val productId = viewModel.uiState.value.products.single().id
-
-        viewModel.addBarcode(productId, "5900000000001")
-
         assertEquals(
-            listOf("5900000000001"),
+            listOf("5900000000001", "5900000000002"),
             viewModel.uiState.value.barcodesByProduct[productId],
         )
     }
 
     @Test
-    fun `a product can hold several barcodes`() = runTest {
+    fun `updating a product adds new barcodes and removes dropped ones`() = runTest {
         val products = FakeProductRepository()
-        products.addProduct(name = "Milk", quantity = 0, unit = "l")
-        val viewModel = makeViewModel(products, FakeBarcodeRepository())
+        val viewModel = makeViewModel(products)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
-        val productId = viewModel.uiState.value.products.single().id
+        viewModel.addProduct(name = "Milk", quantity = 0, unit = "l", barcodes = listOf("A", "B"))
+        val id = viewModel.uiState.value.products.single().id
 
-        viewModel.addBarcode(productId, "5900000000001")
-        viewModel.addBarcode(productId, "5900000000002")
+        // Keep A, drop B, add C.
+        viewModel.updateProduct(id = id, name = "Milk", quantity = 0, unit = "l", barcodes = listOf("A", "C"))
 
-        assertEquals(2, viewModel.uiState.value.barcodesByProduct[productId]?.size)
+        assertEquals(setOf("A", "C"), viewModel.uiState.value.barcodesByProduct[id]?.toSet())
     }
 
     @Test
-    fun `removeBarcode drops the code`() = runTest {
+    fun `updating with an empty list clears all barcodes`() = runTest {
         val products = FakeProductRepository()
-        products.addProduct(name = "Milk", quantity = 0, unit = "l")
-        val viewModel = makeViewModel(products, FakeBarcodeRepository())
+        val viewModel = makeViewModel(products)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
-        val productId = viewModel.uiState.value.products.single().id
-        viewModel.addBarcode(productId, "5900000000001")
+        viewModel.addProduct(name = "Milk", quantity = 0, unit = "l", barcodes = listOf("A"))
+        val id = viewModel.uiState.value.products.single().id
 
-        viewModel.removeBarcode("5900000000001")
+        viewModel.updateProduct(id = id, name = "Milk", quantity = 0, unit = "l", barcodes = emptyList())
 
-        assertNull(viewModel.uiState.value.barcodesByProduct[productId])
+        assertNull(viewModel.uiState.value.barcodesByProduct[id])
     }
 
     @Test
-    fun `scanning a code already on another product reassigns it`() = runTest {
+    fun `a code assigned to another product moves on rescan`() = runTest {
         val products = FakeProductRepository()
-        products.addProduct(name = "Milk", quantity = 0, unit = "l")
-        products.addProduct(name = "Cream", quantity = 0, unit = "l")
-        val viewModel = makeViewModel(products, FakeBarcodeRepository())
+        val viewModel = makeViewModel(products)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        viewModel.addProduct(name = "Milk", quantity = 0, unit = "l", barcodes = listOf("X"))
+        viewModel.addProduct(name = "Cream", quantity = 0, unit = "l")
         val milkId = viewModel.uiState.value.products.first { it.name == "Milk" }.id
         val creamId = viewModel.uiState.value.products.first { it.name == "Cream" }.id
-        viewModel.addBarcode(milkId, "5900000000001")
 
-        viewModel.addBarcode(creamId, "5900000000001")
+        viewModel.updateProduct(id = creamId, name = "Cream", quantity = 0, unit = "l", barcodes = listOf("X"))
 
         assertNull(viewModel.uiState.value.barcodesByProduct[milkId])
-        assertEquals(listOf("5900000000001"), viewModel.uiState.value.barcodesByProduct[creamId])
+        assertEquals(listOf("X"), viewModel.uiState.value.barcodesByProduct[creamId])
     }
 }

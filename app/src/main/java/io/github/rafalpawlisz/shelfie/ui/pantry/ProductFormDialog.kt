@@ -23,6 +23,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +52,7 @@ fun ProductFormDialog(
         minQuantity: Int?,
         notes: String?,
         emoji: String?,
+        barcodes: List<String>,
     ) -> Unit,
     onDismiss: () -> Unit,
     initialName: String = "",
@@ -59,13 +61,10 @@ fun ProductFormDialog(
     initialMinQuantity: Int? = null,
     initialNotes: String? = null,
     initialEmoji: String? = null,
+    initialBarcodes: List<String> = emptyList(),
     stateKey: Any? = null,
     onArchive: (() -> Unit)? = null,
     onRestore: (() -> Unit)? = null,
-    // Non-null only in edit mode (an existing product owns the codes).
-    barcodes: List<String>? = null,
-    onAddBarcode: ((String) -> Unit)? = null,
-    onRemoveBarcode: ((String) -> Unit)? = null,
 ) {
     var name by rememberSaveable(stateKey) { mutableStateOf(initialName) }
     var quantityText by rememberSaveable(stateKey) { mutableStateOf(initialQuantity.toString()) }
@@ -75,6 +74,12 @@ fun ProductFormDialog(
     }
     var notes by rememberSaveable(stateKey) { mutableStateOf(initialNotes.orEmpty()) }
     var emoji by rememberSaveable(stateKey) { mutableStateOf(initialEmoji.orEmpty()) }
+    // Codes are staged locally and committed with the product on confirm
+    // (a new product has no id to attach them to until it is saved).
+    var barcodes by rememberSaveable(
+        stateKey,
+        stateSaver = listSaver<List<String>, String>(save = { it }, restore = { it }),
+    ) { mutableStateOf(initialBarcodes) }
 
     val quantity = quantityText.toIntOrNull()
     val minQuantity = minQuantityText.trim().ifBlank { null }?.toIntOrNull()
@@ -136,41 +141,41 @@ fun ProductFormDialog(
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (barcodes != null && onAddBarcode != null) {
-                    val context = LocalContext.current
-                    Text(
-                        text = stringResource(R.string.product_barcodes_label),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                    barcodes.forEach { code ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = code,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
+                val context = LocalContext.current
+                Text(
+                    text = stringResource(R.string.product_barcodes_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                barcodes.forEach { code ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = code,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = { barcodes = barcodes - code }) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription =
+                                    stringResource(R.string.cd_remove_barcode, code),
                             )
-                            if (onRemoveBarcode != null) {
-                                IconButton(onClick = { onRemoveBarcode(code) }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Clear,
-                                        contentDescription =
-                                            stringResource(R.string.cd_remove_barcode, code),
-                                    )
-                                }
-                            }
                         }
                     }
-                    OutlinedButton(
-                        onClick = { scanBarcode(context) { onAddBarcode(it) } },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.scan_barcode))
-                    }
+                }
+                OutlinedButton(
+                    onClick = {
+                        scanBarcode(context) { code ->
+                            if (code !in barcodes) barcodes = barcodes + code
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.scan_barcode))
                 }
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     if (onArchive != null) {
@@ -202,6 +207,7 @@ fun ProductFormDialog(
                                 minQuantity,
                                 notes.trim().ifBlank { null },
                                 emoji.trim().ifBlank { null },
+                                barcodes,
                             )
                         },
                     ) {
