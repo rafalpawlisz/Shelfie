@@ -20,6 +20,9 @@ class FakeProductRepository : ProductRepository {
     override fun observeArchivedProducts(): Flow<List<Product>> =
         entries.map { list -> list.filter { it.archived }.map { it.product } }
 
+    override suspend fun getActiveProduct(id: String): Product? =
+        entries.value.firstOrNull { !it.archived && it.product.id == id }?.product
+
     override suspend fun addProduct(
         name: String,
         quantity: Int,

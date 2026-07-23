@@ -16,6 +16,9 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
     override fun observeArchivedProducts(): Flow<List<Product>> =
         dao.observeArchived().map { entities -> entities.map(ProductEntity::toDomain).sortedByName() }
 
+    override suspend fun getActiveProduct(id: String): Product? =
+        dao.getActive(id)?.toDomain()
+
     private fun List<Product>.sortedByName(): List<Product> {
         val collator = nameCollator()
         return sortedWith { a, b -> collator.compare(a.name, b.name) }

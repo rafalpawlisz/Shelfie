@@ -9,6 +9,9 @@ interface ProductRepository {
 
     fun observeArchivedProducts(): Flow<List<Product>>
 
+    /** One-shot fetch of a single active product, or null if missing/archived. */
+    suspend fun getActiveProduct(id: String): Product?
+
     /** Returns the id of the newly created product. */
     suspend fun addProduct(
         name: String,

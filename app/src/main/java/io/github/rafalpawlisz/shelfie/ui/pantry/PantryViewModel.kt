@@ -142,8 +142,10 @@ class PantryViewModel(
     fun useUpByBarcode(code: String) {
         viewModelScope.launch {
             val productId = barcodeRepository.findProductId(code)
+            // Fetch straight from the repository, not uiState: returning from the
+            // scanner's own activity can leave the WhileSubscribed uiState stale.
             // Only active products can be used up; archived/unknown → UnknownCode.
-            val product = productId?.let { id -> uiState.value.products.firstOrNull { it.id == id } }
+            val product = productId?.let { repository.getActiveProduct(it) }
             val result = when {
                 product == null -> UseUpScanResult.UnknownCode
                 product.quantity > 0 -> {

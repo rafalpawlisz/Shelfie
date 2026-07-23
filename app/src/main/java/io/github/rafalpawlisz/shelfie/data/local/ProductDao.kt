@@ -16,6 +16,9 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE archivedAt IS NOT NULL")
     fun observeArchived(): Flow<List<ProductEntity>>
 
+    @Query("SELECT * FROM products WHERE id = :id AND archivedAt IS NULL")
+    suspend fun getActive(id: String): ProductEntity?
+
     @Upsert
     suspend fun upsert(product: ProductEntity)
 
