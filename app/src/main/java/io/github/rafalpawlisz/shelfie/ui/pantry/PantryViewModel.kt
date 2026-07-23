@@ -10,38 +10,61 @@ import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.ProductRepository
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.model.Product
+import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class PantryUiState(
     val products: List<Product> = emptyList(),
     val archivedProducts: List<Product> = emptyList(),
+    val lists: List<ShoppingList> = emptyList(),
+    val selectedListId: String? = null,
     val shoppingList: List<ShoppingListItem> = emptyList(),
     val barcodesByProduct: Map<String, List<String>> = emptyMap(),
     val isLoading: Boolean = true,
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class PantryViewModel(
     private val repository: ProductRepository,
     private val shoppingListRepository: ShoppingListRepository,
     private val barcodeRepository: BarcodeRepository,
 ) : ViewModel() {
 
+    // Which list the Shopping tab shows. Kept valid by the init reconciler
+    // below; null only when there are no lists.
+    private val selectedListId = MutableStateFlow<String?>(null)
+
+    private val shoppingItems =
+        selectedListId.flatMapLatest { id ->
+            if (id == null) flowOf(emptyList()) else shoppingListRepository.observeItems(id)
+        }
+
     val uiState: StateFlow<PantryUiState> =
         combine(
-            repository.observeProducts(),
-            repository.observeArchivedProducts(),
-            shoppingListRepository.observeItems(),
-            barcodeRepository.observeBarcodes(),
-        ) { active, archived, shopping, barcodes ->
+            combine(
+                repository.observeProducts(),
+                repository.observeArchivedProducts(),
+                barcodeRepository.observeBarcodes(),
+            ) { active, archived, barcodes -> Triple(active, archived, barcodes) },
+            shoppingListRepository.observeLists(),
+            selectedListId,
+            shoppingItems,
+        ) { (active, archived, barcodes), lists, selected, items ->
             PantryUiState(
                 products = active,
                 archivedProducts = archived,
-                shoppingList = shopping,
+                lists = lists,
+                selectedListId = selected,
+                shoppingList = items,
                 barcodesByProduct = barcodes.groupBy({ it.productId }, { it.barcode }),
                 isLoading = false,
             )
@@ -50,6 +73,20 @@ class PantryViewModel(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = PantryUiState(isLoading = true),
         )
+
+    init {
+        // Keep the selection valid as lists appear/disappear.
+        viewModelScope.launch {
+            shoppingListRepository.observeLists().collect { lists ->
+                val current = selectedListId.value
+                selectedListId.value = when {
+                    lists.isEmpty() -> null
+                    lists.any { it.id == current } -> current
+                    else -> lists.first().id
+                }
+            }
+        }
+    }
 
     fun addProduct(
         name: String,
@@ -89,8 +126,29 @@ class PantryViewModel(
         viewModelScope.launch { repository.adjustQuantity(id, delta = -1) }
     }
 
+    fun selectList(id: String) {
+        selectedListId.value = id
+    }
+
+    fun createList(name: String) {
+        viewModelScope.launch {
+            // Newly created list becomes the selected one.
+            selectedListId.value = shoppingListRepository.createList(name)
+        }
+    }
+
+    fun renameList(id: String, name: String) {
+        viewModelScope.launch { shoppingListRepository.renameList(id, name) }
+    }
+
+    fun deleteList(id: String) {
+        // The init reconciler reselects the first remaining list (or null).
+        viewModelScope.launch { shoppingListRepository.deleteList(id) }
+    }
+
     fun addToShoppingList(productId: String, amount: Int) {
-        viewModelScope.launch { shoppingListRepository.addItem(productId, amount) }
+        val listId = selectedListId.value ?: return
+        viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount) }
     }
 
     fun setShoppingItemChecked(id: String, checked: Boolean) {
@@ -102,7 +160,8 @@ class PantryViewModel(
     }
 
     fun finishShopping() {
-        viewModelScope.launch { shoppingListRepository.finishShopping() }
+        val listId = selectedListId.value ?: return
+        viewModelScope.launch { shoppingListRepository.finishShopping(listId) }
     }
 
     fun archive(id: String) {

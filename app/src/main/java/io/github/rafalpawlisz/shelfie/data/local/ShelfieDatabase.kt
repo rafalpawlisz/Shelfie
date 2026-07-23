@@ -4,8 +4,13 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [ProductEntity::class, ShoppingListItemEntity::class, ProductBarcodeEntity::class],
-    version = 6,
+    entities = [
+        ProductEntity::class,
+        ShoppingListEntity::class,
+        ShoppingListItemEntity::class,
+        ProductBarcodeEntity::class,
+    ],
+    version = 7,
     exportSchema = true,
 )
 abstract class ShelfieDatabase : RoomDatabase() {

@@ -1,8 +1,10 @@
 package io.github.rafalpawlisz.shelfie.data
 
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListDao
+import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemRow
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
+import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
@@ -10,8 +12,30 @@ import kotlinx.coroutines.flow.map
 
 class OfflineShoppingListRepository(private val dao: ShoppingListDao) : ShoppingListRepository {
 
-    override fun observeItems(): Flow<List<ShoppingListItem>> =
-        dao.observeItems().map { rows ->
+    override fun observeLists(): Flow<List<ShoppingList>> =
+        dao.observeLists().map { rows ->
+            val collator = nameCollator()
+            rows.map { ShoppingList(id = it.id, name = it.name) }
+                .sortedWith { a, b -> collator.compare(a.name, b.name) }
+        }
+
+    override suspend fun createList(name: String): String {
+        val now = System.currentTimeMillis()
+        val id = UUID.randomUUID().toString()
+        dao.insertList(ShoppingListEntity(id = id, name = name.trim(), createdAt = now, updatedAt = now))
+        return id
+    }
+
+    override suspend fun renameList(id: String, name: String) {
+        dao.renameList(id = id, name = name.trim(), updatedAt = System.currentTimeMillis())
+    }
+
+    override suspend fun deleteList(id: String) {
+        dao.deleteList(id)
+    }
+
+    override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
+        dao.observeItems(listId).map { rows ->
             val collator = nameCollator()
             rows.map(ShoppingListItemRow::toDomain).sortedWith { a, b ->
                 // Unchecked (to buy) first, then name — locale-aware.
@@ -20,8 +44,9 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
             }
         }
 
-    override suspend fun addItem(productId: String, amount: Int) {
+    override suspend fun addItem(listId: String, productId: String, amount: Int) {
         dao.addOrMerge(
+            listId = listId,
             productId = productId,
             amount = amount,
             newId = UUID.randomUUID().toString(),
@@ -38,7 +63,7 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
         dao.delete(id)
     }
 
-    override suspend fun finishShopping() {
-        dao.checkout(System.currentTimeMillis())
+    override suspend fun finishShopping(listId: String) {
+        dao.checkout(listId, System.currentTimeMillis())
     }
 }

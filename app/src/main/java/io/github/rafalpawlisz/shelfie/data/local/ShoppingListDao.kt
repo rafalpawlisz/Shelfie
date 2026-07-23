@@ -9,20 +9,36 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ShoppingListDao {
 
+    // --- Lists ---
+
+    @Query("SELECT * FROM shopping_lists") // ordered in the repository (collator)
+    fun observeLists(): Flow<List<ShoppingListEntity>>
+
+    @Insert
+    suspend fun insertList(list: ShoppingListEntity)
+
+    @Query("UPDATE shopping_lists SET name = :name, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun renameList(id: String, name: String, updatedAt: Long)
+
+    @Query("DELETE FROM shopping_lists WHERE id = :id") // items cascade
+    suspend fun deleteList(id: String)
+
+    // --- Items within a list ---
+
     @Query(
         "SELECT i.id AS id, i.productId AS productId, i.amount AS amount, " +
             "i.checkedAt AS checkedAt, p.name AS productName, p.emoji AS productEmoji, " +
             "p.unit AS productUnit " +
             "FROM shopping_list_items i " +
             "JOIN products p ON p.id = i.productId " +
-            "WHERE p.archivedAt IS NULL"
+            "WHERE i.listId = :listId AND p.archivedAt IS NULL"
     )
     // Ordering (unchecked first, then by name) is applied in the repository
     // with a locale-aware Collator.
-    fun observeItems(): Flow<List<ShoppingListItemRow>>
+    fun observeItems(listId: String): Flow<List<ShoppingListItemRow>>
 
-    @Query("SELECT * FROM shopping_list_items WHERE productId = :productId LIMIT 1")
-    suspend fun findByProduct(productId: String): ShoppingListItemEntity?
+    @Query("SELECT * FROM shopping_list_items WHERE listId = :listId AND productId = :productId LIMIT 1")
+    suspend fun findByProduct(listId: String, productId: String): ShoppingListItemEntity?
 
     @Insert
     suspend fun insert(item: ShoppingListItemEntity)
@@ -36,44 +52,46 @@ interface ShoppingListDao {
     @Query("DELETE FROM shopping_list_items WHERE id = :id")
     suspend fun delete(id: String)
 
-    @Query("DELETE FROM shopping_list_items WHERE checkedAt IS NOT NULL")
-    suspend fun deleteChecked()
+    @Query("DELETE FROM shopping_list_items WHERE listId = :listId AND checkedAt IS NOT NULL")
+    suspend fun deleteChecked(listId: String)
 
     // Pure in-cart marker: checkedAt = timestamp (in cart) or null (back to buy).
     // No product-quantity side effect — stock is applied only at checkout().
     @Query("UPDATE shopping_list_items SET checkedAt = :checkedAt, updatedAt = :updatedAt WHERE id = :id")
     suspend fun setChecked(id: String, checkedAt: Long?, updatedAt: Long)
 
-    // Adds every checked item's amount to its product. The unique index on
-    // productId means the correlated subquery matches at most one row, so no
-    // aggregation is needed; the WHERE keeps us from writing NULL into the
-    // quantity of products with no checked item. Amounts are > 0, so quantity
-    // only grows — no MAX(0, ...) clamp needed.
+    // Adds every checked item's amount to its product, scoped to one list. The
+    // unique (listId, productId) index means the correlated subquery matches at
+    // most one row, so no aggregation is needed; the WHERE keeps us from writing
+    // NULL into the quantity of products with no checked item. Amounts are > 0,
+    // so quantity only grows — no MAX(0, ...) clamp needed.
     @Query(
         "UPDATE products SET quantity = quantity + " +
             "(SELECT i.amount FROM shopping_list_items i " +
-            "WHERE i.productId = products.id AND i.checkedAt IS NOT NULL), " +
+            "WHERE i.productId = products.id AND i.checkedAt IS NOT NULL AND i.listId = :listId), " +
             "updatedAt = :timestamp " +
-            "WHERE id IN (SELECT productId FROM shopping_list_items WHERE checkedAt IS NOT NULL)"
+            "WHERE id IN (SELECT productId FROM shopping_list_items " +
+            "WHERE checkedAt IS NOT NULL AND listId = :listId)"
     )
-    suspend fun applyCheckedAmountsToProducts(timestamp: Long)
+    suspend fun applyCheckedAmountsToProducts(listId: String, timestamp: Long)
 
-    // "Finish shopping": bank every checked item into its product, then drop
-    // the checked rows. Unchecked items remain. Apply-before-delete matters —
-    // deleteChecked() removes the rows the subquery reads.
+    // "Finish shopping": bank every checked item of this list into its product,
+    // then drop the checked rows. Unchecked items remain. Apply-before-delete
+    // matters — deleteChecked() removes the rows the subquery reads.
     @Transaction
-    suspend fun checkout(timestamp: Long) {
-        applyCheckedAmountsToProducts(timestamp)
-        deleteChecked()
+    suspend fun checkout(listId: String, timestamp: Long) {
+        applyCheckedAmountsToProducts(listId, timestamp)
+        deleteChecked(listId)
     }
 
     @Transaction
-    suspend fun addOrMerge(productId: String, amount: Int, newId: String, timestamp: Long) {
-        val existing = findByProduct(productId)
+    suspend fun addOrMerge(listId: String, productId: String, amount: Int, newId: String, timestamp: Long) {
+        val existing = findByProduct(listId, productId)
         when {
             existing == null -> insert(
                 ShoppingListItemEntity(
                     id = newId,
+                    listId = listId,
                     productId = productId,
                     amount = amount,
                     checkedAt = null,
@@ -89,6 +107,7 @@ interface ShoppingListDao {
                 insert(
                     ShoppingListItemEntity(
                         id = newId,
+                        listId = listId,
                         productId = productId,
                         amount = amount,
                         checkedAt = null,

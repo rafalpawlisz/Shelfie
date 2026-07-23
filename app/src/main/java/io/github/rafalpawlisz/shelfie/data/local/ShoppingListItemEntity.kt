@@ -15,12 +15,23 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
             childColumns = ["productId"],
             onDelete = ForeignKey.CASCADE,
         ),
+        ForeignKey(
+            entity = ShoppingListEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["listId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
-    // Unique: at most one list entry per product (adds merge instead).
-    indices = [Index(value = ["productId"], unique = true)],
+    indices = [
+        // At most one entry per product within a list (adds merge instead).
+        Index(value = ["listId", "productId"], unique = true),
+        // Covers the productId FK now that it's no longer the unique index.
+        Index(value = ["productId"]),
+    ],
 )
 data class ShoppingListItemEntity(
     @PrimaryKey val id: String,
+    val listId: String,
     val productId: String,
     // How many to buy; always > 0 (enforced by the dialog and merge logic).
     val amount: Int,
