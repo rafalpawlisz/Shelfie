@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 sealed interface UseUpScanResult {
     data class Used(val productName: String) : UseUpScanResult
     data class OutOfStock(val productName: String) : UseUpScanResult
-    data object UnknownCode : UseUpScanResult
+    data class UnknownCode(val code: String) : UseUpScanResult
 }
 
 data class PantryUiState(
@@ -147,7 +147,7 @@ class PantryViewModel(
             // Only active products can be used up; archived/unknown → UnknownCode.
             val product = productId?.let { repository.getActiveProduct(it) }
             val result = when {
-                product == null -> UseUpScanResult.UnknownCode
+                product == null -> UseUpScanResult.UnknownCode(code)
                 product.quantity > 0 -> {
                     repository.adjustQuantity(product.id, delta = -1)
                     UseUpScanResult.Used(product.name)

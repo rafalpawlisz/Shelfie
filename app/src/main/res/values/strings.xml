@@ -33,7 +33,7 @@
     <string name="use_up_empty_message">Products you have in stock show up here</string>
     <string name="use_up_scanned">Used: %1$s</string>
     <string name="use_up_scan_out_of_stock">%1$s: nothing in stock</string>
-    <string name="use_up_scan_unknown">Unknown barcode</string>
+    <string name="use_up_scan_unknown">Unknown barcode: %1$s</string>
     <string name="add_product">Add product</string>
     <string name="edit_product">Edit product</string>
     <string name="products_hint">Tap a product to edit it</string>

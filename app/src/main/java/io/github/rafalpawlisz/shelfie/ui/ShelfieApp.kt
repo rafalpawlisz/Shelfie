@@ -64,8 +64,8 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                     context.getString(R.string.use_up_scanned, result.productName)
                 is UseUpScanResult.OutOfStock ->
                     context.getString(R.string.use_up_scan_out_of_stock, result.productName)
-                UseUpScanResult.UnknownCode ->
-                    context.getString(R.string.use_up_scan_unknown)
+                is UseUpScanResult.UnknownCode ->
+                    context.getString(R.string.use_up_scan_unknown, result.code)
             }
             snackbarHostState.showSnackbar(message)
         }
