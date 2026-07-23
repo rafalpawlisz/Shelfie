@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -35,8 +36,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +51,9 @@ import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
+import io.github.rafalpawlisz.shelfie.ui.DragHandleIcon
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun ShoppingScreen(
@@ -59,6 +66,7 @@ fun ShoppingScreen(
     onDeleteList: (id: String) -> Unit,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
+    onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onFinishShopping: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -89,6 +97,7 @@ fun ShoppingScreen(
                 items = items,
                 onToggle = onToggle,
                 onRemove = onRemove,
+                onMove = onMove,
                 onFinishShopping = onFinishShopping,
             )
         }
@@ -239,10 +248,26 @@ private fun ListItems(
     items: List<ShoppingListItem>,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
+    onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onFinishShopping: () -> Unit,
 ) {
     val checkedCount = items.count { it.isChecked }
     var showFinishDialog by rememberSaveable { mutableStateOf(false) }
+
+    // Local mirror so a drag animates smoothly. It re-syncs from [items] whenever
+    // the upstream order actually changes (e.g. after a move is persisted), but
+    // not mid-drag — nothing is persisted until the gesture ends.
+    val ordered = remember { mutableStateListOf<ShoppingListItem>().apply { addAll(items) } }
+    LaunchedEffect(items) {
+        if (ordered != items) {
+            ordered.clear()
+            ordered.addAll(items)
+        }
+    }
+    val lazyListState = rememberLazyListState()
+    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        ordered.add(to.index, ordered.removeAt(from.index))
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Hint and the (conditional) finish action share one fixed-height row so
@@ -265,17 +290,32 @@ private fun ListItems(
             }
         }
         LazyColumn(
+            state = lazyListState,
             modifier = Modifier.fillMaxSize(),
             // Extra bottom padding keeps the FAB clear of the last row.
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(items, key = { it.id }) { item ->
-                ShoppingListRow(
-                    item = item,
-                    onToggle = { onToggle(item.id, !item.isChecked) },
-                    onRemove = { onRemove(item.id) },
-                )
+            items(ordered, key = { it.id }) { item ->
+                ReorderableItem(reorderableState, key = item.id) { _ ->
+                    // Built inside the reorderable scope so draggableHandle binds
+                    // correctly, then handed to the row as a plain Modifier. On
+                    // drop, translate the net move into indices over the upstream
+                    // list so the ViewModel can persist the moved item's position.
+                    val handleModifier = Modifier.draggableHandle(
+                        onDragStopped = {
+                            val from = items.indexOfFirst { it.id == item.id }
+                            val to = ordered.indexOfFirst { it.id == item.id }
+                            if (from != -1 && to != -1 && from != to) onMove(from, to)
+                        },
+                    )
+                    ShoppingListRow(
+                        item = item,
+                        onToggle = { onToggle(item.id, !item.isChecked) },
+                        onRemove = { onRemove(item.id) },
+                        dragHandleModifier = handleModifier,
+                    )
+                }
             }
         }
     }
@@ -308,6 +348,7 @@ private fun ShoppingListRow(
     item: ShoppingListItem,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
+    dragHandleModifier: Modifier,
 ) {
     val textColor =
         if (item.isChecked) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
@@ -345,6 +386,14 @@ private fun ShoppingListRow(
                             stringResource(R.string.cd_remove_from_list, item.productName),
                     )
                 }
+            }
+            // Drag grip: the modifier (built in the reorderable item scope) makes
+            // this the drag handle; the row's own tap still toggles the checkbox.
+            IconButton(modifier = dragHandleModifier, onClick = {}) {
+                Icon(
+                    imageVector = DragHandleIcon,
+                    contentDescription = stringResource(R.string.cd_drag_handle),
+                )
             }
         }
     }

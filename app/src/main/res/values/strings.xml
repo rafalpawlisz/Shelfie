@@ -17,6 +17,7 @@
     <string name="finish_shopping_message">Add %1$d item(s) to your pantry and finish shopping?</string>
     <string name="action_finish">Finish</string>
     <string name="cd_remove_from_list">Remove %1$s from the shopping list</string>
+    <string name="cd_drag_handle">Drag to reorder</string>
     <string name="shopping_no_lists_title">No shopping lists yet</string>
     <string name="shopping_no_lists_message">Tap + to create your first store list</string>
     <string name="create_list">New list</string>

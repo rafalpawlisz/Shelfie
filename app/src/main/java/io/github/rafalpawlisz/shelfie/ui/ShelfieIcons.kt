@@ -25,3 +25,14 @@ internal val BarcodeIcon: ImageVector = materialIcon(name = "Filled.Barcode") {
     materialPath { moveTo(16.0f, 5.0f); horizontalLineTo(17.0f); verticalLineTo(19.0f); horizontalLineTo(16.0f); close() }
     materialPath { moveTo(19.0f, 5.0f); horizontalLineTo(20.0f); verticalLineTo(19.0f); horizontalLineTo(19.0f); close() }
 }
+
+// Material's "drag_handle" (two horizontal bars) lives in material-icons-extended
+// only; this is its path geometry so we can use it as a reorder grip.
+internal val DragHandleIcon: ImageVector = materialIcon(name = "Filled.DragHandle") {
+    materialPath {
+        moveTo(20.0f, 9.0f); horizontalLineTo(4.0f); verticalLineTo(11.0f); horizontalLineTo(20.0f); close()
+    }
+    materialPath {
+        moveTo(20.0f, 13.0f); horizontalLineTo(4.0f); verticalLineTo(15.0f); horizontalLineTo(20.0f); close()
+    }
+}
