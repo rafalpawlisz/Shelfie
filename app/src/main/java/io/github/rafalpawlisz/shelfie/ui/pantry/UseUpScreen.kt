@@ -18,11 +18,14 @@ import io.github.rafalpawlisz.shelfie.ui.RemoveIcon
 
 @Composable
 fun UseUpScreen(products: List<Product>, onDecrement: (String) -> Unit) {
-    if (products.isEmpty()) {
+    // A product at zero can't be used up further, so it doesn't belong here.
+    val usable = products.filter { it.quantity > 0 }
+
+    if (usable.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize()) {
             EmptyState(
-                title = stringResource(R.string.empty_state_title),
-                message = stringResource(R.string.empty_state_go_to_products),
+                title = stringResource(R.string.use_up_empty_title),
+                message = stringResource(R.string.use_up_empty_message),
                 modifier = Modifier.align(Alignment.Center),
             )
         }
@@ -34,10 +37,9 @@ fun UseUpScreen(products: List<Product>, onDecrement: (String) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            ProductList(products = products) { product ->
+            ProductList(products = usable) { product ->
                 ProductListItem(
                     product = product,
-                    enabled = product.quantity > 0,
                     onClick = { onDecrement(product.id) },
                     trailingContent = {
                         Icon(
