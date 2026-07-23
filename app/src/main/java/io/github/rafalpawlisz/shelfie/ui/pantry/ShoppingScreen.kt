@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -51,15 +53,19 @@ fun ShoppingScreen(
     val checkedCount = items.count { it.isChecked }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = stringResource(R.string.shopping_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-        if (checkedCount > 0) {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                Spacer(modifier = Modifier.weight(1f))
+        // Hint and the (conditional) clear action share one fixed-height row so
+        // the button appearing/disappearing never shifts the list below.
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.shopping_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            if (checkedCount > 0) {
                 TextButton(onClick = onClearPurchased) {
                     Icon(imageVector = Icons.Default.Delete, contentDescription = null)
                     Text(text = stringResource(R.string.clear_purchased, checkedCount))
@@ -100,6 +106,7 @@ private fun ShoppingListRow(
         ) {
             // Visual indicator only; the whole row is the touch target.
             Checkbox(checked = item.isChecked, onCheckedChange = null)
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
                 Text(
                     text = listOfNotNull(item.productEmoji, item.productName).joinToString(" "),
