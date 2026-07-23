@@ -1,4 +1,4 @@
-package io.github.rafalpawlisz.shelfie.pantry
+﻿package io.github.rafalpawlisz.shelfie.pantry
 
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
@@ -18,11 +18,14 @@ class PantryViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    private fun makeViewModel(repository: FakeProductRepository) =
+        PantryViewModel(repository, FakeShoppingListRepository(repository))
+
     @Test
     fun `uiState maps repository products and clears loading`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 2, unit = "l")
-        val viewModel = PantryViewModel(repository)
+        val viewModel = makeViewModel(repository)
 
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
 
@@ -37,7 +40,7 @@ class PantryViewModelTest {
     @Test
     fun `addProduct surfaces the new product in uiState`() = runTest {
         val repository = FakeProductRepository()
-        val viewModel = PantryViewModel(repository)
+        val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
 
         assertTrue(viewModel.uiState.value.products.isEmpty())
@@ -54,7 +57,7 @@ class PantryViewModelTest {
     fun `decrement clamps quantity at zero`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Butter", quantity = 1, unit = null)
-        val viewModel = PantryViewModel(repository)
+        val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         val id = viewModel.uiState.value.products.single().id
 
@@ -68,7 +71,7 @@ class PantryViewModelTest {
     fun `updateProduct changes name quantity and unit`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Mlik", quantity = 1, unit = null)
-        val viewModel = PantryViewModel(repository)
+        val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         val id = viewModel.uiState.value.products.single().id
 
@@ -85,7 +88,7 @@ class PantryViewModelTest {
     fun `archive moves the product to the archived list`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Flour", quantity = 1, unit = "kg")
-        val viewModel = PantryViewModel(repository)
+        val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         val id = viewModel.uiState.value.products.single().id
 
@@ -99,7 +102,7 @@ class PantryViewModelTest {
     fun `restore moves the product back to the active list`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Rice", quantity = 2, unit = "kg")
-        val viewModel = PantryViewModel(repository)
+        val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         val id = viewModel.uiState.value.products.single().id
         viewModel.archive(id)
