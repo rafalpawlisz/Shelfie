@@ -43,6 +43,11 @@ android {
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
+    // Aligns kotlinx-serialization app-wide: lifecycle pulls core 1.7.3 while
+    // room-testing pulls json 1.8.1, and mixing them AbstractMethodErrors in
+    // the migration tests (AGP keeps test and app classpaths consistent, so
+    // the pin must live here, not in androidTest).
+    implementation(platform(libs.kotlinx.serialization.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
@@ -63,6 +68,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

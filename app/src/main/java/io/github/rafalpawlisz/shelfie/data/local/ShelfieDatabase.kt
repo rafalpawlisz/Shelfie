@@ -20,4 +20,14 @@ abstract class ShelfieDatabase : RoomDatabase() {
     abstract fun productDao(): ProductDao
     abstract fun shoppingListDao(): ShoppingListDao
     abstract fun productBarcodeDao(): ProductBarcodeDao
+
+    companion object {
+        /**
+         * Every schema step ships an explicit Migration here (with a test in
+         * androidTest/MigrationTest against the exported app/schemas JSONs).
+         * There is no destructive fallback anymore — forgetting one crashes
+         * loudly instead of silently wiping someone's pantry.
+         */
+        val MIGRATIONS = emptyArray<androidx.room.migration.Migration>()
+    }
 }

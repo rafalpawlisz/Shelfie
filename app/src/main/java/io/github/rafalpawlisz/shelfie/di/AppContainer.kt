@@ -19,10 +19,10 @@ class AppContainer(private val context: Context) {
         klass = ShelfieDatabase::class.java,
         name = "shelfie.db",
     )
-        // Schema-experimentation phase: wipe on any version change instead of
-        // writing migrations. Switch to explicit Migration objects before real
-        // pantry data goes in (second user / sync work).
-        .fallbackToDestructiveMigration(dropAllTables = true)
+        // No destructive fallback: real pantry data lives here now, so every
+        // schema change must ship an explicit Migration (see MIGRATIONS) with
+        // a test against the exported schemas in app/schemas.
+        .addMigrations(*ShelfieDatabase.MIGRATIONS)
         .build()
 
     val productRepository: ProductRepository by lazy {
