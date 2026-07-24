@@ -13,7 +13,7 @@ class FakeShoppingListRepository(
     private val products: FakeProductRepository,
 ) : ShoppingListRepository {
 
-    private data class ListEntry(val id: String, val name: String)
+    private data class ListEntry(val id: String, val name: String, val archivedAt: Long? = null)
 
     private data class Item(
         val id: String,
@@ -36,10 +36,19 @@ class FakeShoppingListRepository(
     private var nextListId = 1
     private var nextId = 1
     private var checkSeq = 0L
+    private var archiveSeq = 0L
 
     override fun observeLists(): Flow<List<ShoppingList>> =
         lists.map { entries ->
-            entries.map { ShoppingList(id = it.id, name = it.name) }
+            entries.filter { it.archivedAt == null }
+                .map { ShoppingList(id = it.id, name = it.name) }
+                .sortedBy { it.name.lowercase() }
+        }
+
+    override fun observeArchivedLists(): Flow<List<ShoppingList>> =
+        lists.map { entries ->
+            entries.filter { it.archivedAt != null }
+                .map { ShoppingList(id = it.id, name = it.name) }
                 .sortedBy { it.name.lowercase() }
         }
 
@@ -51,6 +60,15 @@ class FakeShoppingListRepository(
 
     override suspend fun renameList(id: String, name: String) {
         lists.update { list -> list.map { if (it.id == id) it.copy(name = name.trim()) else it } }
+    }
+
+    override suspend fun archiveList(id: String) {
+        // Soft delete: items and order rows stay put, so restore brings them back.
+        lists.update { list -> list.map { if (it.id == id) it.copy(archivedAt = ++archiveSeq) else it } }
+    }
+
+    override suspend fun restoreList(id: String) {
+        lists.update { list -> list.map { if (it.id == id) it.copy(archivedAt = null) else it } }
     }
 
     override suspend fun deleteList(id: String) {

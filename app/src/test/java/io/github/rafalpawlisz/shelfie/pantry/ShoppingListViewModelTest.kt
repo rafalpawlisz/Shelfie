@@ -132,6 +132,76 @@ class ShoppingListViewModelTest {
         assertTrue(viewModel.uiState.value.lists.isEmpty())
     }
 
+    // --- Archiving lists ---
+
+    @Test
+    fun `archiving the selected list hides it, reselects, and moves it to the archive`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Auchan")
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.addToShoppingList(productId, 1)
+
+        viewModel.archiveList(lidl)
+
+        val state = viewModel.uiState.value
+        assertEquals(listOf("Auchan"), state.lists.map { it.name })
+        assertEquals(listOf("Lidl"), state.archivedLists.map { it.name })
+        assertEquals(state.lists.single().id, state.selectedListId) // reselected the survivor
+    }
+
+    @Test
+    fun `restoring a list brings it back with its items and manual order`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Apples", quantity = 0, unit = null)
+        repository.addProduct(name = "Bread", quantity = 0, unit = null)
+        repository.addProduct(name = "Cheese", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        listOf("Apples", "Bread", "Cheese").forEach { viewModel.addToShoppingList(pid(it), 1) }
+        viewModel.moveShoppingItem(fromIndex = 2, toIndex = 0) // [Cheese, Apples, Bread]
+
+        viewModel.archiveList(lidl)
+        assertTrue(viewModel.uiState.value.lists.isEmpty())
+        assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+
+        viewModel.restoreList(lidl)
+
+        assertEquals(listOf("Lidl"), viewModel.uiState.value.lists.map { it.name })
+        assertTrue(viewModel.uiState.value.archivedLists.isEmpty())
+        // Items and the custom order survived the round trip.
+        assertEquals(
+            listOf("Cheese", "Apples", "Bread"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
+    @Test
+    fun `permanently deleting an archived list removes it from the archive`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.addToShoppingList(productId, 1)
+        viewModel.archiveList(lidl)
+        assertEquals(listOf("Lidl"), viewModel.uiState.value.archivedLists.map { it.name })
+
+        viewModel.deleteList(lidl)
+
+        assertTrue(viewModel.uiState.value.lists.isEmpty())
+        assertTrue(viewModel.uiState.value.archivedLists.isEmpty())
+    }
+
     // --- Item behavior within the selected list ---
 
     @Test

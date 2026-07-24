@@ -11,8 +11,11 @@ interface ShoppingListDao {
 
     // --- Lists ---
 
-    @Query("SELECT * FROM shopping_lists") // ordered in the repository (collator)
+    @Query("SELECT * FROM shopping_lists WHERE archivedAt IS NULL") // ordered in the repository (collator)
     fun observeLists(): Flow<List<ShoppingListEntity>>
+
+    @Query("SELECT * FROM shopping_lists WHERE archivedAt IS NOT NULL") // ordered in the repository
+    fun observeArchivedLists(): Flow<List<ShoppingListEntity>>
 
     @Insert
     suspend fun insertList(list: ShoppingListEntity)
@@ -20,7 +23,15 @@ interface ShoppingListDao {
     @Query("UPDATE shopping_lists SET name = :name, updatedAt = :updatedAt WHERE id = :id")
     suspend fun renameList(id: String, name: String, updatedAt: Long)
 
-    @Query("DELETE FROM shopping_lists WHERE id = :id") // items cascade
+    // Soft delete: keeps the row (and its items + order) so the list can be restored.
+    @Query("UPDATE shopping_lists SET archivedAt = :timestamp, updatedAt = :timestamp WHERE id = :id")
+    suspend fun archiveList(id: String, timestamp: Long)
+
+    @Query("UPDATE shopping_lists SET archivedAt = NULL, updatedAt = :timestamp WHERE id = :id")
+    suspend fun restoreList(id: String, timestamp: Long)
+
+    // Permanent delete (only from the archive view); items and order cascade.
+    @Query("DELETE FROM shopping_lists WHERE id = :id")
     suspend fun deleteList(id: String)
 
     // --- Items within a list ---

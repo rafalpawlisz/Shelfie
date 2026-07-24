@@ -9,4 +9,7 @@ data class ShoppingListEntity(
     val name: String,
     val createdAt: Long,
     val updatedAt: Long,
+    // Soft delete: null = active. Archiving keeps the row (and its items + order)
+    // so the list can be restored intact; only a permanent delete drops it.
+    val archivedAt: Long? = null,
 )

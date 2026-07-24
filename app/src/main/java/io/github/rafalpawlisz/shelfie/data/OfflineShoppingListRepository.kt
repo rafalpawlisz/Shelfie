@@ -13,11 +13,16 @@ import kotlinx.coroutines.flow.map
 class OfflineShoppingListRepository(private val dao: ShoppingListDao) : ShoppingListRepository {
 
     override fun observeLists(): Flow<List<ShoppingList>> =
-        dao.observeLists().map { rows ->
-            val collator = nameCollator()
-            rows.map { ShoppingList(id = it.id, name = it.name) }
-                .sortedWith { a, b -> collator.compare(a.name, b.name) }
-        }
+        dao.observeLists().map { it.toSortedDomain() }
+
+    override fun observeArchivedLists(): Flow<List<ShoppingList>> =
+        dao.observeArchivedLists().map { it.toSortedDomain() }
+
+    private fun List<ShoppingListEntity>.toSortedDomain(): List<ShoppingList> {
+        val collator = nameCollator()
+        return map { ShoppingList(id = it.id, name = it.name) }
+            .sortedWith { a, b -> collator.compare(a.name, b.name) }
+    }
 
     override suspend fun createList(name: String): String {
         val now = System.currentTimeMillis()
@@ -28,6 +33,14 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
 
     override suspend fun renameList(id: String, name: String) {
         dao.renameList(id = id, name = name.trim(), updatedAt = System.currentTimeMillis())
+    }
+
+    override suspend fun archiveList(id: String) {
+        dao.archiveList(id, System.currentTimeMillis())
+    }
+
+    override suspend fun restoreList(id: String) {
+        dao.restoreList(id, System.currentTimeMillis())
     }
 
     override suspend fun deleteList(id: String) {

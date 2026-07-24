@@ -8,8 +8,11 @@ interface ShoppingListRepository {
 
     // Lists
     fun observeLists(): Flow<List<ShoppingList>>
+    fun observeArchivedLists(): Flow<List<ShoppingList>>
     suspend fun createList(name: String): String
     suspend fun renameList(id: String, name: String)
+    suspend fun archiveList(id: String)
+    suspend fun restoreList(id: String)
     suspend fun deleteList(id: String)
 
     // Items within a given list

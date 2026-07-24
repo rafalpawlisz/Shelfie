@@ -11,7 +11,7 @@ import androidx.room.RoomDatabase
         ProductBarcodeEntity::class,
         ProductListOrderEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class ShelfieDatabase : RoomDatabase() {

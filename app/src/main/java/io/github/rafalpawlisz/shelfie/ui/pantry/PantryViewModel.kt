@@ -35,6 +35,7 @@ data class PantryUiState(
     val products: List<Product> = emptyList(),
     val archivedProducts: List<Product> = emptyList(),
     val lists: List<ShoppingList> = emptyList(),
+    val archivedLists: List<ShoppingList> = emptyList(),
     val selectedListId: String? = null,
     val shoppingList: List<ShoppingListItem> = emptyList(),
     val barcodesByProduct: Map<String, List<String>> = emptyMap(),
@@ -69,13 +70,15 @@ class PantryViewModel(
                 barcodeRepository.observeBarcodes(),
             ) { active, archived, barcodes -> Triple(active, archived, barcodes) },
             shoppingListRepository.observeLists(),
+            shoppingListRepository.observeArchivedLists(),
             selectedListId,
             shoppingItems,
-        ) { (active, archived, barcodes), lists, selected, items ->
+        ) { (active, archived, barcodes), lists, archivedLists, selected, items ->
             PantryUiState(
                 products = active,
                 archivedProducts = archived,
                 lists = lists,
+                archivedLists = archivedLists,
                 selectedListId = selected,
                 shoppingList = items,
                 barcodesByProduct = barcodes.groupBy({ it.productId }, { it.barcode }),
@@ -173,8 +176,18 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.renameList(id, name) }
     }
 
+    fun archiveList(id: String) {
+        // Reversible soft delete; the reconciler reselects another active list
+        // (or null). Items and manual order stay put for a later restore.
+        viewModelScope.launch { shoppingListRepository.archiveList(id) }
+    }
+
+    fun restoreList(id: String) {
+        viewModelScope.launch { shoppingListRepository.restoreList(id) }
+    }
+
     fun deleteList(id: String) {
-        // The init reconciler reselects the first remaining list (or null).
+        // Permanent (only reachable from the archive view); items cascade.
         viewModelScope.launch { shoppingListRepository.deleteList(id) }
     }
 
