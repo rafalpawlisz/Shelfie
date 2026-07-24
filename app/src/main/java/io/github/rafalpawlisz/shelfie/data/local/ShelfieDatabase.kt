@@ -11,7 +11,9 @@ import androidx.room.RoomDatabase
         ProductBarcodeEntity::class,
         ProductListOrderEntity::class,
     ],
-    version = 12,
+    // Renumbered from 12 back to 1 before the first release — the development
+    // history (schema wipes all along) doesn't need to live in the version.
+    version = 1,
     exportSchema = true,
 )
 abstract class ShelfieDatabase : RoomDatabase() {
