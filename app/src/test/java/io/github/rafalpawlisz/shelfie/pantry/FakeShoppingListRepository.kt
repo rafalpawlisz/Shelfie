@@ -178,6 +178,11 @@ class FakeShoppingListRepository(
         positions.update { it + ((listId to productId) to position) }
     }
 
+    override suspend fun isOnAnyList(productId: String): Boolean {
+        val activeListIds = lists.value.filter { it.archivedAt == null }.map { it.id }.toSet()
+        return items.value.any { it.productId == productId && it.listId in activeListIds }
+    }
+
     // Append at the end the first time a product joins a list; keep an existing slot.
     private fun ensurePosition(listId: String, productId: String) {
         val key = listId to productId

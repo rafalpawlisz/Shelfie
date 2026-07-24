@@ -113,4 +113,6 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
     override suspend fun setItemPosition(listId: String, productId: String, position: Double) {
         dao.setPosition(listId, productId, position, System.currentTimeMillis())
     }
+
+    override suspend fun isOnAnyList(productId: String): Boolean = dao.isOnActiveList(productId)
 }

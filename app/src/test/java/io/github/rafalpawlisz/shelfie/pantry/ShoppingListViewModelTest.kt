@@ -1,7 +1,9 @@
 package io.github.rafalpawlisz.shelfie.pantry
 
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
+import io.github.rafalpawlisz.shelfie.ui.pantry.LowStockSuggestion
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
+import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScanResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -20,12 +22,27 @@ class ShoppingListViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private fun makeViewModel(repository: FakeProductRepository) =
-        PantryViewModel(repository, FakeShoppingListRepository(repository), FakeBarcodeRepository())
+    private fun makeViewModel(
+        repository: FakeProductRepository,
+        uiPreferences: FakeUiPreferences = FakeUiPreferences(),
+    ) = PantryViewModel(
+        repository,
+        FakeShoppingListRepository(repository),
+        FakeBarcodeRepository(),
+        uiPreferences,
+    )
 
     // Keeps the WhileSubscribed uiState hot so reads see the latest state.
     private fun TestScope.observe(viewModel: PantryViewModel) {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+    }
+
+    private fun TestScope.collectLowStock(viewModel: PantryViewModel): List<LowStockSuggestion> {
+        val events = mutableListOf<LowStockSuggestion>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.lowStockEvents.collect { events.add(it) }
+        }
+        return events
     }
 
     // --- Selection & list management ---
@@ -265,6 +282,137 @@ class ShoppingListViewModelTest {
             listOf("Biedronka", "Lidl", "Auchan"),
             viewModel.uiState.value.lists.map { it.name },
         )
+    }
+
+    // --- Low-stock restock suggestions ---
+
+    @Test
+    fun `use-up below the minimum emits a suggestion whose amount grows`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 3, unit = "l", minQuantity = 3)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val events = collectLowStock(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+
+        viewModel.decrement(productId) // 2 < 3
+        viewModel.decrement(productId) // 1 < 3
+
+        assertEquals(listOf(1, 2), events.map { it.suggestedAmount })
+        assertEquals("Milk", events.first().productName)
+    }
+
+    @Test
+    fun `no suggestion without a minimum quantity`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 1, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val events = collectLowStock(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+
+        viewModel.decrement(productId)
+
+        assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun `no suggestion when the product is already on a list`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 2, unit = "l", minQuantity = 3)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val events = collectLowStock(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        viewModel.addToShoppingList(productId, amount = 2)
+
+        viewModel.decrement(productId)
+
+        assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun `suggestion still emitted when there are no lists`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 2, unit = "l", minQuantity = 3)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val events = collectLowStock(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+
+        viewModel.decrement(productId)
+
+        // The UI decides whether an Add action makes sense; the info always flows.
+        assertEquals(1, events.size)
+    }
+
+    @Test
+    fun `scan use-up folds the suggestion into the Used event`() = runTest {
+        val repository = FakeProductRepository()
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val scans = mutableListOf<UseUpScanResult>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.scanEvents.collect { scans.add(it) }
+        }
+        val lowStock = collectLowStock(viewModel)
+        viewModel.addProduct(
+            name = "Milk", quantity = 2, unit = "l", minQuantity = 3,
+            barcodes = listOf("5901234123457"),
+        )
+        viewModel.createList("Lidl")
+
+        viewModel.useUpByBarcode("5901234123457")
+
+        val used = scans.single() as UseUpScanResult.Used
+        assertEquals("Milk", used.productName)
+        assertEquals(2, used.suggestion?.suggestedAmount) // min 3 − new stock 1
+        assertTrue(lowStock.isEmpty()) // no second event for the same use-up
+    }
+
+    @Test
+    fun `addToList adds to the chosen list and remembers it`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val prefs = FakeUiPreferences()
+        val viewModel = makeViewModel(repository, prefs)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.createList("Auchan") // selected now
+
+        viewModel.addToList(lidl, productId, amount = 2) // NOT the selected list
+
+        assertEquals(lidl, prefs.lastRestockListId)
+        assertTrue(viewModel.uiState.value.shoppingList.isEmpty()) // Auchan untouched
+        viewModel.selectList(lidl)
+        assertEquals(2, viewModel.uiState.value.shoppingList.single().amount)
+    }
+
+    @Test
+    fun `defaultRestockListId prefers the remembered list and ignores stale ids`() = runTest {
+        val repository = FakeProductRepository()
+        val prefs = FakeUiPreferences()
+        val viewModel = makeViewModel(repository, prefs)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.createList("Auchan")
+        val auchan = viewModel.uiState.value.selectedListId!!
+
+        // Nothing remembered -> the currently selected list.
+        assertEquals(auchan, viewModel.defaultRestockListId())
+
+        prefs.lastRestockListId = lidl
+        assertEquals(lidl, viewModel.defaultRestockListId())
+
+        // A remembered id that no longer exists falls back to the selection.
+        prefs.lastRestockListId = "gone"
+        assertEquals(auchan, viewModel.defaultRestockListId())
     }
 
     // --- Item behavior within the selected list ---

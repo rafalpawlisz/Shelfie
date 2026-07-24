@@ -9,6 +9,7 @@ import io.github.rafalpawlisz.shelfie.ShelfieApplication
 import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.ProductRepository
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
+import io.github.rafalpawlisz.shelfie.data.UiPreferences
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
@@ -24,9 +25,26 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/**
+ * A restock hint after a use-up left the stock below the product's minimum:
+ * offer to put the product on a shopping list. [suggestedAmount] tops the
+ * stock back up to the minimum.
+ */
+data class LowStockSuggestion(
+    val productId: String,
+    val productName: String,
+    val suggestedAmount: Int,
+)
+
 /** One-shot outcome of scanning a barcode on the Use up tab. */
 sealed interface UseUpScanResult {
-    data class Used(val productName: String) : UseUpScanResult
+    // A successful scan may carry a restock suggestion so the UI can show ONE
+    // snackbar with both messages instead of queueing two.
+    data class Used(
+        val productName: String,
+        val suggestion: LowStockSuggestion? = null,
+    ) : UseUpScanResult
+
     data class OutOfStock(val productName: String) : UseUpScanResult
     data class UnknownCode(val code: String) : UseUpScanResult
 }
@@ -47,6 +65,7 @@ class PantryViewModel(
     private val repository: ProductRepository,
     private val shoppingListRepository: ShoppingListRepository,
     private val barcodeRepository: BarcodeRepository,
+    private val uiPreferences: UiPreferences,
 ) : ViewModel() {
 
     // Which list the Shopping tab shows. Kept valid by the init reconciler
@@ -61,6 +80,10 @@ class PantryViewModel(
     // One-shot feedback for barcode scans on the Use up tab.
     private val scanChannel = Channel<UseUpScanResult>(Channel.BUFFERED)
     val scanEvents = scanChannel.receiveAsFlow()
+
+    // One-shot restock hints for the tap path (scans fold the hint into Used).
+    private val lowStockChannel = Channel<LowStockSuggestion>(Channel.BUFFERED)
+    val lowStockEvents = lowStockChannel.receiveAsFlow()
 
     val uiState: StateFlow<PantryUiState> =
         combine(
@@ -139,7 +162,11 @@ class PantryViewModel(
     }
 
     fun decrement(id: String) {
-        viewModelScope.launch { repository.adjustQuantity(id, delta = -1) }
+        viewModelScope.launch {
+            val product = repository.getActiveProduct(id) ?: return@launch
+            if (product.quantity <= 0) return@launch
+            useUpProduct(product)?.let { lowStockChannel.send(it) }
+        }
     }
 
     fun useUpByBarcode(code: String) {
@@ -151,14 +178,31 @@ class PantryViewModel(
             val product = productId?.let { repository.getActiveProduct(it) }
             val result = when {
                 product == null -> UseUpScanResult.UnknownCode(code)
-                product.quantity > 0 -> {
-                    repository.adjustQuantity(product.id, delta = -1)
-                    UseUpScanResult.Used(product.name)
-                }
+                product.quantity > 0 -> UseUpScanResult.Used(product.name, useUpProduct(product))
                 else -> UseUpScanResult.OutOfStock(product.name)
             }
             scanChannel.send(result)
         }
+    }
+
+    /**
+     * Consume one unit and return a restock suggestion when the stock lands
+     * below the product's minimum. Fires on every such use-up (the amount grows
+     * as the stock shrinks); the "already on a list" check is what keeps it from
+     * nagging. Whether the UI offers an Add action (there may be no lists) is
+     * the UI's call.
+     */
+    private suspend fun useUpProduct(product: Product): LowStockSuggestion? {
+        repository.adjustQuantity(product.id, delta = -1)
+        val min = product.minQuantity ?: return null
+        val newQuantity = product.quantity - 1
+        if (newQuantity >= min) return null
+        if (shoppingListRepository.isOnAnyList(product.id)) return null
+        return LowStockSuggestion(
+            productId = product.id,
+            productName = product.name,
+            suggestedAmount = maxOf(1, min - newQuantity),
+        )
     }
 
     fun selectList(id: String) {
@@ -217,6 +261,23 @@ class PantryViewModel(
     fun addToShoppingList(productId: String, amount: Int) {
         val listId = selectedListId.value ?: return
         viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount) }
+    }
+
+    /** Add to an explicitly chosen list (restock dialog) and remember the choice. */
+    fun addToList(listId: String, productId: String, amount: Int) {
+        uiPreferences.lastRestockListId = listId
+        viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount) }
+    }
+
+    /** Which list the restock dialog should preselect: last used, else selected, else first. */
+    fun defaultRestockListId(): String? {
+        val lists = uiState.value.lists
+        val remembered = uiPreferences.lastRestockListId
+        return when {
+            lists.any { it.id == remembered } -> remembered
+            selectedListId.value != null -> selectedListId.value
+            else -> lists.firstOrNull()?.id
+        }
     }
 
     fun setShoppingItemChecked(id: String, checked: Boolean) {
@@ -279,6 +340,7 @@ class PantryViewModel(
                     app.container.productRepository,
                     app.container.shoppingListRepository,
                     app.container.barcodeRepository,
+                    app.container.uiPreferences,
                 )
             }
         }

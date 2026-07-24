@@ -59,6 +59,15 @@ interface ShoppingListDao {
     @Query("SELECT * FROM shopping_list_items WHERE listId = :listId AND productId = :productId LIMIT 1")
     suspend fun findByProduct(listId: String, productId: String): ShoppingListItemEntity?
 
+    // Is the product waiting to be bought on any non-archived list? Items on
+    // archived lists are dormant and don't count as "already planned".
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM shopping_list_items i " +
+            "JOIN shopping_lists l ON l.id = i.listId " +
+            "WHERE i.productId = :productId AND l.archivedAt IS NULL)"
+    )
+    suspend fun isOnActiveList(productId: String): Boolean
+
     @Insert
     suspend fun insert(item: ShoppingListItemEntity)
 

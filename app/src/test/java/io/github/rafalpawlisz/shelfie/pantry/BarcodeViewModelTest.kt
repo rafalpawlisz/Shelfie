@@ -20,7 +20,12 @@ class BarcodeViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private fun makeViewModel(products: FakeProductRepository) =
-        PantryViewModel(products, FakeShoppingListRepository(products), FakeBarcodeRepository())
+        PantryViewModel(
+            products,
+            FakeShoppingListRepository(products),
+            FakeBarcodeRepository(),
+            FakeUiPreferences(),
+        )
 
     @Test
     fun `adding a product with barcodes stores them under the new product`() = runTest {
