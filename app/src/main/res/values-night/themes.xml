@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark-mode window theme: Compose handles the in-app colors, but the
+         window (cold-start splash background, pre-Compose frame) follows this —
+         without it dark mode flashed a light window on launch. -->
+    <style name="Theme.Shelfie" parent="android:Theme.Material.NoActionBar" />
+</resources>
