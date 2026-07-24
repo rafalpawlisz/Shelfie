@@ -45,6 +45,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -131,6 +133,7 @@ private fun ListChipsRow(
     var renamingListId by rememberSaveable { mutableStateOf<String?>(null) }
     var showArchiveDialog by rememberSaveable { mutableStateOf(false) }
     var deletingArchivedId by rememberSaveable { mutableStateOf<String?>(null) }
+    val haptic = LocalHapticFeedback.current
 
     // Local mirror so a drag animates smoothly; re-synced from [lists] when the
     // upstream order changes (after a move is persisted), but not mid-drag.
@@ -161,6 +164,7 @@ private fun ListChipsRow(
                 val selected = list.id == selectedListId
                 // The whole chip is the drag handle on long-press; a tap still selects.
                 val handleModifier = Modifier.longPressDraggableHandle(
+                    onDragStarted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
                     onDragStopped = {
                         val from = lists.indexOfFirst { it.id == list.id }
                         val to = orderedLists.indexOfFirst { it.id == list.id }
@@ -334,6 +338,7 @@ private fun ListItems(
 ) {
     val checkedCount = items.count { it.isChecked }
     var showFinishDialog by rememberSaveable { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     // Local mirror so a drag animates smoothly. It re-syncs from [items] whenever
     // the upstream order actually changes (e.g. after a move is persisted), but
@@ -389,6 +394,7 @@ private fun ListItems(
                     // drop, translate the net move into indices over the upstream
                     // list so the ViewModel can persist the moved item's position.
                     val handleModifier = Modifier.draggableHandle(
+                        onDragStarted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
                         onDragStopped = {
                             val from = items.indexOfFirst { it.id == item.id }
                             val to = ordered.indexOfFirst { it.id == item.id }
