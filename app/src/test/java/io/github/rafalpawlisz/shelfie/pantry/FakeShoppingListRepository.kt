@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.pantry
 
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
+import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import kotlinx.coroutines.flow.Flow
@@ -175,24 +176,15 @@ class FakeShoppingListRepository(
     override suspend fun moveItem(id: String, targetListId: String) {
         val item = items.value.firstOrNull { it.id == id } ?: return
         if (item.listId == targetListId) return
-        ensurePosition(targetListId, item.productId)
-        val existing = items.value.firstOrNull {
+        // Mirror the DAO: never clobber an existing entry on the target list.
+        val targetHasProduct = items.value.any {
             it.listId == targetListId && it.productId == item.productId
         }
+        if (targetHasProduct) return
+        ensurePosition(targetListId, item.productId)
         items.update { list ->
-            if (existing != null) {
-                // Mirror the DAO: moved values replace the target entry.
-                list.filterNot { it.id == item.id }.map {
-                    if (it.id == existing.id) {
-                        it.copy(amount = item.amount, note = item.note, checkedAt = null)
-                    } else {
-                        it
-                    }
-                }
-            } else {
-                list.map {
-                    if (it.id == id) it.copy(listId = targetListId, checkedAt = null) else it
-                }
+            list.map {
+                if (it.id == id) it.copy(listId = targetListId, checkedAt = null) else it
             }
         }
     }
@@ -218,10 +210,11 @@ class FakeShoppingListRepository(
         return items.value.any { it.productId == productId && it.listId in activeListIds }
     }
 
-    override fun observePlannedProductIds(): Flow<List<String>> =
+    override fun observePlannedEntries(): Flow<List<PlannedEntry>> =
         combine(items, lists) { allItems, allLists ->
             val activeListIds = allLists.filter { it.archivedAt == null }.map { it.id }.toSet()
-            allItems.filter { it.listId in activeListIds }.map { it.productId }.distinct()
+            allItems.filter { it.listId in activeListIds }
+                .map { PlannedEntry(listId = it.listId, productId = it.productId) }
         }
 
     // Append at the end the first time a product joins a list; keep an existing slot.

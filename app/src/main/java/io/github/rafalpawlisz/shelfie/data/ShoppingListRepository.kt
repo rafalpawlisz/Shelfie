@@ -1,5 +1,6 @@
 package io.github.rafalpawlisz.shelfie.data
 
+import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import kotlinx.coroutines.flow.Flow
@@ -28,8 +29,9 @@ interface ShoppingListRepository {
     // used to keep the low-stock suggestion from nagging about planned items.
     suspend fun isOnAnyList(productId: String): Boolean
 
-    // Reactive companion of [isOnAnyList] powering the derived "low stock" list.
-    fun observePlannedProductIds(): Flow<List<String>>
+    // Reactive planning map (list × product) powering the derived "low stock"
+    // list and the move-between-lists guard.
+    fun observePlannedEntries(): Flow<List<PlannedEntry>>
     suspend fun setChecked(id: String, checked: Boolean)
     suspend fun setItemAmount(id: String, amount: Int?)
     suspend fun setItemDetails(id: String, amount: Int?, note: String?)

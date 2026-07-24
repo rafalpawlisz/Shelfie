@@ -4,6 +4,7 @@ import io.github.rafalpawlisz.shelfie.data.local.ShoppingListDao
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemRow
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
+import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import java.util.UUID
@@ -129,5 +130,5 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
 
     override suspend fun isOnAnyList(productId: String): Boolean = dao.isOnActiveList(productId)
 
-    override fun observePlannedProductIds(): Flow<List<String>> = dao.observePlannedProductIds()
+    override fun observePlannedEntries(): Flow<List<PlannedEntry>> = dao.observePlannedEntries()
 }

@@ -56,6 +56,8 @@ data class PantryUiState(
     // Derived "low stock" list: active products below their minimum that are not
     // yet planned on any active shopping list.
     val lowStockProducts: List<Product> = emptyList(),
+    // productId -> ids of the active lists that already plan it; guards moves.
+    val plannedByProduct: Map<String, Set<String>> = emptyMap(),
     val lists: List<ShoppingList> = emptyList(),
     val archivedLists: List<ShoppingList> = emptyList(),
     val selectedListId: String? = null,
@@ -89,7 +91,7 @@ class PantryViewModel(
         val active: List<Product>,
         val archived: List<Product>,
         val barcodes: List<io.github.rafalpawlisz.shelfie.model.ProductBarcode>,
-        val plannedIds: List<String>,
+        val planned: List<io.github.rafalpawlisz.shelfie.model.PlannedEntry>,
     )
 
     val uiState: StateFlow<PantryUiState> =
@@ -98,22 +100,26 @@ class PantryViewModel(
                 repository.observeProducts(),
                 repository.observeArchivedProducts(),
                 barcodeRepository.observeBarcodes(),
-                shoppingListRepository.observePlannedProductIds(),
-            ) { active, archived, barcodes, plannedIds ->
-                ProductsBundle(active, archived, barcodes, plannedIds)
+                shoppingListRepository.observePlannedEntries(),
+            ) { active, archived, barcodes, planned ->
+                ProductsBundle(active, archived, barcodes, planned)
             },
             shoppingListRepository.observeLists(),
             shoppingListRepository.observeArchivedLists(),
             selectedListId,
             shoppingItems,
-        ) { (active, archived, barcodes, plannedIds), lists, archivedLists, selected, items ->
+        ) { (active, archived, barcodes, planned), lists, archivedLists, selected, items ->
+            val plannedByProduct = planned
+                .groupBy({ it.productId }, { it.listId })
+                .mapValues { (_, listIds) -> listIds.toSet() }
             PantryUiState(
                 products = active,
                 archivedProducts = archived,
                 lowStockProducts = active.filter { product ->
                     val min = product.minQuantity
-                    min != null && product.quantity < min && product.id !in plannedIds
+                    min != null && product.quantity < min && product.id !in plannedByProduct
                 },
+                plannedByProduct = plannedByProduct,
                 lists = lists,
                 archivedLists = archivedLists,
                 selectedListId = selected,

@@ -994,7 +994,7 @@ class ShoppingListViewModelTest {
     }
 
     @Test
-    fun `moving onto a list that already has the product replaces that entry`() = runTest {
+    fun `moving onto a list that already has the product is refused`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 0, unit = "l")
         val viewModel = makeViewModel(repository)
@@ -1011,11 +1011,28 @@ class ShoppingListViewModelTest {
         viewModel.selectList(lidl)
         viewModel.updateShoppingItem(lidlItem, amount = 2, note = "from lidl", targetListId = auchan)
 
-        assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+        // Defense in depth: the move is a no-op (the UI disables such targets);
+        // the amount/note edit still applied on the source item.
+        val kept = viewModel.uiState.value.shoppingList.single()
+        assertEquals(2, kept.amount)
         viewModel.selectList(auchan)
-        val merged = viewModel.uiState.value.shoppingList.single()
-        assertEquals(2, merged.amount)
-        assertEquals("from lidl", merged.note)
+        val untouched = viewModel.uiState.value.shoppingList.single()
+        assertEquals(9, untouched.amount)
+        assertEquals("old auchan", untouched.note)
+    }
+
+    @Test
+    fun `plannedByProduct maps products to the lists that plan them`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.addToShoppingList(productId, amount = 1)
+
+        assertEquals(setOf(lidl), viewModel.uiState.value.plannedByProduct[productId])
     }
 
     // --- Cross-list isolation ---

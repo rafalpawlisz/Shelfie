@@ -70,6 +70,7 @@ fun ShoppingScreen(
     selectedListId: String?,
     items: List<ShoppingListItem>,
     lowStockProducts: List<Product>,
+    plannedByProduct: Map<String, Set<String>>,
     onSelectList: (String) -> Unit,
     onCreateList: (String) -> Unit,
     onRenameList: (id: String, name: String) -> Unit,
@@ -137,6 +138,7 @@ fun ShoppingScreen(
                 items = items,
                 lists = lists,
                 currentListId = selectedListId,
+                plannedByProduct = plannedByProduct,
                 onToggle = onToggle,
                 onRemove = onRemove,
                 onUpdateItem = onUpdateItem,
@@ -443,6 +445,7 @@ private fun ListChipsRow(
 private fun ItemEditDialog(
     lists: List<ShoppingList>,
     currentListId: String?,
+    unavailableListIds: Set<String>,
     initialAmount: Int?,
     initialNote: String?,
     onConfirm: (amount: Int?, note: String?, targetListId: String?) -> Unit,
@@ -464,6 +467,9 @@ private fun ItemEditDialog(
                         lists.forEach { list ->
                             FilterChip(
                                 selected = list.id == targetListId,
+                                // A list that already plans this product is not a
+                                // valid move target.
+                                enabled = list.id !in unavailableListIds,
                                 onClick = { targetListId = list.id },
                                 label = { Text(list.name) },
                             )
@@ -581,6 +587,7 @@ private fun ListItems(
     items: List<ShoppingListItem>,
     lists: List<ShoppingList>,
     currentListId: String?,
+    plannedByProduct: Map<String, Set<String>>,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
     onUpdateItem: (id: String, amount: Int?, note: String?, targetListId: String?) -> Unit,
@@ -681,6 +688,11 @@ private fun ListItems(
         ItemEditDialog(
             lists = lists,
             currentListId = currentListId,
+            // Lists that already plan this product can't be a move target — a
+            // move must never silently clobber an existing entry.
+            unavailableListIds = plannedByProduct[editingItem.productId]
+                .orEmpty()
+                .minus(currentListId.orEmpty()),
             initialAmount = editingItem.amount,
             initialNote = editingItem.note,
             onConfirm = { amount, note, targetListId ->

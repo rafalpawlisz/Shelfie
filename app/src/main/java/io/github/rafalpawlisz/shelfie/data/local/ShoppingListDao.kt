@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
+import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -69,23 +70,17 @@ interface ShoppingListDao {
     )
     suspend fun reassignList(id: String, listId: String, timestamp: Long)
 
-    // Move an item (amount + note travel along) to another list. The target may
-    // already list the product (unique (listId, productId)) — then the moved
-    // values REPLACE the target entry and the source row is dropped. The item's
-    // slot on the target comes from its remembered position (or appends).
+    // Move an item (amount + note travel along) to another list. The UI blocks
+    // targets that already list the product; the same check here is defense in
+    // depth — a move never silently clobbers an existing entry (no-op instead).
+    // The item's slot on the target comes from its remembered position (or appends).
     @Transaction
     suspend fun moveToList(id: String, targetListId: String, timestamp: Long) {
         val item = getById(id) ?: return
         if (item.listId == targetListId) return
+        if (findByProduct(targetListId, item.productId) != null) return
         ensurePosition(targetListId, item.productId, timestamp)
-        val existing = findByProduct(targetListId, item.productId)
-        if (existing != null) {
-            setDetails(existing.id, item.amount, item.note, timestamp)
-            setChecked(existing.id, checkedAt = null, updatedAt = timestamp)
-            delete(item.id)
-        } else {
-            reassignList(item.id, targetListId, timestamp)
-        }
+        reassignList(item.id, targetListId, timestamp)
     }
 
     // Is the product waiting to be bought on any non-archived list? Items on
@@ -97,13 +92,13 @@ interface ShoppingListDao {
     )
     suspend fun isOnActiveList(productId: String): Boolean
 
-    // Reactive version for the derived "low stock" list: every product that is
-    // already planned on some active list.
+    // Reactive planning map: which products sit on which active lists. Feeds the
+    // derived "low stock" list and the move-between-lists guard.
     @Query(
-        "SELECT DISTINCT i.productId FROM shopping_list_items i " +
+        "SELECT i.listId AS listId, i.productId AS productId FROM shopping_list_items i " +
             "JOIN shopping_lists l ON l.id = i.listId WHERE l.archivedAt IS NULL"
     )
-    fun observePlannedProductIds(): Flow<List<String>>
+    fun observePlannedEntries(): Flow<List<PlannedEntry>>
 
     @Insert
     suspend fun insert(item: ShoppingListItemEntity)
