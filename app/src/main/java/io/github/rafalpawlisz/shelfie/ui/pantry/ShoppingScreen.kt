@@ -192,6 +192,7 @@ private fun LowStockView(
             items(products, key = { it.id }) { product ->
                 ProductListItem(
                     product = product,
+                    modifier = Modifier.animateItem(),
                     onClick = { onRestockProduct(product) },
                 )
             }

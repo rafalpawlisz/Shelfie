@@ -85,6 +85,7 @@ fun ProductsScreen(
             items(visibleProducts, key = { it.id }) { product ->
                 ProductListItem(
                     product = product,
+                    modifier = Modifier.animateItem(),
                     onClick = { onProductClick(product.id) },
                     trailingContent = {
                         Icon(
@@ -118,6 +119,7 @@ fun ProductsScreen(
                     items(visibleArchived, key = { it.id }) { product ->
                         ProductListItem(
                             product = product,
+                            modifier = Modifier.animateItem(),
                             dimmed = true,
                             onClick = { onProductClick(product.id) },
                             trailingContent = {

@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.ui
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -179,50 +180,52 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             if (!state.isLoading) {
-                when (currentTab) {
-                    ShelfieTab.PRODUCTS -> ProductsScreen(
-                        products = state.products,
-                        archivedProducts = state.archivedProducts,
-                        onProductClick = { editedProductId = it },
-                    )
-                    ShelfieTab.SHOPPING -> ShoppingScreen(
-                        lists = state.lists,
-                        archivedLists = state.archivedLists,
-                        selectedListId = state.selectedListId,
-                        items = state.shoppingList,
-                        lowStockProducts = state.lowStockProducts,
-                        plannedByProduct = state.plannedByProduct,
-                        onRestockProduct = { product ->
-                            // Reuse the restock dialog (store picker, remembered
-                            // list, empty amount) for a tapped shortage.
-                            restockSuggestion = LowStockSuggestion(
-                                productId = product.id,
-                                productName = product.name,
-                                suggestedAmount = maxOf(
-                                    1,
-                                    (product.minQuantity ?: 1) - product.quantity,
-                                ),
-                            )
-                        },
-                        onAddAllLowStock = viewModel::addLowStockToList,
-                        onSelectList = viewModel::selectList,
-                        onCreateList = viewModel::createList,
-                        onRenameList = viewModel::renameList,
-                        onArchiveList = viewModel::archiveList,
-                        onRestoreList = viewModel::restoreList,
-                        onDeleteList = viewModel::deleteList,
-                        onMoveList = viewModel::moveList,
-                        onToggle = viewModel::setShoppingItemChecked,
-                        onRemove = viewModel::removeShoppingItem,
-                        onUpdateItem = viewModel::updateShoppingItem,
-                        onCheckWithAmount = viewModel::checkWithAmount,
-                        onMove = viewModel::moveShoppingItem,
-                        onFinishShopping = viewModel::finishShopping,
-                    )
-                    ShelfieTab.USE_UP -> UseUpScreen(
-                        products = state.products,
-                        onDecrement = viewModel::decrement,
-                    )
+                Crossfade(targetState = currentTab, label = "tab") { tab ->
+                    when (tab) {
+                        ShelfieTab.PRODUCTS -> ProductsScreen(
+                            products = state.products,
+                            archivedProducts = state.archivedProducts,
+                            onProductClick = { editedProductId = it },
+                        )
+                        ShelfieTab.SHOPPING -> ShoppingScreen(
+                            lists = state.lists,
+                            archivedLists = state.archivedLists,
+                            selectedListId = state.selectedListId,
+                            items = state.shoppingList,
+                            lowStockProducts = state.lowStockProducts,
+                            plannedByProduct = state.plannedByProduct,
+                            onRestockProduct = { product ->
+                                // Reuse the restock dialog (store picker, remembered
+                                // list, empty amount) for a tapped shortage.
+                                restockSuggestion = LowStockSuggestion(
+                                    productId = product.id,
+                                    productName = product.name,
+                                    suggestedAmount = maxOf(
+                                        1,
+                                        (product.minQuantity ?: 1) - product.quantity,
+                                    ),
+                                )
+                            },
+                            onAddAllLowStock = viewModel::addLowStockToList,
+                            onSelectList = viewModel::selectList,
+                            onCreateList = viewModel::createList,
+                            onRenameList = viewModel::renameList,
+                            onArchiveList = viewModel::archiveList,
+                            onRestoreList = viewModel::restoreList,
+                            onDeleteList = viewModel::deleteList,
+                            onMoveList = viewModel::moveList,
+                            onToggle = viewModel::setShoppingItemChecked,
+                            onRemove = viewModel::removeShoppingItem,
+                            onUpdateItem = viewModel::updateShoppingItem,
+                            onCheckWithAmount = viewModel::checkWithAmount,
+                            onMove = viewModel::moveShoppingItem,
+                            onFinishShopping = viewModel::finishShopping,
+                        )
+                        ShelfieTab.USE_UP -> UseUpScreen(
+                            products = state.products,
+                            onDecrement = viewModel::decrement,
+                        )
+                    }
                 }
             }
         }
