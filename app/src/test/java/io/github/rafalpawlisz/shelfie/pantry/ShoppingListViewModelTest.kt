@@ -309,7 +309,7 @@ class ShoppingListViewModelTest {
     // --- Manual order (drag to reorder; persisted per list+product) ---
 
     @Test
-    fun `items keep insertion order and checking does not move them`() = runTest {
+    fun `items follow insertion order until reordered`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Apples", quantity = 0, unit = null)
         repository.addProduct(name = "Bread", quantity = 0, unit = null)
@@ -318,16 +318,60 @@ class ShoppingListViewModelTest {
         observe(viewModel)
         viewModel.createList("Lidl")
         fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
-        // Add in a non-alphabetical order to prove it's insertion order, not name.
+        // Non-alphabetical add order proves it's insertion order, not name.
         listOf("Cheese", "Apples", "Bread").forEach { viewModel.addToShoppingList(pid(it), 1) }
 
-        // Checking a middle item must not reorder the list.
-        val apples = viewModel.uiState.value.shoppingList.first { it.productName == "Apples" }
-        viewModel.setShoppingItemChecked(apples.id, checked = true)
-
         assertEquals(
-            listOf("Cheese" to false, "Apples" to true, "Bread" to false),
+            listOf("Cheese", "Apples", "Bread"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
+    @Test
+    fun `checking sinks an item to the bottom, most recently checked on top`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Apples", quantity = 0, unit = null)
+        repository.addProduct(name = "Bread", quantity = 0, unit = null)
+        repository.addProduct(name = "Cheese", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
+        listOf("Apples", "Bread", "Cheese").forEach { viewModel.addToShoppingList(pid(it), 1) }
+        fun itemId(name: String) = viewModel.uiState.value.shoppingList.first { it.productName == name }.id
+
+        viewModel.setShoppingItemChecked(itemId("Apples"), checked = true)
+        viewModel.setShoppingItemChecked(itemId("Cheese"), checked = true)
+
+        // Bread stays on top (unchecked); the checked block below is newest-first.
+        assertEquals(
+            listOf("Bread" to false, "Cheese" to true, "Apples" to true),
             viewModel.uiState.value.shoppingList.map { it.productName to it.isChecked },
+        )
+    }
+
+    @Test
+    fun `unchecking returns an item to its manual position`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Apples", quantity = 0, unit = null)
+        repository.addProduct(name = "Bread", quantity = 0, unit = null)
+        repository.addProduct(name = "Cheese", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
+        listOf("Apples", "Bread", "Cheese").forEach { viewModel.addToShoppingList(pid(it), 1) }
+        fun itemId(name: String) = viewModel.uiState.value.shoppingList.first { it.productName == name }.id
+
+        viewModel.setShoppingItemChecked(itemId("Apples"), checked = true) // sinks to bottom
+        assertEquals("Apples", viewModel.uiState.value.shoppingList.last().productName)
+
+        viewModel.setShoppingItemChecked(itemId("Apples"), checked = false)
+
+        // Back in its own slot (added first -> top of the list), all unchecked again.
+        assertEquals(
+            listOf("Apples", "Bread", "Cheese"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
         )
     }
 

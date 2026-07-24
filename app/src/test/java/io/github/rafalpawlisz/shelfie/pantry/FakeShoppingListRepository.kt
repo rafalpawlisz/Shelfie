@@ -20,7 +20,9 @@ class FakeShoppingListRepository(
         val listId: String,
         val productId: String,
         val amount: Int,
-        val checked: Boolean,
+        // null = to buy; increasing value = in cart. Monotonic stand-in for the
+        // real checkedAt timestamp, so "most recently checked" sorts highest.
+        val checkedAt: Long?,
     )
 
     private val lists = MutableStateFlow<List<ListEntry>>(emptyList())
@@ -33,6 +35,7 @@ class FakeShoppingListRepository(
 
     private var nextListId = 1
     private var nextId = 1
+    private var checkSeq = 0L
 
     override fun observeLists(): Flow<List<ShoppingList>> =
         lists.map { entries ->
@@ -59,20 +62,41 @@ class FakeShoppingListRepository(
 
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
         combine(items, products.observeProducts(), positions) { list, active, pos ->
-            list.filter { it.listId == listId }.mapNotNull { item ->
-                val product = active.firstOrNull { it.id == item.productId }
-                    ?: return@mapNotNull null
-                ShoppingListItem(
-                    id = item.id,
-                    productId = item.productId,
-                    amount = item.amount,
-                    isChecked = item.checked,
-                    productName = product.name,
-                    productEmoji = product.emoji,
-                    productUnit = product.unit,
-                    position = pos[listId to item.productId] ?: 0.0,
-                )
-            }.sortedWith(compareBy({ it.position }, { it.productName.lowercase() }))
+            list.filter { it.listId == listId }
+                .mapNotNull { item ->
+                    val product = active.firstOrNull { it.id == item.productId }
+                        ?: return@mapNotNull null
+                    item to product
+                }
+                .sortedWith { (aItem, aProd), (bItem, bProd) ->
+                    // Unchecked first (manual position, then name); checked sink to
+                    // the bottom ordered by most-recently-checked.
+                    val aChecked = aItem.checkedAt != null
+                    val bChecked = bItem.checkedAt != null
+                    when {
+                        aChecked != bChecked -> if (aChecked) 1 else -1
+                        aChecked -> bItem.checkedAt!!.compareTo(aItem.checkedAt!!)
+                        else -> {
+                            val pa = pos[listId to aItem.productId] ?: 0.0
+                            val pb = pos[listId to bItem.productId] ?: 0.0
+                            val byPos = pa.compareTo(pb)
+                            if (byPos != 0) byPos
+                            else aProd.name.lowercase().compareTo(bProd.name.lowercase())
+                        }
+                    }
+                }
+                .map { (item, product) ->
+                    ShoppingListItem(
+                        id = item.id,
+                        productId = item.productId,
+                        amount = item.amount,
+                        isChecked = item.checkedAt != null,
+                        productName = product.name,
+                        productEmoji = product.emoji,
+                        productUnit = product.unit,
+                        position = pos[listId to item.productId] ?: 0.0,
+                    )
+                }
         }
 
     override suspend fun addItem(listId: String, productId: String, amount: Int) {
@@ -85,10 +109,10 @@ class FakeShoppingListRepository(
                     listId = listId,
                     productId = productId,
                     amount = amount,
-                    checked = false,
+                    checkedAt = null,
                 )
             }
-            !existing.checked -> items.update { list ->
+            existing.checkedAt == null -> items.update { list ->
                 list.map { item ->
                     if (item.id == existing.id) item.copy(amount = item.amount + amount) else item
                 }
@@ -100,7 +124,7 @@ class FakeShoppingListRepository(
                         listId = listId,
                         productId = productId,
                         amount = amount,
-                        checked = false,
+                        checkedAt = null,
                     )
             }
         }
@@ -108,7 +132,9 @@ class FakeShoppingListRepository(
 
     override suspend fun setChecked(id: String, checked: Boolean) {
         items.update { list ->
-            list.map { if (it.id == id) it.copy(checked = checked) else it }
+            list.map {
+                if (it.id == id) it.copy(checkedAt = if (checked) ++checkSeq else null) else it
+            }
         }
     }
 
@@ -118,10 +144,10 @@ class FakeShoppingListRepository(
     }
 
     override suspend fun finishShopping(listId: String) {
-        items.value.filter { it.listId == listId && it.checked }
+        items.value.filter { it.listId == listId && it.checkedAt != null }
             .forEach { products.adjustQuantity(it.productId, it.amount) }
         // Checked items are removed but their order rows persist.
-        items.update { list -> list.filterNot { it.listId == listId && it.checked } }
+        items.update { list -> list.filterNot { it.listId == listId && it.checkedAt != null } }
     }
 
     override suspend fun setItemPosition(listId: String, productId: String, position: Double) {

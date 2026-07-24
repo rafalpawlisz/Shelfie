@@ -266,7 +266,12 @@ private fun ListItems(
     }
     val lazyListState = rememberLazyListState()
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        ordered.add(to.index, ordered.removeAt(from.index))
+        // Only unchecked items are manually ordered; keep the drag within that
+        // block so the checked items parked at the bottom aren't displaced.
+        val uncheckedCount = ordered.count { !it.isChecked }
+        if (to.index < uncheckedCount) {
+            ordered.add(to.index, ordered.removeAt(from.index))
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -378,6 +383,10 @@ private fun ShoppingListRow(
                     textDecoration = decoration,
                 )
             }
+            // Remove and drag handle only on unchecked (to-buy) rows. Checked items
+            // are parked at the bottom ordered by check time, so no manual handle;
+            // the drag grip (built in the reorderable item scope) makes it draggable
+            // while the row's own tap still toggles the checkbox.
             if (!item.isChecked) {
                 IconButton(onClick = onRemove) {
                     Icon(
@@ -386,14 +395,12 @@ private fun ShoppingListRow(
                             stringResource(R.string.cd_remove_from_list, item.productName),
                     )
                 }
-            }
-            // Drag grip: the modifier (built in the reorderable item scope) makes
-            // this the drag handle; the row's own tap still toggles the checkbox.
-            IconButton(modifier = dragHandleModifier, onClick = {}) {
-                Icon(
-                    imageVector = DragHandleIcon,
-                    contentDescription = stringResource(R.string.cd_drag_handle),
-                )
+                IconButton(modifier = dragHandleModifier, onClick = {}) {
+                    Icon(
+                        imageVector = DragHandleIcon,
+                        contentDescription = stringResource(R.string.cd_drag_handle),
+                    )
+                }
             }
         }
     }

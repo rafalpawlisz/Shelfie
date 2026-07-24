@@ -207,9 +207,14 @@ class PantryViewModel(
         val items = uiState.value.shoppingList
         if (fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) return
         val moved = items[fromIndex]
+        // Only unchecked items carry a manual position; checked items are parked at
+        // the bottom by check time and aren't repositioned by dragging.
+        if (moved.isChecked) return
         val without = items.toMutableList().apply { removeAt(fromIndex) }
-        val prev = without.getOrNull(toIndex - 1)?.position
-        val next = without.getOrNull(toIndex)?.position
+        // Neighbours must be unchecked — a checked item at the boundary keeps its
+        // own retained position and must not pull the dropped item into its range.
+        val prev = without.getOrNull(toIndex - 1)?.takeUnless { it.isChecked }?.position
+        val next = without.getOrNull(toIndex)?.takeUnless { it.isChecked }?.position
         val newPosition = when {
             prev == null && next == null -> moved.position
             prev == null -> next!! - 1.0

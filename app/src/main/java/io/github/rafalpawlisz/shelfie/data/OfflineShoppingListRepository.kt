@@ -37,12 +37,24 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
         dao.observeItems(listId).map { rows ->
             val collator = nameCollator()
-            rows.map(ShoppingListItemRow::toDomain).sortedWith { a, b ->
-                // Manual order (persisted position); name as a stable, locale-aware
-                // tiebreak. Checked items stay in place — no pushing them to the bottom.
-                val byPosition = a.position.compareTo(b.position)
-                if (byPosition != 0) byPosition else collator.compare(a.productName, b.productName)
-            }
+            // Unchecked (still to buy) first, in manual position order; checked
+            // items sink to the bottom ordered by most-recently-checked. Sorting
+            // on rows lets us read checkedAt (the domain model only keeps the flag).
+            rows.sortedWith { a, b ->
+                val aChecked = a.checkedAt != null
+                val bChecked = b.checkedAt != null
+                when {
+                    aChecked != bChecked -> if (aChecked) 1 else -1
+                    aChecked -> {
+                        val byTime = b.checkedAt!!.compareTo(a.checkedAt!!)
+                        if (byTime != 0) byTime else collator.compare(a.productName, b.productName)
+                    }
+                    else -> {
+                        val byPosition = a.position.compareTo(b.position)
+                        if (byPosition != 0) byPosition else collator.compare(a.productName, b.productName)
+                    }
+                }
+            }.map(ShoppingListItemRow::toDomain)
         }
 
     override suspend fun addItem(listId: String, productId: String, amount: Int) {
