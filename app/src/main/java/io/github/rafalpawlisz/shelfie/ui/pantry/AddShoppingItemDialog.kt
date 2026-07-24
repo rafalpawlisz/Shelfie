@@ -29,14 +29,14 @@ import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.Product
 
 /**
- * Two-phase picker: choose an active product, then the amount to buy.
- * The amount defaults to the product's stock deficit when a minimum
- * quantity is set.
+ * Two-phase picker: choose an active product, then optionally the amount to
+ * buy. The field starts empty; leaving it blank records the bare need — the
+ * actual amount is asked for when the item is checked off in the store.
  */
 @Composable
 fun AddShoppingItemDialog(
     products: List<Product>,
-    onConfirm: (productId: String, amount: Int) -> Unit,
+    onConfirm: (productId: String, amount: Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedProductId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -93,15 +93,13 @@ fun AddShoppingItemDialog(
 @Composable
 private fun AmountPhase(
     product: Product,
-    onConfirm: (productId: String, amount: Int) -> Unit,
+    onConfirm: (productId: String, amount: Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val defaultAmount = product.minQuantity
-        ?.let { maxOf(1, it - product.quantity) }
-        ?: 1
-    var amountText by rememberSaveable(product.id) { mutableStateOf(defaultAmount.toString()) }
-    val amount = amountText.toIntOrNull()
-    val isValid = amount != null && amount > 0
+    // Always starts empty; blank = no amount ("just buy it").
+    var amountText by rememberSaveable(product.id) { mutableStateOf("") }
+    val amount = amountText.trim().toIntOrNull()
+    val isValid = amountText.isBlank() || (amount != null && amount > 0)
 
     Text(
         text = listOfNotNull(product.emoji, product.name).joinToString(" "),
@@ -122,7 +120,7 @@ private fun AmountPhase(
         }
         TextButton(
             enabled = isValid,
-            onClick = { onConfirm(product.id, amount ?: 1) },
+            onClick = { onConfirm(product.id, if (amountText.isBlank()) null else amount) },
         ) {
             Text(stringResource(R.string.action_add))
         }

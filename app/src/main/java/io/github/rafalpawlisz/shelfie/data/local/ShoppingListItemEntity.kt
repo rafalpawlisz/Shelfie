@@ -33,8 +33,9 @@ data class ShoppingListItemEntity(
     @PrimaryKey val id: String,
     val listId: String,
     val productId: String,
-    // How many to buy; always > 0 (enforced by the dialog and merge logic).
-    val amount: Int,
+    // How many to buy; > 0 when set. null = "just buy it" — the amount is asked
+    // for when the item is checked off, so checkout math still works.
+    val amount: Int?,
     // null = still to buy; non-null = in the cart (marked bought). The amount
     // is applied to the product's quantity only at checkout(), not when checked.
     val checkedAt: Long?,
@@ -46,7 +47,7 @@ data class ShoppingListItemEntity(
 data class ShoppingListItemRow(
     val id: String,
     val productId: String,
-    val amount: Int,
+    val amount: Int?,
     val checkedAt: Long?,
     val productName: String,
     val productEmoji: String?,

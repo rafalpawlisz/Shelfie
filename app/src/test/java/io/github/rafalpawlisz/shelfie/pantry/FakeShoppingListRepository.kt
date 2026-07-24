@@ -24,7 +24,7 @@ class FakeShoppingListRepository(
         val id: String,
         val listId: String,
         val productId: String,
-        val amount: Int,
+        val amount: Int?,
         // null = to buy; increasing value = in cart. Monotonic stand-in for the
         // real checkedAt timestamp, so "most recently checked" sorts highest.
         val checkedAt: Long?,
@@ -123,7 +123,7 @@ class FakeShoppingListRepository(
                 }
         }
 
-    override suspend fun addItem(listId: String, productId: String, amount: Int) {
+    override suspend fun addItem(listId: String, productId: String, amount: Int?) {
         ensurePosition(listId, productId)
         val existing = items.value.firstOrNull { it.listId == listId && it.productId == productId }
         when {
@@ -138,7 +138,17 @@ class FakeShoppingListRepository(
             }
             existing.checkedAt == null -> items.update { list ->
                 list.map { item ->
-                    if (item.id == existing.id) item.copy(amount = item.amount + amount) else item
+                    if (item.id == existing.id) {
+                        // Mirror the DAO: null acts as 0 unless both are null.
+                        val merged = if (item.amount == null && amount == null) {
+                            null
+                        } else {
+                            (item.amount ?: 0) + (amount ?: 0)
+                        }
+                        item.copy(amount = merged)
+                    } else {
+                        item
+                    }
                 }
             }
             else -> items.update { list ->
@@ -162,7 +172,7 @@ class FakeShoppingListRepository(
         }
     }
 
-    override suspend fun setItemAmount(id: String, amount: Int) {
+    override suspend fun setItemAmount(id: String, amount: Int?) {
         items.update { list -> list.map { if (it.id == id) it.copy(amount = amount) else it } }
     }
 
@@ -173,7 +183,7 @@ class FakeShoppingListRepository(
 
     override suspend fun finishShopping(listId: String) {
         items.value.filter { it.listId == listId && it.checkedAt != null }
-            .forEach { products.adjustQuantity(it.productId, it.amount) }
+            .forEach { item -> item.amount?.let { products.adjustQuantity(item.productId, it) } }
         // Checked items are removed but their order rows persist.
         items.update { list -> list.filterNot { it.listId == listId && it.checkedAt != null } }
     }

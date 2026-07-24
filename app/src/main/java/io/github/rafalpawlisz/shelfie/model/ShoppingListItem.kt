@@ -3,7 +3,8 @@ package io.github.rafalpawlisz.shelfie.model
 data class ShoppingListItem(
     val id: String,
     val productId: String,
-    val amount: Int,
+    // null = "just buy it"; the actual amount is asked for at check-off.
+    val amount: Int?,
     val isChecked: Boolean,
     val productName: String,
     val productEmoji: String?,

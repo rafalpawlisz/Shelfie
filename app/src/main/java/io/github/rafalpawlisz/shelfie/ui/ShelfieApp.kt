@@ -181,6 +181,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                         onToggle = viewModel::setShoppingItemChecked,
                         onRemove = viewModel::removeShoppingItem,
                         onSetAmount = viewModel::setShoppingItemAmount,
+                        onCheckWithAmount = viewModel::checkWithAmount,
                         onMove = viewModel::moveShoppingItem,
                         onFinishShopping = viewModel::finishShopping,
                     )
@@ -214,7 +215,6 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                 ?: suggestion.productName,
             lists = state.lists,
             defaultListId = viewModel.defaultRestockListId(),
-            suggestedAmount = suggestion.suggestedAmount,
             onConfirm = { listId, amount ->
                 viewModel.addToList(listId, suggestion.productId, amount)
                 restockSuggestion = null

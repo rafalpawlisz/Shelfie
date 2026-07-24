@@ -18,13 +18,16 @@ interface ShoppingListRepository {
 
     // Items within a given list
     fun observeItems(listId: String): Flow<List<ShoppingListItem>>
-    suspend fun addItem(listId: String, productId: String, amount: Int)
+
+    // amount = null records the bare need ("just buy it"); the actual amount is
+    // asked for when the item is checked off.
+    suspend fun addItem(listId: String, productId: String, amount: Int?)
 
     // True when the product already sits on any active (non-archived) list —
     // used to keep the low-stock suggestion from nagging about planned items.
     suspend fun isOnAnyList(productId: String): Boolean
     suspend fun setChecked(id: String, checked: Boolean)
-    suspend fun setItemAmount(id: String, amount: Int)
+    suspend fun setItemAmount(id: String, amount: Int?)
     suspend fun removeItem(id: String)
     suspend fun finishShopping(listId: String)
 

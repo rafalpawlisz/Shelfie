@@ -475,6 +475,75 @@ class ShoppingListViewModelTest {
     }
 
     @Test
+    fun `an item can be added without an amount and a concrete amount wins on merge`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+
+        viewModel.addToShoppingList(productId, amount = null)
+        assertNull(viewModel.uiState.value.shoppingList.single().amount)
+
+        // null + null stays "just buy it".
+        viewModel.addToShoppingList(productId, amount = null)
+        assertNull(viewModel.uiState.value.shoppingList.single().amount)
+
+        // null + 5 -> 5 (the concrete amount wins).
+        viewModel.addToShoppingList(productId, amount = 5)
+        assertEquals(5, viewModel.uiState.value.shoppingList.single().amount)
+
+        // 5 + null -> 5 (kept), 5 + 2 -> 7 (sum regression).
+        viewModel.addToShoppingList(productId, amount = null)
+        assertEquals(5, viewModel.uiState.value.shoppingList.single().amount)
+        viewModel.addToShoppingList(productId, amount = 2)
+        assertEquals(7, viewModel.uiState.value.shoppingList.single().amount)
+    }
+
+    @Test
+    fun `checkWithAmount records the bought amount, checks the item, and checkout banks it`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 1, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        viewModel.addToShoppingList(productId, amount = null)
+        val itemId = viewModel.uiState.value.shoppingList.single().id
+
+        viewModel.checkWithAmount(itemId, amount = 3)
+
+        val item = viewModel.uiState.value.shoppingList.single()
+        assertTrue(item.isChecked)
+        assertEquals(3, item.amount)
+
+        viewModel.finishShopping()
+        assertEquals(4, viewModel.uiState.value.products.single().quantity)
+        assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+    }
+
+    @Test
+    fun `a checked item without an amount does not change stock at checkout`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 1, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        viewModel.addToShoppingList(productId, amount = 2)
+        val itemId = viewModel.uiState.value.shoppingList.single().id
+        viewModel.setShoppingItemChecked(itemId, checked = true)
+        // Deliberately clear the amount after checking (soft invariant).
+        viewModel.setShoppingItemAmount(itemId, null)
+
+        viewModel.finishShopping()
+
+        assertEquals(1, viewModel.uiState.value.products.single().quantity)
+        assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+    }
+
+    @Test
     fun `setShoppingItemAmount changes the amount and rejects non-positive values`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 0, unit = "l")

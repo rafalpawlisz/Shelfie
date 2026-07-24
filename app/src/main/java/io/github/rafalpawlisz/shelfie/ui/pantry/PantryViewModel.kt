@@ -258,13 +258,13 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.deleteList(id) }
     }
 
-    fun addToShoppingList(productId: String, amount: Int) {
+    fun addToShoppingList(productId: String, amount: Int?) {
         val listId = selectedListId.value ?: return
         viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount) }
     }
 
     /** Add to an explicitly chosen list (restock dialog) and remember the choice. */
-    fun addToList(listId: String, productId: String, amount: Int) {
+    fun addToList(listId: String, productId: String, amount: Int?) {
         uiPreferences.lastRestockListId = listId
         viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount) }
     }
@@ -284,9 +284,21 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.setChecked(id, checked) }
     }
 
-    fun setShoppingItemAmount(id: String, amount: Int) {
-        if (amount <= 0) return
+    fun setShoppingItemAmount(id: String, amount: Int?) {
+        if (amount != null && amount <= 0) return
         viewModelScope.launch { shoppingListRepository.setItemAmount(id, amount) }
+    }
+
+    /**
+     * Check off an item that had no amount: the check-off dialog just asked how
+     * many were bought. One coroutine so the amount lands before the check.
+     */
+    fun checkWithAmount(id: String, amount: Int) {
+        if (amount <= 0) return
+        viewModelScope.launch {
+            shoppingListRepository.setItemAmount(id, amount)
+            shoppingListRepository.setChecked(id, checked = true)
+        }
     }
 
     fun removeShoppingItem(id: String) {

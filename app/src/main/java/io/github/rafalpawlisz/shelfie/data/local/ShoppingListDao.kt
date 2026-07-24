@@ -71,15 +71,10 @@ interface ShoppingListDao {
     @Insert
     suspend fun insert(item: ShoppingListItemEntity)
 
-    @Query(
-        "UPDATE shopping_list_items SET amount = amount + :extra, updatedAt = :timestamp " +
-            "WHERE id = :id"
-    )
-    suspend fun increaseAmount(id: String, extra: Int, timestamp: Long)
-
-    // Direct edit of the amount to buy (> 0, enforced by the dialog and ViewModel).
+    // Direct edit of the amount to buy (> 0 when set, enforced by the dialog and
+    // ViewModel; null = "just buy it").
     @Query("UPDATE shopping_list_items SET amount = :amount, updatedAt = :timestamp WHERE id = :id")
-    suspend fun setAmount(id: String, amount: Int, timestamp: Long)
+    suspend fun setAmount(id: String, amount: Int?, timestamp: Long)
 
     @Query("DELETE FROM shopping_list_items WHERE id = :id")
     suspend fun delete(id: String)
@@ -96,14 +91,17 @@ interface ShoppingListDao {
     // unique (listId, productId) index means the correlated subquery matches at
     // most one row, so no aggregation is needed; the WHERE keeps us from writing
     // NULL into the quantity of products with no checked item. Amounts are > 0,
-    // so quantity only grows — no MAX(0, ...) clamp needed.
+    // so quantity only grows — no MAX(0, ...) clamp needed. Checked items
+    // normally have an amount (the check-off dialog asks for it); the
+    // amount IS NOT NULL guards are defensive — such items just don't touch stock.
     @Query(
         "UPDATE products SET quantity = quantity + " +
             "(SELECT i.amount FROM shopping_list_items i " +
-            "WHERE i.productId = products.id AND i.checkedAt IS NOT NULL AND i.listId = :listId), " +
+            "WHERE i.productId = products.id AND i.checkedAt IS NOT NULL " +
+            "AND i.amount IS NOT NULL AND i.listId = :listId), " +
             "updatedAt = :timestamp " +
             "WHERE id IN (SELECT productId FROM shopping_list_items " +
-            "WHERE checkedAt IS NOT NULL AND listId = :listId)"
+            "WHERE checkedAt IS NOT NULL AND amount IS NOT NULL AND listId = :listId)"
     )
     suspend fun applyCheckedAmountsToProducts(listId: String, timestamp: Long)
 
@@ -136,7 +134,7 @@ interface ShoppingListDao {
     suspend fun setPosition(listId: String, productId: String, position: Double, timestamp: Long)
 
     @Transaction
-    suspend fun addOrMerge(listId: String, productId: String, amount: Int, newId: String, timestamp: Long) {
+    suspend fun addOrMerge(listId: String, productId: String, amount: Int?, newId: String, timestamp: Long) {
         ensurePosition(listId, productId, timestamp)
         val existing = findByProduct(listId, productId)
         when {
@@ -151,7 +149,16 @@ interface ShoppingListDao {
                     updatedAt = timestamp,
                 )
             )
-            existing.checkedAt == null -> increaseAmount(existing.id, amount, timestamp)
+            existing.checkedAt == null -> {
+                // A concrete amount beats "just buy it": null acts as 0 unless
+                // both sides are unspecified.
+                val merged = if (existing.amount == null && amount == null) {
+                    null
+                } else {
+                    (existing.amount ?: 0) + (amount ?: 0)
+                }
+                setAmount(existing.id, merged, timestamp)
+            }
             else -> {
                 // Existing checked entry (in cart, not yet checked out):
                 // replace it with a fresh unchecked item at the new amount.

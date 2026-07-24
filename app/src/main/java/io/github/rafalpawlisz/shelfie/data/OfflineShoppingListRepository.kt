@@ -87,7 +87,7 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
             }.map(ShoppingListItemRow::toDomain)
         }
 
-    override suspend fun addItem(listId: String, productId: String, amount: Int) {
+    override suspend fun addItem(listId: String, productId: String, amount: Int?) {
         dao.addOrMerge(
             listId = listId,
             productId = productId,
@@ -102,7 +102,7 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
         dao.setChecked(id = id, checkedAt = if (checked) now else null, updatedAt = now)
     }
 
-    override suspend fun setItemAmount(id: String, amount: Int) {
+    override suspend fun setItemAmount(id: String, amount: Int?) {
         dao.setAmount(id, amount, System.currentTimeMillis())
     }
 

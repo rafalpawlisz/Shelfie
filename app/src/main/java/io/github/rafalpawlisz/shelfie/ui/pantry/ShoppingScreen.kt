@@ -74,7 +74,8 @@ fun ShoppingScreen(
     onMoveList: (fromIndex: Int, toIndex: Int) -> Unit,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
-    onSetAmount: (id: String, amount: Int) -> Unit,
+    onSetAmount: (id: String, amount: Int?) -> Unit,
+    onCheckWithAmount: (id: String, amount: Int) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onFinishShopping: () -> Unit,
 ) {
@@ -111,6 +112,7 @@ fun ShoppingScreen(
                 onToggle = onToggle,
                 onRemove = onRemove,
                 onSetAmount = onSetAmount,
+                onCheckWithAmount = onCheckWithAmount,
                 onMove = onMove,
                 onFinishShopping = onFinishShopping,
             )
@@ -301,19 +303,23 @@ private fun ListChipsRow(
     }
 }
 
+// [allowEmpty]: a blank field is valid and confirms null ("just buy it") when
+// editing; the check-off variant requires a number (stock math needs it).
 @Composable
 private fun AmountDialog(
-    initialAmount: Int,
-    onConfirm: (Int) -> Unit,
+    title: String,
+    initialAmount: Int?,
+    allowEmpty: Boolean,
+    onConfirm: (Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var amountText by rememberSaveable { mutableStateOf(initialAmount.toString()) }
-    val amount = amountText.toIntOrNull()
-    val isValid = amount != null && amount > 0
+    var amountText by rememberSaveable { mutableStateOf(initialAmount?.toString().orEmpty()) }
+    val amount = amountText.trim().toIntOrNull()
+    val isValid = if (amountText.isBlank()) allowEmpty else amount != null && amount > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.edit_amount)) },
+        title = { Text(title) },
         text = {
             OutlinedTextField(
                 value = amountText,
@@ -324,7 +330,10 @@ private fun AmountDialog(
             )
         },
         confirmButton = {
-            TextButton(enabled = isValid, onClick = { onConfirm(amount ?: 1) }) {
+            TextButton(
+                enabled = isValid,
+                onClick = { onConfirm(if (amountText.isBlank()) null else amount) },
+            ) {
                 Text(stringResource(R.string.action_save))
             }
         },
@@ -370,13 +379,17 @@ private fun ListItems(
     items: List<ShoppingListItem>,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
-    onSetAmount: (id: String, amount: Int) -> Unit,
+    onSetAmount: (id: String, amount: Int?) -> Unit,
+    onCheckWithAmount: (id: String, amount: Int) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onFinishShopping: () -> Unit,
 ) {
     val checkedCount = items.count { it.isChecked }
     var showFinishDialog by rememberSaveable { mutableStateOf(false) }
     var editingAmountItemId by rememberSaveable { mutableStateOf<String?>(null) }
+    // Item being checked off that has no amount yet — the dialog asks how many
+    // were actually bought so checkout can bank it into stock.
+    var checkingItemId by rememberSaveable { mutableStateOf<String?>(null) }
     val haptic = LocalHapticFeedback.current
 
     // Local mirror so a drag animates smoothly. It re-syncs from [items] whenever
@@ -442,7 +455,14 @@ private fun ListItems(
                     )
                     ShoppingListRow(
                         item = item,
-                        onToggle = { onToggle(item.id, !item.isChecked) },
+                        onToggle = {
+                            if (!item.isChecked && item.amount == null) {
+                                // No amount recorded — ask how many were bought.
+                                checkingItemId = item.id
+                            } else {
+                                onToggle(item.id, !item.isChecked)
+                            }
+                        },
                         onRemove = { onRemove(item.id) },
                         onEditAmount = { editingAmountItemId = item.id },
                         dragHandleModifier = handleModifier,
@@ -455,12 +475,28 @@ private fun ListItems(
     val editingItem = items.firstOrNull { it.id == editingAmountItemId }
     if (editingItem != null) {
         AmountDialog(
+            title = stringResource(R.string.edit_amount),
             initialAmount = editingItem.amount,
+            allowEmpty = true, // blank = "just buy it"
             onConfirm = { amount ->
                 onSetAmount(editingItem.id, amount)
                 editingAmountItemId = null
             },
             onDismiss = { editingAmountItemId = null },
+        )
+    }
+
+    val checkingItem = items.firstOrNull { it.id == checkingItemId }
+    if (checkingItem != null) {
+        AmountDialog(
+            title = stringResource(R.string.check_amount_title),
+            initialAmount = 1,
+            allowEmpty = false, // checkout math needs a number
+            onConfirm = { amount ->
+                if (amount != null) onCheckWithAmount(checkingItem.id, amount)
+                checkingItemId = null
+            },
+            onDismiss = { checkingItemId = null },
         )
     }
 
@@ -515,14 +551,17 @@ private fun ShoppingListRow(
                     color = textColor,
                     textDecoration = decoration,
                 )
-                Text(
-                    text = item.productUnit
-                        ?.let { stringResource(R.string.shopping_amount_with_unit, item.amount, it) }
-                        ?: stringResource(R.string.shopping_amount, item.amount),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = textColor,
-                    textDecoration = decoration,
-                )
+                // No amount recorded = "just buy it" — only the name shows.
+                if (item.amount != null) {
+                    Text(
+                        text = item.productUnit
+                            ?.let { stringResource(R.string.shopping_amount_with_unit, item.amount, it) }
+                            ?: stringResource(R.string.shopping_amount, item.amount),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
+                        textDecoration = decoration,
+                    )
+                }
             }
             // Remove and drag handle only on unchecked (to-buy) rows. Checked items
             // are parked at the bottom ordered by check time, so no manual handle;

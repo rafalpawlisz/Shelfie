@@ -31,8 +31,8 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingList
 
 /**
  * Follow-up of the low-stock snackbar action: pick the store list (last-used
- * one preselected via [defaultListId]) and the amount (prefilled with the
- * top-up-to-minimum suggestion), then add the product to that list.
+ * one preselected via [defaultListId]) and optionally the amount — the field
+ * always starts empty; blank records the bare need.
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -40,16 +40,16 @@ fun RestockDialog(
     productLabel: String,
     lists: List<ShoppingList>,
     defaultListId: String?,
-    suggestedAmount: Int,
-    onConfirm: (listId: String, amount: Int) -> Unit,
+    onConfirm: (listId: String, amount: Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedListId by rememberSaveable {
         mutableStateOf(defaultListId ?: lists.firstOrNull()?.id)
     }
-    var amountText by rememberSaveable { mutableStateOf(suggestedAmount.toString()) }
-    val amount = amountText.toIntOrNull()
-    val isValid = amount != null && amount > 0 && lists.any { it.id == selectedListId }
+    var amountText by rememberSaveable { mutableStateOf("") }
+    val amount = amountText.trim().toIntOrNull()
+    val amountValid = amountText.isBlank() || (amount != null && amount > 0)
+    val isValid = amountValid && lists.any { it.id == selectedListId }
 
     Dialog(onDismissRequest = onDismiss) {
         Card {
@@ -90,7 +90,9 @@ fun RestockDialog(
                     }
                     TextButton(
                         enabled = isValid,
-                        onClick = { onConfirm(selectedListId!!, amount ?: 1) },
+                        onClick = {
+                            onConfirm(selectedListId!!, if (amountText.isBlank()) null else amount)
+                        },
                     ) {
                         Text(stringResource(R.string.action_add))
                     }

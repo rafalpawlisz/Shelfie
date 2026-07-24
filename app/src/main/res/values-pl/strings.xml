@@ -9,8 +9,9 @@
     <string name="shopping_empty_title">Lista zakupów jest pusta</string>
     <string name="shopping_empty_message">Dotknij +, aby dodać coś do kupienia</string>
     <string name="add_to_shopping_list">Dodaj do listy zakupów</string>
-    <string name="shopping_amount_label">Ilość do kupienia</string>
+    <string name="shopping_amount_label">Ilość do kupienia (opcjonalnie)</string>
     <string name="edit_amount">Zmień ilość</string>
+    <string name="check_amount_title">Ile kupujesz?</string>
     <string name="finish_shopping">Zakończ zakupy (%1$d)</string>
     <string name="finish_shopping_message">Dodać %1$d pozycji do spiżarni i zakończyć zakupy?</string>
     <string name="action_finish">Zakończ</string>
