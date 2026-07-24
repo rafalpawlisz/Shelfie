@@ -13,7 +13,12 @@
     <string name="edit_amount">Zmień ilość</string>
     <string name="check_amount_title">Ile kupujesz?</string>
     <string name="finish_shopping">Zakończ zakupy (%1$d)</string>
-    <string name="finish_shopping_message">Dodać %1$d pozycji do spiżarni i zakończyć zakupy?</string>
+    <plurals name="finish_shopping_message">
+        <item quantity="one">Dodać %1$d pozycję do spiżarni i zakończyć zakupy?</item>
+        <item quantity="few">Dodać %1$d pozycje do spiżarni i zakończyć zakupy?</item>
+        <item quantity="many">Dodać %1$d pozycji do spiżarni i zakończyć zakupy?</item>
+        <item quantity="other">Dodać %1$d pozycji do spiżarni i zakończyć zakupy?</item>
+    </plurals>
     <string name="action_finish">Zakończ</string>
     <string name="cd_remove_from_list">Usuń %1$s z listy zakupów</string>
     <string name="cd_drag_handle">Przeciągnij, aby zmienić kolejność</string>

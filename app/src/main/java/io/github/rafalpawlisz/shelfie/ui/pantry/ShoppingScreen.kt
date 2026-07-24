@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
@@ -570,7 +571,15 @@ private fun ListItems(
                     Text(stringResource(R.string.action_cancel))
                 }
             },
-            text = { Text(stringResource(R.string.finish_shopping_message, checkedCount)) },
+            text = {
+                Text(
+                    pluralStringResource(
+                        R.plurals.finish_shopping_message,
+                        checkedCount,
+                        checkedCount,
+                    ),
+                )
+            },
         )
     }
 }
