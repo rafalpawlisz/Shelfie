@@ -162,41 +162,59 @@ fun ProductFormDialog(
                         .padding(horizontal = 24.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text(stringResource(R.string.product_name_label)) },
-                        singleLine = true,
+                    // Emoji is a small leading accessory next to the name.
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = emoji,
-                        onValueChange = { emoji = it },
-                        label = { Text(stringResource(R.string.product_emoji_label)) },
-                        singleLine = true,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = emoji,
+                            onValueChange = { emoji = it },
+                            label = { Text(stringResource(R.string.product_emoji_label)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.3f),
+                        )
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text(stringResource(R.string.product_name_label)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.7f),
+                        )
+                    }
+                    // Quantity + unit read as one value ("2 l").
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = quantityText,
-                        onValueChange = { quantityText = it },
-                        label = { Text(stringResource(R.string.product_quantity_label)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = unit,
-                        onValueChange = { unit = it },
-                        label = { Text(stringResource(R.string.product_unit_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = quantityText,
+                            onValueChange = { quantityText = it },
+                            label = { Text(stringResource(R.string.product_quantity_label)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(0.4f),
+                        )
+                        OutlinedTextField(
+                            value = unit,
+                            onValueChange = { unit = it },
+                            label = { Text(stringResource(R.string.product_unit_label)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.6f),
+                        )
+                    }
                     OutlinedTextField(
                         value = minQuantityText,
                         onValueChange = { minQuantityText = it },
                         label = { Text(stringResource(R.string.product_min_quantity_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        // Echo the entered unit so the threshold reads in context ("4 l").
+                        suffix = if (unit.isNotBlank()) {
+                            { Text(unit.trim()) }
+                        } else {
+                            null
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(

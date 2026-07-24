@@ -39,10 +39,10 @@
     <string name="products_hint">Dotknij produktu, aby go edytować</string>
     <string name="product_name_label">Nazwa</string>
     <string name="product_quantity_label">Ilość</string>
-    <string name="product_unit_label">Jednostka (opcjonalnie)</string>
+    <string name="product_unit_label">Jednostka</string>
     <string name="product_min_quantity_label">Ilość minimalna (opcjonalnie)</string>
     <string name="product_notes_label">Notatki (opcjonalnie)</string>
-    <string name="product_emoji_label">Emoji (opcjonalnie)</string>
+    <string name="product_emoji_label">Emoji</string>
     <string name="product_barcodes_label">Kody kreskowe</string>
     <string name="scan_barcode">Skanuj kod</string>
     <string name="cd_remove_barcode">Usuń kod %1$s</string>

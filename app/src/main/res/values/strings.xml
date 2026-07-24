@@ -42,10 +42,10 @@
     <string name="products_hint">Tap a product to edit it</string>
     <string name="product_name_label">Name</string>
     <string name="product_quantity_label">Quantity</string>
-    <string name="product_unit_label">Unit (optional)</string>
+    <string name="product_unit_label">Unit</string>
     <string name="product_min_quantity_label">Minimum quantity (optional)</string>
     <string name="product_notes_label">Notes (optional)</string>
-    <string name="product_emoji_label">Emoji (optional)</string>
+    <string name="product_emoji_label">Emoji</string>
     <string name="product_barcodes_label">Barcodes</string>
     <string name="scan_barcode">Scan barcode</string>
     <string name="cd_remove_barcode">Remove barcode %1$s</string>
