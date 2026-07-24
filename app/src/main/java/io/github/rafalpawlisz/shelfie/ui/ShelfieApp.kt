@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rafalpawlisz.shelfie.R
+import kotlinx.coroutines.flow.collectLatest
 import io.github.rafalpawlisz.shelfie.ui.pantry.AddShoppingItemDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.LowStockSuggestion
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
@@ -78,9 +79,10 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     }
 
     LaunchedEffect(Unit) {
-        viewModel.useUpEvents.collect { result ->
-            // A burst of use-ups shouldn't queue snackbars — the newest wins.
-            snackbarHostState.currentSnackbarData?.dismiss()
+        // collectLatest: a burst of use-ups must not queue snackbars — a new
+        // event cancels the previous handler, which dismisses its snackbar
+        // (showSnackbar cleans up on cancellation), so the newest wins.
+        viewModel.useUpEvents.collectLatest { result ->
             when (result) {
                 is UseUpScanResult.Used -> {
                     val suggestion = result.suggestion
@@ -95,6 +97,9 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                         val shown = snackbarHostState.showSnackbar(
                             message = context.getString(R.string.use_up_scanned, result.productName),
                             actionLabel = context.getString(R.string.action_undo),
+                            // With an action label M3 defaults to Indefinite —
+                            // an undo hint must not linger forever.
+                            duration = SnackbarDuration.Long,
                         )
                         if (shown == SnackbarResult.ActionPerformed) {
                             viewModel.undoUseUp(result.productId)
