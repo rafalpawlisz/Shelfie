@@ -67,6 +67,7 @@ fun ShoppingScreen(
     onArchiveList: (id: String) -> Unit,
     onRestoreList: (id: String) -> Unit,
     onDeleteList: (id: String) -> Unit,
+    onMoveList: (fromIndex: Int, toIndex: Int) -> Unit,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
@@ -83,6 +84,7 @@ fun ShoppingScreen(
             onArchiveList = onArchiveList,
             onRestoreList = onRestoreList,
             onDeleteList = onDeleteList,
+            onMoveList = onMoveList,
         )
         when {
             lists.isEmpty() -> Box(modifier = Modifier.fillMaxSize()) {
@@ -122,6 +124,7 @@ private fun ListChipsRow(
     onArchiveList: (id: String) -> Unit,
     onRestoreList: (id: String) -> Unit,
     onDeleteList: (id: String) -> Unit,
+    onMoveList: (fromIndex: Int, toIndex: Int) -> Unit,
 ) {
     var menuListId by rememberSaveable { mutableStateOf<String?>(null) }
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
@@ -129,43 +132,72 @@ private fun ListChipsRow(
     var showArchiveDialog by rememberSaveable { mutableStateOf(false) }
     var deletingArchivedId by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // Local mirror so a drag animates smoothly; re-synced from [lists] when the
+    // upstream order changes (after a move is persisted), but not mid-drag.
+    val orderedLists = remember { mutableStateListOf<ShoppingList>().apply { addAll(lists) } }
+    LaunchedEffect(lists) {
+        if (orderedLists != lists) {
+            orderedLists.clear()
+            orderedLists.addAll(lists)
+        }
+    }
+    val lazyListState = rememberLazyListState()
+    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        // Only the list chips reorder; the trailing +/Archive chips stay at the end.
+        if (to.index < orderedLists.size) {
+            orderedLists.add(to.index, orderedLists.removeAt(from.index))
+        }
+    }
+
     LazyRow(
+        state = lazyListState,
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        items(lists, key = { it.id }) { list ->
-            val selected = list.id == selectedListId
-            Box {
-                FilterChip(
-                    selected = selected,
-                    onClick = { onSelectList(list.id) },
-                    label = { Text(list.name) },
-                    trailingIcon = if (selected) {
-                        {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = stringResource(R.string.cd_list_menu, list.name),
-                                modifier = Modifier.clickable { menuListId = list.id },
-                            )
-                        }
-                    } else {
-                        null
+        items(orderedLists, key = { it.id }) { list ->
+            ReorderableItem(reorderableState, key = list.id) { _ ->
+                val selected = list.id == selectedListId
+                // The whole chip is the drag handle on long-press; a tap still selects.
+                val handleModifier = Modifier.longPressDraggableHandle(
+                    onDragStopped = {
+                        val from = lists.indexOfFirst { it.id == list.id }
+                        val to = orderedLists.indexOfFirst { it.id == list.id }
+                        if (from != -1 && to != -1 && from != to) onMoveList(from, to)
                     },
                 )
-                DropdownMenu(
-                    expanded = menuListId == list.id,
-                    onDismissRequest = { menuListId = null },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_rename)) },
-                        onClick = { menuListId = null; renamingListId = list.id },
+                Box {
+                    FilterChip(
+                        selected = selected,
+                        onClick = { onSelectList(list.id) },
+                        label = { Text(list.name) },
+                        modifier = handleModifier,
+                        trailingIcon = if (selected) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = stringResource(R.string.cd_list_menu, list.name),
+                                    modifier = Modifier.clickable { menuListId = list.id },
+                                )
+                            }
+                        } else {
+                            null
+                        },
                     )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_archive)) },
-                        onClick = { menuListId = null; onArchiveList(list.id) },
-                    )
+                    DropdownMenu(
+                        expanded = menuListId == list.id,
+                        onDismissRequest = { menuListId = null },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_rename)) },
+                            onClick = { menuListId = null; renamingListId = list.id },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_archive)) },
+                            onClick = { menuListId = null; onArchiveList(list.id) },
+                        )
+                    }
                 }
             }
         }

@@ -135,6 +135,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                         onArchiveList = viewModel::archiveList,
                         onRestoreList = viewModel::restoreList,
                         onDeleteList = viewModel::deleteList,
+                        onMoveList = viewModel::moveList,
                         onToggle = viewModel::setShoppingItemChecked,
                         onRemove = viewModel::removeShoppingItem,
                         onMove = viewModel::moveShoppingItem,
