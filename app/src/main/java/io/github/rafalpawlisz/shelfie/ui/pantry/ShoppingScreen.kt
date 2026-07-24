@@ -42,6 +42,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -524,7 +526,13 @@ private fun AmountDialog(
     onConfirm: (Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var amountText by rememberSaveable { mutableStateOf(initialAmount?.toString().orEmpty()) }
+    // TextFieldValue instead of a plain String so the cursor can start after
+    // the prefilled amount — one backspace clears it.
+    var amountField by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        val text = initialAmount?.toString().orEmpty()
+        mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
+    }
+    val amountText = amountField.text
     val amount = amountText.trim().toIntOrNull()
     val isValid = if (amountText.isBlank()) allowEmpty else amount != null && amount > 0
     val amountFocus = remember { FocusRequester() }
@@ -534,8 +542,8 @@ private fun AmountDialog(
         title = { Text(title) },
         text = {
             OutlinedTextField(
-                value = amountText,
-                onValueChange = { amountText = it },
+                value = amountField,
+                onValueChange = { amountField = it },
                 label = { Text(stringResource(R.string.shopping_amount_label)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
