@@ -63,11 +63,24 @@ fun AddShoppingItemDialog(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
+                        var query by rememberSaveable { mutableStateOf("") }
+                        val visibleProducts = products.filterByName(query)
+                        ProductSearchField(
+                            query = query,
+                            onQueryChange = { query = it },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (query.isNotBlank() && visibleProducts.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.search_no_results),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                         LazyColumn(
                             modifier = Modifier.heightIn(max = 360.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            items(products, key = { it.id }) { product ->
+                            items(visibleProducts, key = { it.id }) { product ->
                                 ProductListItem(
                                     product = product,
                                     onClick = { selectedProductId = product.id },

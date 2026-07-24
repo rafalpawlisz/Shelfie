@@ -46,6 +46,9 @@
     <string name="add_product">Dodaj produkt</string>
     <string name="edit_product">Edytuj produkt</string>
     <string name="products_hint">Dotknij produktu, aby go edytować</string>
+    <string name="search_placeholder">Szukaj produktów</string>
+    <string name="search_clear">Wyczyść wyszukiwanie</string>
+    <string name="search_no_results">Brak pasujących produktów</string>
     <string name="product_name_label">Nazwa</string>
     <string name="product_quantity_label">Ilość</string>
     <string name="product_unit_label">Jednostka</string>

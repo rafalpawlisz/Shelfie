@@ -8,12 +8,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,6 +51,10 @@ fun ProductsScreen(
     }
 
     var archivedExpanded by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    // Presentation-only filter; the source lists stay sorted by the repository.
+    val visibleProducts = products.filterByName(query)
+    val visibleArchived = archivedProducts.filterByName(query)
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
@@ -54,13 +63,26 @@ fun ProductsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
+        ProductSearchField(
+            query = query,
+            onQueryChange = { query = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        )
+        if (query.isNotBlank() && visibleProducts.isEmpty() && visibleArchived.isEmpty()) {
+            Text(
+                text = stringResource(R.string.search_no_results),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             // Extra bottom padding keeps the FAB clear of the last row.
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(products, key = { it.id }) { product ->
+            items(visibleProducts, key = { it.id }) { product ->
                 ProductListItem(
                     product = product,
                     onClick = { onProductClick(product.id) },
@@ -73,7 +95,7 @@ fun ProductsScreen(
                     },
                 )
             }
-            if (archivedProducts.isNotEmpty()) {
+            if (visibleArchived.isNotEmpty()) {
                 item(key = "archived-header") {
                     TextButton(onClick = { archivedExpanded = !archivedExpanded }) {
                         Icon(
@@ -87,13 +109,13 @@ fun ProductsScreen(
                         Text(
                             text = stringResource(
                                 R.string.archived_section,
-                                archivedProducts.size,
+                                visibleArchived.size,
                             ),
                         )
                     }
                 }
                 if (archivedExpanded) {
-                    items(archivedProducts, key = { it.id }) { product ->
+                    items(visibleArchived, key = { it.id }) { product ->
                         ProductListItem(
                             product = product,
                             dimmed = true,
@@ -111,4 +133,39 @@ fun ProductsScreen(
             }
         }
     }
+}
+
+/** Case-insensitive name filter shared by the Products tab and the list picker. */
+internal fun List<Product>.filterByName(query: String): List<Product> {
+    val trimmed = query.trim()
+    if (trimmed.isEmpty()) return this
+    return filter { it.name.contains(trimmed, ignoreCase = true) }
+}
+
+@Composable
+internal fun ProductSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = { Text(stringResource(R.string.search_placeholder)) },
+        leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null) },
+        trailingIcon = if (query.isNotEmpty()) {
+            {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = stringResource(R.string.search_clear),
+                    )
+                }
+            }
+        } else {
+            null
+        },
+        singleLine = true,
+        modifier = modifier,
+    )
 }
