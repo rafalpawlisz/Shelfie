@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -130,6 +131,7 @@ fun ShoppingScreen(
                     title = stringResource(R.string.shopping_no_lists_title),
                     message = stringResource(R.string.shopping_no_lists_message),
                     modifier = Modifier.align(Alignment.Center),
+                    icon = Icons.Default.ShoppingCart,
                 )
             }
             items.isEmpty() -> Box(modifier = Modifier.fillMaxSize()) {
@@ -137,6 +139,7 @@ fun ShoppingScreen(
                     title = stringResource(R.string.shopping_empty_title),
                     message = stringResource(R.string.shopping_empty_message),
                     modifier = Modifier.align(Alignment.Center),
+                    icon = Icons.Default.ShoppingCart,
                 )
             }
             else -> ListItems(

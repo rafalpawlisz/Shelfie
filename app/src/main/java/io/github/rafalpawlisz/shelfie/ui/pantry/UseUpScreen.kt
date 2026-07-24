@@ -27,6 +27,7 @@ fun UseUpScreen(products: List<Product>, onDecrement: (String) -> Unit) {
                 title = stringResource(R.string.use_up_empty_title),
                 message = stringResource(R.string.use_up_empty_message),
                 modifier = Modifier.align(Alignment.Center),
+                icon = RemoveIcon,
             )
         }
     } else {

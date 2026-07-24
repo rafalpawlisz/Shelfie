@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -45,6 +46,7 @@ fun ProductsScreen(
                 title = stringResource(R.string.empty_state_title),
                 message = stringResource(R.string.empty_state_message),
                 modifier = Modifier.align(Alignment.Center),
+                icon = Icons.AutoMirrored.Filled.List,
             )
         }
         return
