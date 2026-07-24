@@ -116,6 +116,22 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
         }
     }
 
+    LaunchedEffect(Unit) {
+        // Separate collector from use-up events: removals and use-ups come from
+        // different tabs, and each stream should replace only its own snackbar.
+        viewModel.itemRemovedEvents.collectLatest { removed ->
+            val shown = snackbarHostState.showSnackbar(
+                message = context.getString(R.string.shopping_item_removed, removed.productName),
+                actionLabel = context.getString(R.string.action_undo),
+                // With an action label M3 defaults to Indefinite.
+                duration = SnackbarDuration.Long,
+            )
+            if (shown == SnackbarResult.ActionPerformed) {
+                viewModel.undoRemoveItem(removed)
+            }
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },

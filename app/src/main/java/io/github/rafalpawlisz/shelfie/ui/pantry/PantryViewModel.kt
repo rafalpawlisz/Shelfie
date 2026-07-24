@@ -50,6 +50,19 @@ sealed interface UseUpScanResult {
     data class UnknownCode(val code: String) : UseUpScanResult
 }
 
+/**
+ * Snapshot of a shopping-list item that was just removed, carrying everything
+ * Undo needs to put it back ([ShoppingListItem] itself has no listId — the
+ * removal always happens on the then-selected list).
+ */
+data class RemovedShoppingItem(
+    val listId: String,
+    val productId: String,
+    val productName: String,
+    val amount: Int?,
+    val note: String?,
+)
+
 data class PantryUiState(
     val products: List<Product> = emptyList(),
     val archivedProducts: List<Product> = emptyList(),
@@ -86,6 +99,10 @@ class PantryViewModel(
     // One-shot feedback for use-ups (tap or scan) on the Use up tab.
     private val useUpChannel = Channel<UseUpScanResult>(Channel.BUFFERED)
     val useUpEvents = useUpChannel.receiveAsFlow()
+
+    // One-shot "item removed" events so the UI can offer Undo.
+    private val itemRemovedChannel = Channel<RemovedShoppingItem>(Channel.BUFFERED)
+    val itemRemovedEvents = itemRemovedChannel.receiveAsFlow()
 
     private data class ProductsBundle(
         val active: List<Product>,
@@ -350,7 +367,39 @@ class PantryViewModel(
     }
 
     fun removeShoppingItem(id: String) {
-        viewModelScope.launch { shoppingListRepository.removeItem(id) }
+        // Snapshot before deleting so the snackbar can offer Undo.
+        val item = uiState.value.shoppingList.firstOrNull { it.id == id }
+        val listId = selectedListId.value
+        viewModelScope.launch {
+            shoppingListRepository.removeItem(id)
+            if (item != null && listId != null) {
+                itemRemovedChannel.send(
+                    RemovedShoppingItem(
+                        listId = listId,
+                        productId = item.productId,
+                        productName = item.productName,
+                        amount = item.amount,
+                        note = item.note,
+                    ),
+                )
+            }
+        }
+    }
+
+    /**
+     * Undo of a remove: put the item back on its list with the same amount and
+     * note. The manual position survives removal (product_list_order is kept),
+     * so the item returns to its old slot; it comes back unchecked.
+     */
+    fun undoRemoveItem(removed: RemovedShoppingItem) {
+        viewModelScope.launch {
+            shoppingListRepository.addItem(
+                removed.listId,
+                removed.productId,
+                removed.amount,
+                removed.note,
+            )
+        }
     }
 
     fun finishShopping() {

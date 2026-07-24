@@ -3,6 +3,7 @@ package io.github.rafalpawlisz.shelfie.pantry
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.ui.pantry.LowStockSuggestion
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
+import io.github.rafalpawlisz.shelfie.ui.pantry.RemovedShoppingItem
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScanResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -903,6 +904,63 @@ class ShoppingListViewModelTest {
             listOf("Cheese", "Apples", "Bread"),
             viewModel.uiState.value.shoppingList.map { it.productName },
         )
+    }
+
+    @Test
+    fun `removing an item emits an undo event with the item's snapshot`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val removals = mutableListOf<RemovedShoppingItem>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.itemRemovedEvents.collect { removals.add(it) }
+        }
+        viewModel.createList("Lidl")
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.addToShoppingList(productId, amount = 3, note = "the blue one")
+
+        viewModel.removeShoppingItem(viewModel.uiState.value.shoppingList.single().id)
+
+        val removed = removals.single()
+        assertEquals(viewModel.uiState.value.selectedListId, removed.listId)
+        assertEquals(productId, removed.productId)
+        assertEquals("Milk", removed.productName)
+        assertEquals(3, removed.amount)
+        assertEquals("the blue one", removed.note)
+    }
+
+    @Test
+    fun `undoRemoveItem puts the item back with amount, note and its manual slot`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Apples", quantity = 0, unit = null)
+        repository.addProduct(name = "Bread", quantity = 0, unit = null)
+        repository.addProduct(name = "Cheese", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val removals = mutableListOf<RemovedShoppingItem>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.itemRemovedEvents.collect { removals.add(it) }
+        }
+        viewModel.createList("Lidl")
+        fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
+        listOf("Apples", "Bread", "Cheese").forEach { viewModel.addToShoppingList(pid(it), 1) }
+        viewModel.moveShoppingItem(fromIndex = 2, toIndex = 0) // [Cheese, Apples, Bread]
+        val cheese = viewModel.uiState.value.shoppingList.first { it.productName == "Cheese" }
+        viewModel.updateShoppingItem(cheese.id, amount = 2, note = "gouda")
+
+        viewModel.removeShoppingItem(cheese.id)
+        viewModel.undoRemoveItem(removals.single())
+
+        // Back at the front (position survives removal), details intact.
+        assertEquals(
+            listOf("Cheese", "Apples", "Bread"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+        val restored = viewModel.uiState.value.shoppingList.first()
+        assertEquals(2, restored.amount)
+        assertEquals("gouda", restored.note)
+        assertFalse(restored.isChecked)
     }
 
     @Test

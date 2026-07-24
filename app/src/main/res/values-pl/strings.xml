@@ -44,6 +44,7 @@
     <string name="low_stock_hint">Produkty poniżej minimum — dotknij, aby dodać do listy</string>
     <string name="action_add_all">Dodaj wszystkie</string>
     <string name="action_undo">Cofnij</string>
+    <string name="shopping_item_removed">Usunięto: %1$s</string>
     <string name="use_up_scan_out_of_stock">%1$s: brak zapasu</string>
     <string name="use_up_scan_unknown">Nieznany kod: %1$s</string>
     <string name="add_product">Dodaj produkt</string>
