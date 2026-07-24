@@ -13,7 +13,12 @@ class FakeShoppingListRepository(
     private val products: FakeProductRepository,
 ) : ShoppingListRepository {
 
-    private data class ListEntry(val id: String, val name: String, val archivedAt: Long? = null)
+    private data class ListEntry(
+        val id: String,
+        val name: String,
+        val position: Double,
+        val archivedAt: Long? = null,
+    )
 
     private data class Item(
         val id: String,
@@ -39,22 +44,19 @@ class FakeShoppingListRepository(
     private var archiveSeq = 0L
 
     override fun observeLists(): Flow<List<ShoppingList>> =
-        lists.map { entries ->
-            entries.filter { it.archivedAt == null }
-                .map { ShoppingList(id = it.id, name = it.name) }
-                .sortedBy { it.name.lowercase() }
-        }
+        lists.map { entries -> entries.filter { it.archivedAt == null }.toSortedDomain() }
 
     override fun observeArchivedLists(): Flow<List<ShoppingList>> =
-        lists.map { entries ->
-            entries.filter { it.archivedAt != null }
-                .map { ShoppingList(id = it.id, name = it.name) }
-                .sortedBy { it.name.lowercase() }
-        }
+        lists.map { entries -> entries.filter { it.archivedAt != null }.toSortedDomain() }
+
+    private fun List<ListEntry>.toSortedDomain(): List<ShoppingList> =
+        map { ShoppingList(id = it.id, name = it.name, position = it.position) }
+            .sortedWith(compareBy({ it.position }, { it.name.lowercase() }))
 
     override suspend fun createList(name: String): String {
         val id = "list-${nextListId++}"
-        lists.update { it + ListEntry(id = id, name = name.trim()) }
+        val position = (lists.value.maxOfOrNull { it.position } ?: 0.0) + 1.0
+        lists.update { it + ListEntry(id = id, name = name.trim(), position = position) }
         return id
     }
 
@@ -76,6 +78,10 @@ class FakeShoppingListRepository(
         // Mirror the FK CASCADE: dropping a list drops its items and order rows.
         items.update { list -> list.filterNot { it.listId == id } }
         positions.update { map -> map.filterKeys { it.first != id } }
+    }
+
+    override suspend fun setListPosition(id: String, position: Double) {
+        lists.update { list -> list.map { if (it.id == id) it.copy(position = position) else it } }
     }
 
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =

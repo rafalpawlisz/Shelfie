@@ -14,6 +14,7 @@ interface ShoppingListRepository {
     suspend fun archiveList(id: String)
     suspend fun restoreList(id: String)
     suspend fun deleteList(id: String)
+    suspend fun setListPosition(id: String, position: Double)
 
     // Items within a given list
     fun observeItems(listId: String): Flow<List<ShoppingListItem>>

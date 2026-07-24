@@ -176,6 +176,29 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.renameList(id, name) }
     }
 
+    /**
+     * Persist a manual reorder of the lists: move the list at [fromIndex] to
+     * [toIndex]. Only the moved list's position changes — it's set to the midpoint
+     * between its new neighbours (fractional indexing).
+     */
+    fun moveList(fromIndex: Int, toIndex: Int) {
+        val lists = uiState.value.lists
+        if (fromIndex !in lists.indices || toIndex !in lists.indices || fromIndex == toIndex) return
+        val moved = lists[fromIndex]
+        val without = lists.toMutableList().apply { removeAt(fromIndex) }
+        val prev = without.getOrNull(toIndex - 1)?.position
+        val next = without.getOrNull(toIndex)?.position
+        val newPosition = when {
+            prev == null && next == null -> moved.position
+            prev == null -> next!! - 1.0
+            next == null -> prev + 1.0
+            else -> (prev + next) / 2.0
+        }
+        viewModelScope.launch {
+            shoppingListRepository.setListPosition(moved.id, newPosition)
+        }
+    }
+
     fun archiveList(id: String) {
         // Reversible soft delete; the reconciler reselects another active list
         // (or null). Items and manual order stay put for a later restore.

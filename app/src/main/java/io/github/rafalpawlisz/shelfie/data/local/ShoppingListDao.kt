@@ -34,6 +34,13 @@ interface ShoppingListDao {
     @Query("DELETE FROM shopping_lists WHERE id = :id")
     suspend fun deleteList(id: String)
 
+    // Manual list order (fractional index); new lists append after the current max.
+    @Query("SELECT MAX(position) FROM shopping_lists")
+    suspend fun maxListPosition(): Double?
+
+    @Query("UPDATE shopping_lists SET position = :position, updatedAt = :timestamp WHERE id = :id")
+    suspend fun setListPosition(id: String, position: Double, timestamp: Long)
+
     // --- Items within a list ---
 
     @Query(

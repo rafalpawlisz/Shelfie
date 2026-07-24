@@ -20,14 +20,27 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
 
     private fun List<ShoppingListEntity>.toSortedDomain(): List<ShoppingList> {
         val collator = nameCollator()
-        return map { ShoppingList(id = it.id, name = it.name) }
-            .sortedWith { a, b -> collator.compare(a.name, b.name) }
+        return map { ShoppingList(id = it.id, name = it.name, position = it.position) }
+            .sortedWith { a, b ->
+                // Manual order; name as a stable, locale-aware tiebreak.
+                val byPosition = a.position.compareTo(b.position)
+                if (byPosition != 0) byPosition else collator.compare(a.name, b.name)
+            }
     }
 
     override suspend fun createList(name: String): String {
         val now = System.currentTimeMillis()
         val id = UUID.randomUUID().toString()
-        dao.insertList(ShoppingListEntity(id = id, name = name.trim(), createdAt = now, updatedAt = now))
+        val position = (dao.maxListPosition() ?: 0.0) + 1.0
+        dao.insertList(
+            ShoppingListEntity(
+                id = id,
+                name = name.trim(),
+                createdAt = now,
+                updatedAt = now,
+                position = position,
+            ),
+        )
         return id
     }
 
@@ -45,6 +58,10 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
 
     override suspend fun deleteList(id: String) {
         dao.deleteList(id)
+    }
+
+    override suspend fun setListPosition(id: String, position: Double) {
+        dao.setListPosition(id, position, System.currentTimeMillis())
     }
 
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =

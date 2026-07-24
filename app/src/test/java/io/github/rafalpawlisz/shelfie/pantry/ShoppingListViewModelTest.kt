@@ -202,6 +202,71 @@ class ShoppingListViewModelTest {
         assertTrue(viewModel.uiState.value.archivedLists.isEmpty())
     }
 
+    // --- Reordering lists ---
+
+    @Test
+    fun `moveList reorders the lists`() = runTest {
+        val viewModel = makeViewModel(FakeProductRepository())
+        observe(viewModel)
+        // Non-alphabetical creation order proves the order is manual, not by name.
+        viewModel.createList("Lidl")
+        viewModel.createList("Auchan")
+        viewModel.createList("Biedronka")
+        assertEquals(
+            listOf("Lidl", "Auchan", "Biedronka"),
+            viewModel.uiState.value.lists.map { it.name },
+        )
+
+        // Drag Biedronka (index 2) to the front.
+        viewModel.moveList(fromIndex = 2, toIndex = 0)
+
+        assertEquals(
+            listOf("Biedronka", "Lidl", "Auchan"),
+            viewModel.uiState.value.lists.map { it.name },
+        )
+    }
+
+    @Test
+    fun `a new list is appended at the end`() = runTest {
+        val viewModel = makeViewModel(FakeProductRepository())
+        observe(viewModel)
+        viewModel.createList("Biedronka")
+        viewModel.createList("Auchan")
+
+        // "Aldi" sorts first alphabetically but must land last (append, not by name).
+        viewModel.createList("Aldi")
+
+        assertEquals(
+            listOf("Biedronka", "Auchan", "Aldi"),
+            viewModel.uiState.value.lists.map { it.name },
+        )
+    }
+
+    @Test
+    fun `list order survives archive and restore`() = runTest {
+        val viewModel = makeViewModel(FakeProductRepository())
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        viewModel.createList("Auchan")
+        viewModel.createList("Biedronka")
+        viewModel.moveList(fromIndex = 2, toIndex = 0) // [Biedronka, Lidl, Auchan]
+        val lidl = viewModel.uiState.value.lists.first { it.name == "Lidl" }.id
+
+        viewModel.archiveList(lidl)
+        assertEquals(
+            listOf("Biedronka", "Auchan"),
+            viewModel.uiState.value.lists.map { it.name },
+        )
+
+        viewModel.restoreList(lidl)
+
+        // Lidl returns to its own slot, not the end.
+        assertEquals(
+            listOf("Biedronka", "Lidl", "Auchan"),
+            viewModel.uiState.value.lists.map { it.name },
+        )
+    }
+
     // --- Item behavior within the selected list ---
 
     @Test
