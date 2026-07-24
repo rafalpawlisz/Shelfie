@@ -14,7 +14,7 @@
     <string name="edit_amount">Change amount</string>
     <string name="check_amount_title">How many did you get?</string>
     <string name="shopping_amount">×%1$d</string>
-    <string name="shopping_amount_with_unit">×%1$d %2$s</string>
+    <string name="shopping_amount_with_unit">%1$d %2$s</string>
     <string name="finish_shopping">Finish shopping (%1$d)</string>
     <string name="finish_shopping_message">Add %1$d item(s) to your pantry and finish shopping?</string>
     <string name="action_finish">Finish</string>

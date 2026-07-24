@@ -198,6 +198,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
         ProductFormDialog(
             title = stringResource(R.string.add_product),
             confirmLabel = stringResource(R.string.action_add),
+            autoFocusName = true,
             onConfirm = { name, quantity, unit, minQuantity, notes, emoji, barcodes ->
                 viewModel.addProduct(name, quantity, unit, minQuantity, notes, emoji, barcodes)
                 showAddDialog = false
@@ -226,6 +227,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     if (showAddToListDialog) {
         AddShoppingItemDialog(
             products = state.products,
+            items = state.shoppingList,
             onConfirm = { productId, amount, note ->
                 viewModel.addToShoppingList(productId, amount, note)
                 showAddToListDialog = false

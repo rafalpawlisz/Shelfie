@@ -140,31 +140,15 @@ class FakeShoppingListRepository(
                     checkedAt = null,
                 )
             }
-            existing.checkedAt == null -> items.update { list ->
+            else -> items.update { list ->
+                // Mirror the DAO: re-adding replaces amount + note and unchecks.
                 list.map { item ->
                     if (item.id == existing.id) {
-                        // Mirror the DAO: null acts as 0 unless both are null.
-                        val merged = if (item.amount == null && amount == null) {
-                            null
-                        } else {
-                            (item.amount ?: 0) + (amount ?: 0)
-                        }
-                        item.copy(amount = merged, note = cleanNote ?: item.note)
+                        item.copy(amount = amount, note = cleanNote, checkedAt = null)
                     } else {
                         item
                     }
                 }
-            }
-            else -> items.update { list ->
-                list.filterNot { it.id == existing.id } +
-                    Item(
-                        id = "item-${nextId++}",
-                        listId = listId,
-                        productId = productId,
-                        amount = amount,
-                        note = cleanNote,
-                        checkedAt = null,
-                    )
             }
         }
     }

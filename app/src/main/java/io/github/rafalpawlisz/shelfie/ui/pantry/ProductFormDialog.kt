@@ -26,7 +26,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.listSaver
@@ -34,6 +36,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -76,6 +80,8 @@ fun ProductFormDialog(
     initialEmoji: String? = null,
     initialBarcodes: List<String> = emptyList(),
     stateKey: Any? = null,
+    // Add mode: focus the (required) name field right away so typing can start.
+    autoFocusName: Boolean = false,
     onArchive: (() -> Unit)? = null,
     onRestore: (() -> Unit)? = null,
 ) {
@@ -174,13 +180,17 @@ fun ProductFormDialog(
                             singleLine = true,
                             modifier = Modifier.weight(0.3f),
                         )
+                        val nameFocus = remember { FocusRequester() }
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
                             label = { Text(stringResource(R.string.product_name_label)) },
                             singleLine = true,
-                            modifier = Modifier.weight(0.7f),
+                            modifier = Modifier.weight(0.7f).focusRequester(nameFocus),
                         )
+                        if (autoFocusName) {
+                            LaunchedEffect(Unit) { nameFocus.requestFocus() }
+                        }
                     }
                     // Quantity + unit read as one value ("2 l").
                     Row(

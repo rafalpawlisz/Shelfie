@@ -164,33 +164,13 @@ interface ShoppingListDao {
                     updatedAt = timestamp,
                 )
             )
-            existing.checkedAt == null -> {
-                // A concrete amount beats "just buy it": null acts as 0 unless
-                // both sides are unspecified. A new note replaces the old one;
-                // no new note keeps it.
-                val merged = if (existing.amount == null && amount == null) {
-                    null
-                } else {
-                    (existing.amount ?: 0) + (amount ?: 0)
-                }
-                setDetails(existing.id, merged, note ?: existing.note, timestamp)
-            }
             else -> {
-                // Existing checked entry (in cart, not yet checked out):
-                // replace it with a fresh unchecked item at the new amount.
-                delete(existing.id)
-                insert(
-                    ShoppingListItemEntity(
-                        id = newId,
-                        listId = listId,
-                        productId = productId,
-                        amount = amount,
-                        note = note,
-                        checkedAt = null,
-                        createdAt = timestamp,
-                        updatedAt = timestamp,
-                    )
-                )
+                // Adding an already-listed product REPLACES its amount and note —
+                // the add dialog pre-fills the current values, so what's confirmed
+                // is what you get (no merge math). A checked entry goes back to
+                // the to-buy state.
+                setDetails(existing.id, amount, note, timestamp)
+                setChecked(existing.id, checkedAt = null, updatedAt = timestamp)
             }
         }
     }

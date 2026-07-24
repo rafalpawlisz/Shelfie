@@ -437,7 +437,7 @@ class ShoppingListViewModelTest {
     }
 
     @Test
-    fun `adding a product with an unchecked item sums amounts into one entry`() = runTest {
+    fun `re-adding a product replaces the existing entry's values`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 0, unit = "l")
         val viewModel = makeViewModel(repository)
@@ -445,11 +445,13 @@ class ShoppingListViewModelTest {
         val productId = viewModel.uiState.value.products.single().id
         viewModel.createList("Lidl")
 
+        // The add dialog pre-fills the current values for an already-listed
+        // product, so confirming REPLACES them — no merge math.
         viewModel.addToShoppingList(productId, amount = 3)
         viewModel.addToShoppingList(productId, amount = 1)
 
         val item = viewModel.uiState.value.shoppingList.single()
-        assertEquals(4, item.amount)
+        assertEquals(1, item.amount)
         assertFalse(item.isChecked)
     }
 
@@ -475,7 +477,7 @@ class ShoppingListViewModelTest {
     }
 
     @Test
-    fun `an item can be added without an amount and a concrete amount wins on merge`() = runTest {
+    fun `an item can be added without an amount and re-adding sets exactly what was confirmed`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 0, unit = "l")
         val viewModel = makeViewModel(repository)
@@ -486,19 +488,12 @@ class ShoppingListViewModelTest {
         viewModel.addToShoppingList(productId, amount = null)
         assertNull(viewModel.uiState.value.shoppingList.single().amount)
 
-        // null + null stays "just buy it".
-        viewModel.addToShoppingList(productId, amount = null)
-        assertNull(viewModel.uiState.value.shoppingList.single().amount)
-
-        // null + 5 -> 5 (the concrete amount wins).
         viewModel.addToShoppingList(productId, amount = 5)
         assertEquals(5, viewModel.uiState.value.shoppingList.single().amount)
 
-        // 5 + null -> 5 (kept), 5 + 2 -> 7 (sum regression).
+        // Replace semantics: clearing the (pre-filled) field really clears it.
         viewModel.addToShoppingList(productId, amount = null)
-        assertEquals(5, viewModel.uiState.value.shoppingList.single().amount)
-        viewModel.addToShoppingList(productId, amount = 2)
-        assertEquals(7, viewModel.uiState.value.shoppingList.single().amount)
+        assertNull(viewModel.uiState.value.shoppingList.single().amount)
     }
 
     @Test
@@ -562,7 +557,7 @@ class ShoppingListViewModelTest {
     }
 
     @Test
-    fun `item note is set on add, replaced on merge, and dies with the item at checkout`() = runTest {
+    fun `item note is set on add, replaced on re-add, and dies with the item at checkout`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 0, unit = "l")
         val viewModel = makeViewModel(repository)
@@ -573,12 +568,9 @@ class ShoppingListViewModelTest {
         viewModel.addToShoppingList(productId, amount = 2, note = "the blue one")
         assertEquals("the blue one", viewModel.uiState.value.shoppingList.single().note)
 
-        // Re-adding without a note keeps the existing one.
-        viewModel.addToShoppingList(productId, amount = 1, note = null)
-        assertEquals("the blue one", viewModel.uiState.value.shoppingList.single().note)
-
-        // A new note replaces it.
-        viewModel.addToShoppingList(productId, amount = null, note = "only on sale")
+        // Replace semantics: the dialog pre-fills the current note, so whatever
+        // is confirmed (including a cleared field) is what sticks.
+        viewModel.addToShoppingList(productId, amount = 1, note = "only on sale")
         assertEquals("only on sale", viewModel.uiState.value.shoppingList.single().note)
 
         // The row-tap edit can change or clear it.

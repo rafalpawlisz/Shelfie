@@ -27,15 +27,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.Product
+import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 
 /**
  * Two-phase picker: choose an active product, then optionally the amount to
- * buy. The field starts empty; leaving it blank records the bare need — the
- * actual amount is asked for when the item is checked off in the store.
+ * buy. For a new item the fields start empty (blank amount = the bare need —
+ * it's asked for at check-off). Picking a product that is already on the list
+ * pre-fills its current amount and note, and confirming REPLACES them.
  */
 @Composable
 fun AddShoppingItemDialog(
     products: List<Product>,
+    items: List<ShoppingListItem>,
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -81,6 +84,7 @@ fun AddShoppingItemDialog(
                 } else {
                     AmountPhase(
                         product = selectedProduct,
+                        existing = items.firstOrNull { it.productId == selectedProduct.id },
                         onConfirm = onConfirm,
                         onDismiss = onDismiss,
                     )
@@ -93,13 +97,17 @@ fun AddShoppingItemDialog(
 @Composable
 private fun AmountPhase(
     product: Product,
+    existing: ShoppingListItem?,
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // Always starts empty; blank = no amount ("just buy it").
-    var amountText by rememberSaveable(product.id) { mutableStateOf("") }
+    // New items start empty (blank = no amount, "just buy it"); an already-listed
+    // product shows its current values, so confirming replaces them knowingly.
+    var amountText by rememberSaveable(product.id) {
+        mutableStateOf(existing?.amount?.toString().orEmpty())
+    }
     // One-off shopping note; dies with the item at checkout.
-    var noteText by rememberSaveable(product.id) { mutableStateOf("") }
+    var noteText by rememberSaveable(product.id) { mutableStateOf(existing?.note.orEmpty()) }
     val amount = amountText.trim().toIntOrNull()
     val isValid = amountText.isBlank() || (amount != null && amount > 0)
 
@@ -137,7 +145,11 @@ private fun AmountPhase(
                 )
             },
         ) {
-            Text(stringResource(R.string.action_add))
+            Text(
+                stringResource(
+                    if (existing != null) R.string.action_save else R.string.action_add,
+                ),
+            )
         }
     }
 }
