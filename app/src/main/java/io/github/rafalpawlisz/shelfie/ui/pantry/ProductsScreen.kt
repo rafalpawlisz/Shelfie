@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
@@ -89,13 +88,6 @@ fun ProductsScreen(
                     product = product,
                     modifier = Modifier.animateItem(),
                     onClick = { onProductClick(product.id) },
-                    trailingContent = {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    },
                 )
             }
             if (visibleArchived.isNotEmpty()) {
@@ -124,13 +116,6 @@ fun ProductsScreen(
                             modifier = Modifier.animateItem(),
                             dimmed = true,
                             onClick = { onProductClick(product.id) },
-                            trailingContent = {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.outline,
-                                )
-                            },
                         )
                     }
                 }
