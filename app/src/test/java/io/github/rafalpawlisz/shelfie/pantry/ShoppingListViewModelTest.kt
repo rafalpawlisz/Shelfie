@@ -287,6 +287,74 @@ class ShoppingListViewModelTest {
         )
     }
 
+    // --- Derived low-stock ("Braki") list ---
+
+    @Test
+    fun `lowStockProducts lists unplanned products below their minimum`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 2, unit = "l", minQuantity = 4) // low
+        repository.addProduct(name = "Bread", quantity = 5, unit = null, minQuantity = 2) // fine
+        repository.addProduct(name = "Cheese", quantity = 0, unit = null) // no minimum
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+
+        assertEquals(listOf("Milk"), viewModel.uiState.value.lowStockProducts.map { it.name })
+    }
+
+    @Test
+    fun `a planned product drops off the low-stock list reactively`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 1, unit = "l", minQuantity = 3)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        assertEquals(1, viewModel.uiState.value.lowStockProducts.size)
+
+        viewModel.addToShoppingList(productId, amount = null)
+        assertTrue(viewModel.uiState.value.lowStockProducts.isEmpty())
+
+        // Removing it from the list makes it "unplanned" (and low) again.
+        viewModel.removeShoppingItem(viewModel.uiState.value.shoppingList.single().id)
+        assertEquals(1, viewModel.uiState.value.lowStockProducts.size)
+    }
+
+    @Test
+    fun `an archived product never shows as low stock`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l", minQuantity = 3)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+
+        viewModel.archive(productId)
+
+        assertTrue(viewModel.uiState.value.lowStockProducts.isEmpty())
+    }
+
+    @Test
+    fun `addLowStockToList puts every shortage on the chosen list without amounts`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 1, unit = "l", minQuantity = 3)
+        repository.addProduct(name = "Bread", quantity = 0, unit = null, minQuantity = 1)
+        val prefs = FakeUiPreferences()
+        val viewModel = makeViewModel(repository, prefs)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.createList("Auchan") // selected now
+        assertEquals(2, viewModel.uiState.value.lowStockProducts.size)
+
+        viewModel.addLowStockToList(lidl) // NOT the selected list
+
+        assertTrue(viewModel.uiState.value.lowStockProducts.isEmpty())
+        assertEquals(lidl, prefs.lastRestockListId)
+        viewModel.selectList(lidl)
+        val items = viewModel.uiState.value.shoppingList
+        assertEquals(setOf("Milk", "Bread"), items.map { it.productName }.toSet())
+        assertTrue(items.all { it.amount == null })
+    }
+
     // --- Low-stock restock suggestions ---
 
     @Test

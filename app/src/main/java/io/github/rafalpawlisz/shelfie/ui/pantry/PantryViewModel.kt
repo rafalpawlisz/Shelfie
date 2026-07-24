@@ -53,6 +53,9 @@ sealed interface UseUpScanResult {
 data class PantryUiState(
     val products: List<Product> = emptyList(),
     val archivedProducts: List<Product> = emptyList(),
+    // Derived "low stock" list: active products below their minimum that are not
+    // yet planned on any active shopping list.
+    val lowStockProducts: List<Product> = emptyList(),
     val lists: List<ShoppingList> = emptyList(),
     val archivedLists: List<ShoppingList> = emptyList(),
     val selectedListId: String? = null,
@@ -82,21 +85,35 @@ class PantryViewModel(
     private val useUpChannel = Channel<UseUpScanResult>(Channel.BUFFERED)
     val useUpEvents = useUpChannel.receiveAsFlow()
 
+    private data class ProductsBundle(
+        val active: List<Product>,
+        val archived: List<Product>,
+        val barcodes: List<io.github.rafalpawlisz.shelfie.model.ProductBarcode>,
+        val plannedIds: List<String>,
+    )
+
     val uiState: StateFlow<PantryUiState> =
         combine(
             combine(
                 repository.observeProducts(),
                 repository.observeArchivedProducts(),
                 barcodeRepository.observeBarcodes(),
-            ) { active, archived, barcodes -> Triple(active, archived, barcodes) },
+                shoppingListRepository.observePlannedProductIds(),
+            ) { active, archived, barcodes, plannedIds ->
+                ProductsBundle(active, archived, barcodes, plannedIds)
+            },
             shoppingListRepository.observeLists(),
             shoppingListRepository.observeArchivedLists(),
             selectedListId,
             shoppingItems,
-        ) { (active, archived, barcodes), lists, archivedLists, selected, items ->
+        ) { (active, archived, barcodes, plannedIds), lists, archivedLists, selected, items ->
             PantryUiState(
                 products = active,
                 archivedProducts = archived,
+                lowStockProducts = active.filter { product ->
+                    val min = product.minQuantity
+                    min != null && product.quantity < min && product.id !in plannedIds
+                },
                 lists = lists,
                 archivedLists = archivedLists,
                 selectedListId = selected,
@@ -272,6 +289,19 @@ class PantryViewModel(
     fun addToList(listId: String, productId: String, amount: Int?) {
         uiPreferences.lastRestockListId = listId
         viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount) }
+    }
+
+    /**
+     * "Add all" on the derived low-stock list: put every below-minimum product
+     * on the chosen list without an amount (it's asked for at check-off).
+     */
+    fun addLowStockToList(listId: String) {
+        val products = uiState.value.lowStockProducts
+        if (products.isEmpty()) return
+        uiPreferences.lastRestockListId = listId
+        viewModelScope.launch {
+            products.forEach { shoppingListRepository.addItem(listId, it.id, amount = null) }
+        }
     }
 
     /** Which list the restock dialog should preselect: last used, else selected, else first. */

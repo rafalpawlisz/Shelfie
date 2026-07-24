@@ -193,6 +193,12 @@ class FakeShoppingListRepository(
         return items.value.any { it.productId == productId && it.listId in activeListIds }
     }
 
+    override fun observePlannedProductIds(): Flow<List<String>> =
+        combine(items, lists) { allItems, allLists ->
+            val activeListIds = allLists.filter { it.archivedAt == null }.map { it.id }.toSet()
+            allItems.filter { it.listId in activeListIds }.map { it.productId }.distinct()
+        }
+
     // Append at the end the first time a product joins a list; keep an existing slot.
     private fun ensurePosition(listId: String, productId: String) {
         val key = listId to productId

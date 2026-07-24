@@ -68,6 +68,14 @@ interface ShoppingListDao {
     )
     suspend fun isOnActiveList(productId: String): Boolean
 
+    // Reactive version for the derived "low stock" list: every product that is
+    // already planned on some active list.
+    @Query(
+        "SELECT DISTINCT i.productId FROM shopping_list_items i " +
+            "JOIN shopping_lists l ON l.id = i.listId WHERE l.archivedAt IS NULL"
+    )
+    fun observePlannedProductIds(): Flow<List<String>>
+
     @Insert
     suspend fun insert(item: ShoppingListItemEntity)
 

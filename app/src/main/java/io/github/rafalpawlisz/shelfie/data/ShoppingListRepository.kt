@@ -27,6 +27,9 @@ interface ShoppingListRepository {
     // True when the product already sits on any active (non-archived) list —
     // used to keep the low-stock suggestion from nagging about planned items.
     suspend fun isOnAnyList(productId: String): Boolean
+
+    // Reactive companion of [isOnAnyList] powering the derived "low stock" list.
+    fun observePlannedProductIds(): Flow<List<String>>
     suspend fun setChecked(id: String, checked: Boolean)
     suspend fun setItemAmount(id: String, amount: Int?)
     suspend fun setItemDetails(id: String, amount: Int?, note: String?)
