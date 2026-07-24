@@ -78,20 +78,27 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     }
 
     LaunchedEffect(Unit) {
-        viewModel.scanEvents.collect { result ->
+        viewModel.useUpEvents.collect { result ->
+            // A burst of use-ups shouldn't queue snackbars — the newest wins.
+            snackbarHostState.currentSnackbarData?.dismiss()
             when (result) {
                 is UseUpScanResult.Used -> {
                     val suggestion = result.suggestion
                     if (suggestion != null) {
-                        // ONE snackbar carrying both the outcome and the hint.
+                        // ONE snackbar carrying both the outcome and the hint;
+                        // the restock action outranks Undo (one action slot).
                         suggestRestock(
                             context.getString(R.string.use_up_scanned_low, result.productName),
                             suggestion,
                         )
                     } else {
-                        snackbarHostState.showSnackbar(
-                            context.getString(R.string.use_up_scanned, result.productName),
+                        val shown = snackbarHostState.showSnackbar(
+                            message = context.getString(R.string.use_up_scanned, result.productName),
+                            actionLabel = context.getString(R.string.action_undo),
                         )
+                        if (shown == SnackbarResult.ActionPerformed) {
+                            viewModel.undoUseUp(result.productId)
+                        }
                     }
                 }
                 is UseUpScanResult.OutOfStock -> snackbarHostState.showSnackbar(
@@ -101,15 +108,6 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                     context.getString(R.string.use_up_scan_unknown, result.code),
                 )
             }
-        }
-    }
-    LaunchedEffect(Unit) {
-        // Tap path (Use up list) — scans fold the hint into the Used event above.
-        viewModel.lowStockEvents.collect { suggestion ->
-            suggestRestock(
-                context.getString(R.string.low_stock_message, suggestion.productName),
-                suggestion,
-            )
         }
     }
 

@@ -1,4 +1,4 @@
-package io.github.rafalpawlisz.shelfie.pantry
+﻿package io.github.rafalpawlisz.shelfie.pantry
 
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
@@ -81,7 +81,7 @@ class BarcodeViewModelTest {
         val viewModel = makeViewModel(products)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         val events = mutableListOf<UseUpScanResult>()
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.scanEvents.collect { events += it } }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.useUpEvents.collect { events += it } }
         val id = viewModel.uiState.value.products.single().id
         viewModel.addProduct(name = "ignored", quantity = 0, unit = null) // noise product
         viewModel.updateProduct(id = id, name = "Milk", quantity = 2, unit = "l", barcodes = listOf("5901234123457"))
@@ -89,7 +89,7 @@ class BarcodeViewModelTest {
         viewModel.useUpByBarcode("5901234123457")
 
         assertEquals(1, viewModel.uiState.value.products.first { it.name == "Milk" }.quantity)
-        assertEquals(UseUpScanResult.Used("Milk"), events.last())
+        assertEquals(UseUpScanResult.Used(id, "Milk"), events.last())
     }
 
     @Test
@@ -99,7 +99,7 @@ class BarcodeViewModelTest {
         val viewModel = makeViewModel(products)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         val events = mutableListOf<UseUpScanResult>()
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.scanEvents.collect { events += it } }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.useUpEvents.collect { events += it } }
         val id = viewModel.uiState.value.products.single().id
         viewModel.updateProduct(id = id, name = "Milk", quantity = 0, unit = "l", barcodes = listOf("5901234123457"))
 
@@ -116,7 +116,7 @@ class BarcodeViewModelTest {
         val viewModel = makeViewModel(products)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         val events = mutableListOf<UseUpScanResult>()
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.scanEvents.collect { events += it } }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.useUpEvents.collect { events += it } }
 
         viewModel.useUpByBarcode("0000000000000")
 

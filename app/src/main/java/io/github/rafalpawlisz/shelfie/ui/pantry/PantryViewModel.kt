@@ -36,11 +36,12 @@ data class LowStockSuggestion(
     val suggestedAmount: Int,
 )
 
-/** One-shot outcome of scanning a barcode on the Use up tab. */
+/** One-shot outcome of a use-up (tap or scan) on the Use up tab. */
 sealed interface UseUpScanResult {
-    // A successful scan may carry a restock suggestion so the UI can show ONE
-    // snackbar with both messages instead of queueing two.
+    // A use-up may carry a restock suggestion so the UI can show ONE snackbar
+    // with both messages; [productId] lets the plain variant offer Undo.
     data class Used(
+        val productId: String,
         val productName: String,
         val suggestion: LowStockSuggestion? = null,
     ) : UseUpScanResult
@@ -77,13 +78,9 @@ class PantryViewModel(
             if (id == null) flowOf(emptyList()) else shoppingListRepository.observeItems(id)
         }
 
-    // One-shot feedback for barcode scans on the Use up tab.
-    private val scanChannel = Channel<UseUpScanResult>(Channel.BUFFERED)
-    val scanEvents = scanChannel.receiveAsFlow()
-
-    // One-shot restock hints for the tap path (scans fold the hint into Used).
-    private val lowStockChannel = Channel<LowStockSuggestion>(Channel.BUFFERED)
-    val lowStockEvents = lowStockChannel.receiveAsFlow()
+    // One-shot feedback for use-ups (tap or scan) on the Use up tab.
+    private val useUpChannel = Channel<UseUpScanResult>(Channel.BUFFERED)
+    val useUpEvents = useUpChannel.receiveAsFlow()
 
     val uiState: StateFlow<PantryUiState> =
         combine(
@@ -165,7 +162,9 @@ class PantryViewModel(
         viewModelScope.launch {
             val product = repository.getActiveProduct(id) ?: return@launch
             if (product.quantity <= 0) return@launch
-            useUpProduct(product)?.let { lowStockChannel.send(it) }
+            useUpChannel.send(
+                UseUpScanResult.Used(product.id, product.name, useUpProduct(product)),
+            )
         }
     }
 
@@ -178,11 +177,17 @@ class PantryViewModel(
             val product = productId?.let { repository.getActiveProduct(it) }
             val result = when {
                 product == null -> UseUpScanResult.UnknownCode(code)
-                product.quantity > 0 -> UseUpScanResult.Used(product.name, useUpProduct(product))
+                product.quantity > 0 ->
+                    UseUpScanResult.Used(product.id, product.name, useUpProduct(product))
                 else -> UseUpScanResult.OutOfStock(product.name)
             }
-            scanChannel.send(result)
+            useUpChannel.send(result)
         }
+    }
+
+    /** Undo of the last use-up snackbar: put the unit back. */
+    fun undoUseUp(productId: String) {
+        viewModelScope.launch { repository.adjustQuantity(productId, delta = +1) }
     }
 
     /**

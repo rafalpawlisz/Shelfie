@@ -37,10 +37,13 @@ class ShoppingListViewModelTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
     }
 
+    // Restock hints ride inside Used events on the unified use-up channel.
     private fun TestScope.collectLowStock(viewModel: PantryViewModel): List<LowStockSuggestion> {
         val events = mutableListOf<LowStockSuggestion>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.lowStockEvents.collect { events.add(it) }
+            viewModel.useUpEvents.collect { result ->
+                (result as? UseUpScanResult.Used)?.suggestion?.let { events.add(it) }
+            }
         }
         return events
     }
@@ -356,9 +359,8 @@ class ShoppingListViewModelTest {
         observe(viewModel)
         val scans = mutableListOf<UseUpScanResult>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.scanEvents.collect { scans.add(it) }
+            viewModel.useUpEvents.collect { scans.add(it) }
         }
-        val lowStock = collectLowStock(viewModel)
         viewModel.addProduct(
             name = "Milk", quantity = 2, unit = "l", minQuantity = 3,
             barcodes = listOf("5901234123457"),
@@ -367,10 +369,25 @@ class ShoppingListViewModelTest {
 
         viewModel.useUpByBarcode("5901234123457")
 
+        // ONE event carrying both the outcome and the hint.
         val used = scans.single() as UseUpScanResult.Used
         assertEquals("Milk", used.productName)
         assertEquals(2, used.suggestion?.suggestedAmount) // min 3 − new stock 1
-        assertTrue(lowStock.isEmpty()) // no second event for the same use-up
+    }
+
+    @Test
+    fun `undoUseUp puts the unit back`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 2, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+
+        viewModel.decrement(productId)
+        assertEquals(1, viewModel.uiState.value.products.single().quantity)
+
+        viewModel.undoUseUp(productId)
+        assertEquals(2, viewModel.uiState.value.products.single().quantity)
     }
 
     @Test
