@@ -14,8 +14,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -33,9 +35,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.ui.pantry.AddShoppingItemDialog
+import io.github.rafalpawlisz.shelfie.ui.pantry.LowStockSuggestion
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
 import io.github.rafalpawlisz.shelfie.ui.pantry.ProductFormDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.ProductsScreen
+import io.github.rafalpawlisz.shelfie.ui.pantry.RestockDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.ShoppingScreen
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScanResult
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScreen
@@ -57,17 +61,55 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
 
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    // Ephemeral restock hint being acted on; deliberately not saved across
+    // rotation — it's a suggestion, not state.
+    var restockSuggestion by remember { mutableStateOf<LowStockSuggestion?>(null) }
+
+    // Shows the low-stock snackbar; the Add action is offered only when there
+    // is a list to add to. On action, opens the restock dialog.
+    suspend fun suggestRestock(message: String, suggestion: LowStockSuggestion) {
+        val canAdd = viewModel.uiState.value.lists.isNotEmpty()
+        val result = snackbarHostState.showSnackbar(
+            message = message,
+            actionLabel = if (canAdd) context.getString(R.string.action_add) else null,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) restockSuggestion = suggestion
+    }
+
     LaunchedEffect(Unit) {
         viewModel.scanEvents.collect { result ->
-            val message = when (result) {
-                is UseUpScanResult.Used ->
-                    context.getString(R.string.use_up_scanned, result.productName)
-                is UseUpScanResult.OutOfStock ->
-                    context.getString(R.string.use_up_scan_out_of_stock, result.productName)
-                is UseUpScanResult.UnknownCode ->
-                    context.getString(R.string.use_up_scan_unknown, result.code)
+            when (result) {
+                is UseUpScanResult.Used -> {
+                    val suggestion = result.suggestion
+                    if (suggestion != null) {
+                        // ONE snackbar carrying both the outcome and the hint.
+                        suggestRestock(
+                            context.getString(R.string.use_up_scanned_low, result.productName),
+                            suggestion,
+                        )
+                    } else {
+                        snackbarHostState.showSnackbar(
+                            context.getString(R.string.use_up_scanned, result.productName),
+                        )
+                    }
+                }
+                is UseUpScanResult.OutOfStock -> snackbarHostState.showSnackbar(
+                    context.getString(R.string.use_up_scan_out_of_stock, result.productName),
+                )
+                is UseUpScanResult.UnknownCode -> snackbarHostState.showSnackbar(
+                    context.getString(R.string.use_up_scan_unknown, result.code),
+                )
             }
-            snackbarHostState.showSnackbar(message)
+        }
+    }
+    LaunchedEffect(Unit) {
+        // Tap path (Use up list) — scans fold the hint into the Used event above.
+        viewModel.lowStockEvents.collect { suggestion ->
+            suggestRestock(
+                context.getString(R.string.low_stock_message, suggestion.productName),
+                suggestion,
+            )
         }
     }
 
@@ -159,6 +201,24 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },
+        )
+    }
+
+    val suggestion = restockSuggestion
+    if (suggestion != null) {
+        val product = state.products.firstOrNull { it.id == suggestion.productId }
+        RestockDialog(
+            productLabel = product
+                ?.let { listOfNotNull(it.emoji, it.name).joinToString(" ") }
+                ?: suggestion.productName,
+            lists = state.lists,
+            defaultListId = viewModel.defaultRestockListId(),
+            suggestedAmount = suggestion.suggestedAmount,
+            onConfirm = { listId, amount ->
+                viewModel.addToList(listId, suggestion.productId, amount)
+                restockSuggestion = null
+            },
+            onDismiss = { restockSuggestion = null },
         )
     }
 

@@ -32,6 +32,8 @@
     <string name="use_up_empty_title">Nie ma czego zużyć</string>
     <string name="use_up_empty_message">Produkty, które masz w zapasie, pojawią się tutaj</string>
     <string name="use_up_scanned">Zużyto: %1$s</string>
+    <string name="use_up_scanned_low">Zużyto: %1$s — kończy się</string>
+    <string name="low_stock_message">Kończy się: %1$s</string>
     <string name="use_up_scan_out_of_stock">%1$s: brak zapasu</string>
     <string name="use_up_scan_unknown">Nieznany kod: %1$s</string>
     <string name="add_product">Dodaj produkt</string>
