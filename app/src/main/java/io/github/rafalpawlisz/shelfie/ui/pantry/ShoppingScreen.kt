@@ -79,7 +79,7 @@ fun ShoppingScreen(
     onMoveList: (fromIndex: Int, toIndex: Int) -> Unit,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
-    onUpdateItem: (id: String, amount: Int?, note: String?) -> Unit,
+    onUpdateItem: (id: String, amount: Int?, note: String?, targetListId: String?) -> Unit,
     onCheckWithAmount: (id: String, amount: Int) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onRestockProduct: (Product) -> Unit,
@@ -135,6 +135,8 @@ fun ShoppingScreen(
             }
             else -> ListItems(
                 items = items,
+                lists = lists,
+                currentListId = selectedListId,
                 onToggle = onToggle,
                 onRemove = onRemove,
                 onUpdateItem = onUpdateItem,
@@ -433,25 +435,41 @@ private fun ListChipsRow(
     }
 }
 
-// Row-tap edit: amount (blank = "just buy it") and the one-off shopping note
-// (blank = none) saved together.
+// Row-tap edit: amount (blank = "just buy it"), the one-off shopping note
+// (blank = none), and — when there is more than one list — the list the item
+// belongs to. Picking a different list moves the item there on save.
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ItemEditDialog(
+    lists: List<ShoppingList>,
+    currentListId: String?,
     initialAmount: Int?,
     initialNote: String?,
-    onConfirm: (amount: Int?, note: String?) -> Unit,
+    onConfirm: (amount: Int?, note: String?, targetListId: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var amountText by rememberSaveable { mutableStateOf(initialAmount?.toString().orEmpty()) }
     var noteText by rememberSaveable { mutableStateOf(initialNote.orEmpty()) }
+    var targetListId by rememberSaveable { mutableStateOf(currentListId) }
     val amount = amountText.trim().toIntOrNull()
     val isValid = amountText.isBlank() || (amount != null && amount > 0)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.edit_amount)) },
+        title = { Text(stringResource(R.string.edit_item)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (lists.size > 1) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        lists.forEach { list ->
+                            FilterChip(
+                                selected = list.id == targetListId,
+                                onClick = { targetListId = list.id },
+                                label = { Text(list.name) },
+                            )
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
@@ -474,6 +492,7 @@ private fun ItemEditDialog(
                     onConfirm(
                         if (amountText.isBlank()) null else amount,
                         noteText.trim().ifBlank { null },
+                        targetListId?.takeIf { it != currentListId },
                     )
                 },
             ) {
@@ -560,9 +579,11 @@ private fun ListNameDialog(
 @Composable
 private fun ListItems(
     items: List<ShoppingListItem>,
+    lists: List<ShoppingList>,
+    currentListId: String?,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
-    onUpdateItem: (id: String, amount: Int?, note: String?) -> Unit,
+    onUpdateItem: (id: String, amount: Int?, note: String?, targetListId: String?) -> Unit,
     onCheckWithAmount: (id: String, amount: Int) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onFinishShopping: () -> Unit,
@@ -658,10 +679,12 @@ private fun ListItems(
     val editingItem = items.firstOrNull { it.id == editingAmountItemId }
     if (editingItem != null) {
         ItemEditDialog(
+            lists = lists,
+            currentListId = currentListId,
             initialAmount = editingItem.amount,
             initialNote = editingItem.note,
-            onConfirm = { amount, note ->
-                onUpdateItem(editingItem.id, amount, note)
+            onConfirm = { amount, note, targetListId ->
+                onUpdateItem(editingItem.id, amount, note, targetListId)
                 editingAmountItemId = null
             },
             onDismiss = { editingAmountItemId = null },

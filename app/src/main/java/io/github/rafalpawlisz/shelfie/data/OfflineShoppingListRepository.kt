@@ -111,6 +111,10 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
         dao.setDetails(id, amount, note?.trim()?.ifBlank { null }, System.currentTimeMillis())
     }
 
+    override suspend fun moveItem(id: String, targetListId: String) {
+        dao.moveToList(id, targetListId, System.currentTimeMillis())
+    }
+
     override suspend fun removeItem(id: String) {
         dao.delete(id)
     }

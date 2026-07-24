@@ -59,6 +59,35 @@ interface ShoppingListDao {
     @Query("SELECT * FROM shopping_list_items WHERE listId = :listId AND productId = :productId LIMIT 1")
     suspend fun findByProduct(listId: String, productId: String): ShoppingListItemEntity?
 
+    @Query("SELECT * FROM shopping_list_items WHERE id = :id")
+    suspend fun getById(id: String): ShoppingListItemEntity?
+
+    // Reassign an item to another list; it arrives unchecked (a fresh plan there).
+    @Query(
+        "UPDATE shopping_list_items SET listId = :listId, checkedAt = NULL, " +
+            "updatedAt = :timestamp WHERE id = :id"
+    )
+    suspend fun reassignList(id: String, listId: String, timestamp: Long)
+
+    // Move an item (amount + note travel along) to another list. The target may
+    // already list the product (unique (listId, productId)) — then the moved
+    // values REPLACE the target entry and the source row is dropped. The item's
+    // slot on the target comes from its remembered position (or appends).
+    @Transaction
+    suspend fun moveToList(id: String, targetListId: String, timestamp: Long) {
+        val item = getById(id) ?: return
+        if (item.listId == targetListId) return
+        ensurePosition(targetListId, item.productId, timestamp)
+        val existing = findByProduct(targetListId, item.productId)
+        if (existing != null) {
+            setDetails(existing.id, item.amount, item.note, timestamp)
+            setChecked(existing.id, checkedAt = null, updatedAt = timestamp)
+            delete(item.id)
+        } else {
+            reassignList(item.id, targetListId, timestamp)
+        }
+    }
+
     // Is the product waiting to be bought on any non-archived list? Items on
     // archived lists are dormant and don't count as "already planned".
     @Query(

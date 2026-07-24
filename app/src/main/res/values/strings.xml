@@ -6,12 +6,12 @@
     <string name="tab_products">Products</string>
     <string name="tab_shopping">Shopping</string>
     <string name="tab_use_up">Use up</string>
-    <string name="shopping_hint">Check off bought items; tap one to change the amount</string>
+    <string name="shopping_hint">Check off bought items; tap one to edit it</string>
     <string name="shopping_empty_title">Shopping list is empty</string>
     <string name="shopping_empty_message">Tap + to add something to buy</string>
     <string name="add_to_shopping_list">Add to shopping list</string>
     <string name="shopping_amount_label">Amount to buy (optional)</string>
-    <string name="edit_amount">Change amount</string>
+    <string name="edit_item">Edit item</string>
     <string name="check_amount_title">How many did you get?</string>
     <string name="shopping_amount">×%1$d</string>
     <string name="shopping_amount_with_unit">%1$d %2$s</string>

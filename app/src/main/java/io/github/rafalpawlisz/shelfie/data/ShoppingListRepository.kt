@@ -33,6 +33,10 @@ interface ShoppingListRepository {
     suspend fun setChecked(id: String, checked: Boolean)
     suspend fun setItemAmount(id: String, amount: Int?)
     suspend fun setItemDetails(id: String, amount: Int?, note: String?)
+
+    // Move the item (amount + note travel along) to another list; arrives
+    // unchecked, in its remembered slot there. No-op for the same list.
+    suspend fun moveItem(id: String, targetListId: String)
     suspend fun removeItem(id: String)
     suspend fun finishShopping(listId: String)
 

@@ -965,6 +965,59 @@ class ShoppingListViewModelTest {
         )
     }
 
+    // --- Moving items between lists ---
+
+    @Test
+    fun `updateShoppingItem with a target list moves the item with amount and note`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.createList("Auchan")
+        val auchan = viewModel.uiState.value.selectedListId!!
+        viewModel.selectList(lidl)
+        viewModel.addToShoppingList(productId, amount = 2, note = "promo")
+        val itemId = viewModel.uiState.value.shoppingList.single().id
+
+        // Edit + move in one confirm: new amount, kept note, different list.
+        viewModel.updateShoppingItem(itemId, amount = 3, note = "promo", targetListId = auchan)
+
+        assertTrue(viewModel.uiState.value.shoppingList.isEmpty()) // gone from Lidl
+        viewModel.selectList(auchan)
+        val moved = viewModel.uiState.value.shoppingList.single()
+        assertEquals(3, moved.amount)
+        assertEquals("promo", moved.note)
+        assertFalse(moved.isChecked)
+    }
+
+    @Test
+    fun `moving onto a list that already has the product replaces that entry`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.addToShoppingList(productId, amount = 2, note = "from lidl")
+        val lidlItem = viewModel.uiState.value.shoppingList.single().id
+        viewModel.createList("Auchan")
+        val auchan = viewModel.uiState.value.selectedListId!!
+        viewModel.addToShoppingList(productId, amount = 9, note = "old auchan")
+
+        viewModel.selectList(lidl)
+        viewModel.updateShoppingItem(lidlItem, amount = 2, note = "from lidl", targetListId = auchan)
+
+        assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+        viewModel.selectList(auchan)
+        val merged = viewModel.uiState.value.shoppingList.single()
+        assertEquals(2, merged.amount)
+        assertEquals("from lidl", merged.note)
+    }
+
     // --- Cross-list isolation ---
 
     @Test

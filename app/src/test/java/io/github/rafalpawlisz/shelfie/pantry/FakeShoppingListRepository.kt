@@ -172,6 +172,31 @@ class FakeShoppingListRepository(
         }
     }
 
+    override suspend fun moveItem(id: String, targetListId: String) {
+        val item = items.value.firstOrNull { it.id == id } ?: return
+        if (item.listId == targetListId) return
+        ensurePosition(targetListId, item.productId)
+        val existing = items.value.firstOrNull {
+            it.listId == targetListId && it.productId == item.productId
+        }
+        items.update { list ->
+            if (existing != null) {
+                // Mirror the DAO: moved values replace the target entry.
+                list.filterNot { it.id == item.id }.map {
+                    if (it.id == existing.id) {
+                        it.copy(amount = item.amount, note = item.note, checkedAt = null)
+                    } else {
+                        it
+                    }
+                }
+            } else {
+                list.map {
+                    if (it.id == id) it.copy(listId = targetListId, checkedAt = null) else it
+                }
+            }
+        }
+    }
+
     override suspend fun removeItem(id: String) {
         // The order row persists (mirrors the real DB), so re-adding restores the slot.
         items.update { list -> list.filterNot { it.id == id } }

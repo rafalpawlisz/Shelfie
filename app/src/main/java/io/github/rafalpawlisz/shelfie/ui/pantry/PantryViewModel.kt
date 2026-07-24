@@ -319,10 +319,16 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.setChecked(id, checked) }
     }
 
-    /** Row-tap edit: amount and the one-off note saved together. */
-    fun updateShoppingItem(id: String, amount: Int?, note: String?) {
+    /**
+     * Row-tap edit: amount and the one-off note saved together; a different
+     * [targetListId] additionally moves the item to that list.
+     */
+    fun updateShoppingItem(id: String, amount: Int?, note: String?, targetListId: String? = null) {
         if (amount != null && amount <= 0) return
-        viewModelScope.launch { shoppingListRepository.setItemDetails(id, amount, note) }
+        viewModelScope.launch {
+            shoppingListRepository.setItemDetails(id, amount, note)
+            if (targetListId != null) shoppingListRepository.moveItem(id, targetListId)
+        }
     }
 
     /**
