@@ -258,9 +258,9 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.deleteList(id) }
     }
 
-    fun addToShoppingList(productId: String, amount: Int?) {
+    fun addToShoppingList(productId: String, amount: Int?, note: String? = null) {
         val listId = selectedListId.value ?: return
-        viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount) }
+        viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount, note) }
     }
 
     /** Add to an explicitly chosen list (restock dialog) and remember the choice. */
@@ -284,9 +284,10 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.setChecked(id, checked) }
     }
 
-    fun setShoppingItemAmount(id: String, amount: Int?) {
+    /** Row-tap edit: amount and the one-off note saved together. */
+    fun updateShoppingItem(id: String, amount: Int?, note: String?) {
         if (amount != null && amount <= 0) return
-        viewModelScope.launch { shoppingListRepository.setItemAmount(id, amount) }
+        viewModelScope.launch { shoppingListRepository.setItemDetails(id, amount, note) }
     }
 
     /**

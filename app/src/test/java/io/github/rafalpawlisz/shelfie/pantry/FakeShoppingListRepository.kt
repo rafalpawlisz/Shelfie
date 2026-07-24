@@ -25,6 +25,7 @@ class FakeShoppingListRepository(
         val listId: String,
         val productId: String,
         val amount: Int?,
+        val note: String? = null,
         // null = to buy; increasing value = in cart. Monotonic stand-in for the
         // real checkedAt timestamp, so "most recently checked" sorts highest.
         val checkedAt: Long?,
@@ -114,6 +115,7 @@ class FakeShoppingListRepository(
                         id = item.id,
                         productId = item.productId,
                         amount = item.amount,
+                        note = item.note,
                         isChecked = item.checkedAt != null,
                         productName = product.name,
                         productEmoji = product.emoji,
@@ -123,8 +125,9 @@ class FakeShoppingListRepository(
                 }
         }
 
-    override suspend fun addItem(listId: String, productId: String, amount: Int?) {
+    override suspend fun addItem(listId: String, productId: String, amount: Int?, note: String?) {
         ensurePosition(listId, productId)
+        val cleanNote = note?.trim()?.ifBlank { null }
         val existing = items.value.firstOrNull { it.listId == listId && it.productId == productId }
         when {
             existing == null -> items.update {
@@ -133,6 +136,7 @@ class FakeShoppingListRepository(
                     listId = listId,
                     productId = productId,
                     amount = amount,
+                    note = cleanNote,
                     checkedAt = null,
                 )
             }
@@ -145,7 +149,7 @@ class FakeShoppingListRepository(
                         } else {
                             (item.amount ?: 0) + (amount ?: 0)
                         }
-                        item.copy(amount = merged)
+                        item.copy(amount = merged, note = cleanNote ?: item.note)
                     } else {
                         item
                     }
@@ -158,6 +162,7 @@ class FakeShoppingListRepository(
                         listId = listId,
                         productId = productId,
                         amount = amount,
+                        note = cleanNote,
                         checkedAt = null,
                     )
             }
@@ -174,6 +179,13 @@ class FakeShoppingListRepository(
 
     override suspend fun setItemAmount(id: String, amount: Int?) {
         items.update { list -> list.map { if (it.id == id) it.copy(amount = amount) else it } }
+    }
+
+    override suspend fun setItemDetails(id: String, amount: Int?, note: String?) {
+        val cleanNote = note?.trim()?.ifBlank { null }
+        items.update { list ->
+            list.map { if (it.id == id) it.copy(amount = amount, note = cleanNote) else it }
+        }
     }
 
     override suspend fun removeItem(id: String) {

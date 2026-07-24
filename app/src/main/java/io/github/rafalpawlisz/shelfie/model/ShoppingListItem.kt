@@ -5,6 +5,8 @@ data class ShoppingListItem(
     val productId: String,
     // null = "just buy it"; the actual amount is asked for at check-off.
     val amount: Int?,
+    // One-off shopping note; dies with the item at checkout/removal.
+    val note: String?,
     val isChecked: Boolean,
     val productName: String,
     val productEmoji: String?,

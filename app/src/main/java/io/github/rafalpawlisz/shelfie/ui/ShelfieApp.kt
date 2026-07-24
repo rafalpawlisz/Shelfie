@@ -180,7 +180,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                         onMoveList = viewModel::moveList,
                         onToggle = viewModel::setShoppingItemChecked,
                         onRemove = viewModel::removeShoppingItem,
-                        onSetAmount = viewModel::setShoppingItemAmount,
+                        onUpdateItem = viewModel::updateShoppingItem,
                         onCheckWithAmount = viewModel::checkWithAmount,
                         onMove = viewModel::moveShoppingItem,
                         onFinishShopping = viewModel::finishShopping,
@@ -226,8 +226,8 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     if (showAddToListDialog) {
         AddShoppingItemDialog(
             products = state.products,
-            onConfirm = { productId, amount ->
-                viewModel.addToShoppingList(productId, amount)
+            onConfirm = { productId, amount, note ->
+                viewModel.addToShoppingList(productId, amount, note)
                 showAddToListDialog = false
             },
             onDismiss = { showAddToListDialog = false },

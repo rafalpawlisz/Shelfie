@@ -535,7 +535,7 @@ class ShoppingListViewModelTest {
         val itemId = viewModel.uiState.value.shoppingList.single().id
         viewModel.setShoppingItemChecked(itemId, checked = true)
         // Deliberately clear the amount after checking (soft invariant).
-        viewModel.setShoppingItemAmount(itemId, null)
+        viewModel.updateShoppingItem(itemId, amount = null, note = null)
 
         viewModel.finishShopping()
 
@@ -544,7 +544,7 @@ class ShoppingListViewModelTest {
     }
 
     @Test
-    fun `setShoppingItemAmount changes the amount and rejects non-positive values`() = runTest {
+    fun `updateShoppingItem changes the amount and rejects non-positive values`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 0, unit = "l")
         val viewModel = makeViewModel(repository)
@@ -554,11 +554,44 @@ class ShoppingListViewModelTest {
         viewModel.addToShoppingList(productId, amount = 2)
         val itemId = viewModel.uiState.value.shoppingList.single().id
 
-        viewModel.setShoppingItemAmount(itemId, 5)
+        viewModel.updateShoppingItem(itemId, amount = 5, note = null)
         assertEquals(5, viewModel.uiState.value.shoppingList.single().amount)
 
-        viewModel.setShoppingItemAmount(itemId, 0) // ignored
+        viewModel.updateShoppingItem(itemId, amount = 0, note = null) // ignored
         assertEquals(5, viewModel.uiState.value.shoppingList.single().amount)
+    }
+
+    @Test
+    fun `item note is set on add, replaced on merge, and dies with the item at checkout`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+
+        viewModel.addToShoppingList(productId, amount = 2, note = "the blue one")
+        assertEquals("the blue one", viewModel.uiState.value.shoppingList.single().note)
+
+        // Re-adding without a note keeps the existing one.
+        viewModel.addToShoppingList(productId, amount = 1, note = null)
+        assertEquals("the blue one", viewModel.uiState.value.shoppingList.single().note)
+
+        // A new note replaces it.
+        viewModel.addToShoppingList(productId, amount = null, note = "only on sale")
+        assertEquals("only on sale", viewModel.uiState.value.shoppingList.single().note)
+
+        // The row-tap edit can change or clear it.
+        val itemId = viewModel.uiState.value.shoppingList.single().id
+        viewModel.updateShoppingItem(itemId, amount = 3, note = "promo")
+        assertEquals("promo", viewModel.uiState.value.shoppingList.single().note)
+        assertEquals(3, viewModel.uiState.value.shoppingList.single().amount)
+
+        // Checkout removes the item — a later re-add starts with no note.
+        viewModel.setShoppingItemChecked(itemId, checked = true)
+        viewModel.finishShopping()
+        viewModel.addToShoppingList(productId, amount = 1)
+        assertNull(viewModel.uiState.value.shoppingList.single().note)
     }
 
     @Test

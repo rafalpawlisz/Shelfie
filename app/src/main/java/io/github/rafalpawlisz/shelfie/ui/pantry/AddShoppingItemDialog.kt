@@ -36,7 +36,7 @@ import io.github.rafalpawlisz.shelfie.model.Product
 @Composable
 fun AddShoppingItemDialog(
     products: List<Product>,
-    onConfirm: (productId: String, amount: Int?) -> Unit,
+    onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedProductId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -93,11 +93,13 @@ fun AddShoppingItemDialog(
 @Composable
 private fun AmountPhase(
     product: Product,
-    onConfirm: (productId: String, amount: Int?) -> Unit,
+    onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     // Always starts empty; blank = no amount ("just buy it").
     var amountText by rememberSaveable(product.id) { mutableStateOf("") }
+    // One-off shopping note; dies with the item at checkout.
+    var noteText by rememberSaveable(product.id) { mutableStateOf("") }
     val amount = amountText.trim().toIntOrNull()
     val isValid = amountText.isBlank() || (amount != null && amount > 0)
 
@@ -113,6 +115,13 @@ private fun AmountPhase(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth(),
     )
+    OutlinedTextField(
+        value = noteText,
+        onValueChange = { noteText = it },
+        label = { Text(stringResource(R.string.product_notes_label)) },
+        maxLines = 3,
+        modifier = Modifier.fillMaxWidth(),
+    )
     Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Spacer(modifier = Modifier.weight(1f))
         TextButton(onClick = onDismiss) {
@@ -120,7 +129,13 @@ private fun AmountPhase(
         }
         TextButton(
             enabled = isValid,
-            onClick = { onConfirm(product.id, if (amountText.isBlank()) null else amount) },
+            onClick = {
+                onConfirm(
+                    product.id,
+                    if (amountText.isBlank()) null else amount,
+                    noteText.trim().ifBlank { null },
+                )
+            },
         ) {
             Text(stringResource(R.string.action_add))
         }

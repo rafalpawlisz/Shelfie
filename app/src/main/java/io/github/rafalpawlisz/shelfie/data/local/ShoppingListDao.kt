@@ -44,7 +44,7 @@ interface ShoppingListDao {
     // --- Items within a list ---
 
     @Query(
-        "SELECT i.id AS id, i.productId AS productId, i.amount AS amount, " +
+        "SELECT i.id AS id, i.productId AS productId, i.amount AS amount, i.note AS note, " +
             "i.checkedAt AS checkedAt, p.name AS productName, p.emoji AS productEmoji, " +
             "p.unit AS productUnit, COALESCE(o.position, 0.0) AS position " +
             "FROM shopping_list_items i " +
@@ -75,6 +75,13 @@ interface ShoppingListDao {
     // ViewModel; null = "just buy it").
     @Query("UPDATE shopping_list_items SET amount = :amount, updatedAt = :timestamp WHERE id = :id")
     suspend fun setAmount(id: String, amount: Int?, timestamp: Long)
+
+    // The row-tap edit dialog saves amount and note together.
+    @Query(
+        "UPDATE shopping_list_items SET amount = :amount, note = :note, updatedAt = :timestamp " +
+            "WHERE id = :id"
+    )
+    suspend fun setDetails(id: String, amount: Int?, note: String?, timestamp: Long)
 
     @Query("DELETE FROM shopping_list_items WHERE id = :id")
     suspend fun delete(id: String)
@@ -134,7 +141,14 @@ interface ShoppingListDao {
     suspend fun setPosition(listId: String, productId: String, position: Double, timestamp: Long)
 
     @Transaction
-    suspend fun addOrMerge(listId: String, productId: String, amount: Int?, newId: String, timestamp: Long) {
+    suspend fun addOrMerge(
+        listId: String,
+        productId: String,
+        amount: Int?,
+        note: String?,
+        newId: String,
+        timestamp: Long,
+    ) {
         ensurePosition(listId, productId, timestamp)
         val existing = findByProduct(listId, productId)
         when {
@@ -144,6 +158,7 @@ interface ShoppingListDao {
                     listId = listId,
                     productId = productId,
                     amount = amount,
+                    note = note,
                     checkedAt = null,
                     createdAt = timestamp,
                     updatedAt = timestamp,
@@ -151,13 +166,14 @@ interface ShoppingListDao {
             )
             existing.checkedAt == null -> {
                 // A concrete amount beats "just buy it": null acts as 0 unless
-                // both sides are unspecified.
+                // both sides are unspecified. A new note replaces the old one;
+                // no new note keeps it.
                 val merged = if (existing.amount == null && amount == null) {
                     null
                 } else {
                     (existing.amount ?: 0) + (amount ?: 0)
                 }
-                setAmount(existing.id, merged, timestamp)
+                setDetails(existing.id, merged, note ?: existing.note, timestamp)
             }
             else -> {
                 // Existing checked entry (in cart, not yet checked out):
@@ -169,6 +185,7 @@ interface ShoppingListDao {
                         listId = listId,
                         productId = productId,
                         amount = amount,
+                        note = note,
                         checkedAt = null,
                         createdAt = timestamp,
                         updatedAt = timestamp,

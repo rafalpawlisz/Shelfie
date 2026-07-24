@@ -36,6 +36,10 @@ data class ShoppingListItemEntity(
     // How many to buy; > 0 when set. null = "just buy it" — the amount is asked
     // for when the item is checked off, so checkout math still works.
     val amount: Int?,
+    // One-off shopping note ("the blue one", "only if on sale") — independent of
+    // the product's own notes. Lives and dies with this row: checkout/removal
+    // deletes the row, taking the note with it.
+    val note: String?,
     // null = still to buy; non-null = in the cart (marked bought). The amount
     // is applied to the product's quantity only at checkout(), not when checked.
     val checkedAt: Long?,
@@ -48,6 +52,7 @@ data class ShoppingListItemRow(
     val id: String,
     val productId: String,
     val amount: Int?,
+    val note: String?,
     val checkedAt: Long?,
     val productName: String,
     val productEmoji: String?,
@@ -60,6 +65,7 @@ fun ShoppingListItemRow.toDomain(): ShoppingListItem = ShoppingListItem(
     id = id,
     productId = productId,
     amount = amount,
+    note = note,
     isChecked = checkedAt != null,
     productName = productName,
     productEmoji = productEmoji,

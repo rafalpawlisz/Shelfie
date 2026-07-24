@@ -74,7 +74,7 @@ fun ShoppingScreen(
     onMoveList: (fromIndex: Int, toIndex: Int) -> Unit,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
-    onSetAmount: (id: String, amount: Int?) -> Unit,
+    onUpdateItem: (id: String, amount: Int?, note: String?) -> Unit,
     onCheckWithAmount: (id: String, amount: Int) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onFinishShopping: () -> Unit,
@@ -111,7 +111,7 @@ fun ShoppingScreen(
                 items = items,
                 onToggle = onToggle,
                 onRemove = onRemove,
-                onSetAmount = onSetAmount,
+                onUpdateItem = onUpdateItem,
                 onCheckWithAmount = onCheckWithAmount,
                 onMove = onMove,
                 onFinishShopping = onFinishShopping,
@@ -303,6 +303,59 @@ private fun ListChipsRow(
     }
 }
 
+// Row-tap edit: amount (blank = "just buy it") and the one-off shopping note
+// (blank = none) saved together.
+@Composable
+private fun ItemEditDialog(
+    initialAmount: Int?,
+    initialNote: String?,
+    onConfirm: (amount: Int?, note: String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var amountText by rememberSaveable { mutableStateOf(initialAmount?.toString().orEmpty()) }
+    var noteText by rememberSaveable { mutableStateOf(initialNote.orEmpty()) }
+    val amount = amountText.trim().toIntOrNull()
+    val isValid = amountText.isBlank() || (amount != null && amount > 0)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.edit_amount)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text(stringResource(R.string.shopping_amount_label)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    label = { Text(stringResource(R.string.product_notes_label)) },
+                    maxLines = 3,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = isValid,
+                onClick = {
+                    onConfirm(
+                        if (amountText.isBlank()) null else amount,
+                        noteText.trim().ifBlank { null },
+                    )
+                },
+            ) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}
+
 // [allowEmpty]: a blank field is valid and confirms null ("just buy it") when
 // editing; the check-off variant requires a number (stock math needs it).
 @Composable
@@ -379,7 +432,7 @@ private fun ListItems(
     items: List<ShoppingListItem>,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
-    onSetAmount: (id: String, amount: Int?) -> Unit,
+    onUpdateItem: (id: String, amount: Int?, note: String?) -> Unit,
     onCheckWithAmount: (id: String, amount: Int) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onFinishShopping: () -> Unit,
@@ -474,12 +527,11 @@ private fun ListItems(
 
     val editingItem = items.firstOrNull { it.id == editingAmountItemId }
     if (editingItem != null) {
-        AmountDialog(
-            title = stringResource(R.string.edit_amount),
+        ItemEditDialog(
             initialAmount = editingItem.amount,
-            allowEmpty = true, // blank = "just buy it"
-            onConfirm = { amount ->
-                onSetAmount(editingItem.id, amount)
+            initialNote = editingItem.note,
+            onConfirm = { amount, note ->
+                onUpdateItem(editingItem.id, amount, note)
                 editingAmountItemId = null
             },
             onDismiss = { editingAmountItemId = null },
@@ -559,6 +611,19 @@ private fun ShoppingListRow(
                             ?: stringResource(R.string.shopping_amount, item.amount),
                         style = MaterialTheme.typography.bodyMedium,
                         color = textColor,
+                        textDecoration = decoration,
+                    )
+                }
+                // One-off shopping note; dies with the item at checkout.
+                if (item.note != null) {
+                    Text(
+                        text = item.note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (item.isChecked) {
+                            MaterialTheme.colorScheme.outline
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                         textDecoration = decoration,
                     )
                 }
