@@ -169,6 +169,20 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                         archivedLists = state.archivedLists,
                         selectedListId = state.selectedListId,
                         items = state.shoppingList,
+                        lowStockProducts = state.lowStockProducts,
+                        onRestockProduct = { product ->
+                            // Reuse the restock dialog (store picker, remembered
+                            // list, empty amount) for a tapped shortage.
+                            restockSuggestion = LowStockSuggestion(
+                                productId = product.id,
+                                productName = product.name,
+                                suggestedAmount = maxOf(
+                                    1,
+                                    (product.minQuantity ?: 1) - product.quantity,
+                                ),
+                            )
+                        },
+                        onAddAllLowStock = viewModel::addLowStockToList,
                         onSelectList = viewModel::selectList,
                         onCreateList = viewModel::createList,
                         onRenameList = viewModel::renameList,

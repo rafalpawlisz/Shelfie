@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -54,6 +56,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import io.github.rafalpawlisz.shelfie.ui.DragHandleIcon
@@ -66,6 +69,7 @@ fun ShoppingScreen(
     archivedLists: List<ShoppingList>,
     selectedListId: String?,
     items: List<ShoppingListItem>,
+    lowStockProducts: List<Product>,
     onSelectList: (String) -> Unit,
     onCreateList: (String) -> Unit,
     onRenameList: (id: String, name: String) -> Unit,
@@ -78,14 +82,29 @@ fun ShoppingScreen(
     onUpdateItem: (id: String, amount: Int?, note: String?) -> Unit,
     onCheckWithAmount: (id: String, amount: Int) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
+    onRestockProduct: (Product) -> Unit,
+    onAddAllLowStock: (listId: String) -> Unit,
     onFinishShopping: () -> Unit,
 ) {
+    // Viewing the derived "low stock" pseudo-list; purely presentational, the
+    // real list selection in the ViewModel stays untouched.
+    var lowStockSelected by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(lowStockProducts.isEmpty()) {
+        if (lowStockProducts.isEmpty()) lowStockSelected = false
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         ListChipsRow(
             lists = lists,
             archivedLists = archivedLists,
-            selectedListId = selectedListId,
-            onSelectList = onSelectList,
+            selectedListId = if (lowStockSelected) null else selectedListId,
+            lowStockCount = lowStockProducts.size,
+            lowStockSelected = lowStockSelected,
+            onSelectLowStock = { lowStockSelected = true },
+            onSelectList = {
+                lowStockSelected = false
+                onSelectList(it)
+            },
             onCreateList = onCreateList,
             onRenameList = onRenameList,
             onArchiveList = onArchiveList,
@@ -94,6 +113,12 @@ fun ShoppingScreen(
             onMoveList = onMoveList,
         )
         when {
+            lowStockSelected -> LowStockView(
+                products = lowStockProducts,
+                lists = lists,
+                onRestockProduct = onRestockProduct,
+                onAddAll = onAddAllLowStock,
+            )
             lists.isEmpty() -> Box(modifier = Modifier.fillMaxSize()) {
                 EmptyState(
                     title = stringResource(R.string.shopping_no_lists_title),
@@ -121,12 +146,94 @@ fun ShoppingScreen(
     }
 }
 
+// Read-only view of the products below their minimum: tapping a row opens the
+// restock dialog (store picker); "Add all" sends every shortage to one list.
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LowStockView(
+    products: List<Product>,
+    lists: List<ShoppingList>,
+    onRestockProduct: (Product) -> Unit,
+    onAddAll: (listId: String) -> Unit,
+) {
+    var showAddAllDialog by rememberSaveable { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.low_stock_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            if (lists.isNotEmpty()) {
+                TextButton(onClick = { showAddAllDialog = true }) {
+                    Text(stringResource(R.string.action_add_all))
+                }
+            }
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(products, key = { it.id }) { product ->
+                ProductListItem(
+                    product = product,
+                    onClick = { onRestockProduct(product) },
+                )
+            }
+        }
+    }
+
+    if (showAddAllDialog) {
+        var targetListId by rememberSaveable { mutableStateOf(lists.firstOrNull()?.id) }
+        AlertDialog(
+            onDismissRequest = { showAddAllDialog = false },
+            title = { Text(stringResource(R.string.add_to_shopping_list)) },
+            text = {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    lists.forEach { list ->
+                        FilterChip(
+                            selected = list.id == targetListId,
+                            onClick = { targetListId = list.id },
+                            label = { Text(list.name) },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = lists.any { it.id == targetListId },
+                    onClick = {
+                        onAddAll(targetListId!!)
+                        showAddAllDialog = false
+                    },
+                ) {
+                    Text(stringResource(R.string.action_add))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddAllDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ListChipsRow(
     lists: List<ShoppingList>,
     archivedLists: List<ShoppingList>,
     selectedListId: String?,
+    lowStockCount: Int,
+    lowStockSelected: Boolean,
+    onSelectLowStock: () -> Unit,
     onSelectList: (String) -> Unit,
     onCreateList: (String) -> Unit,
     onRenameList: (id: String, name: String) -> Unit,
@@ -152,10 +259,13 @@ private fun ListChipsRow(
         }
     }
     val lazyListState = rememberLazyListState()
+    // The pinned low-stock chip (when present) shifts every LazyRow index by one.
+    val chipOffset = if (lowStockCount > 0) 1 else 0
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        // Only the list chips reorder; the trailing +/Archive chips stay at the end.
-        if (to.index < orderedLists.size) {
-            orderedLists.add(to.index, orderedLists.removeAt(from.index))
+        // Only the list chips reorder; the pinned low-stock chip stays first and
+        // the trailing +/Archive chips stay at the end.
+        if (to.index >= chipOffset && to.index < chipOffset + orderedLists.size) {
+            orderedLists.add(to.index - chipOffset, orderedLists.removeAt(from.index - chipOffset))
         }
     }
 
@@ -166,6 +276,25 @@ private fun ListChipsRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (lowStockCount > 0) {
+            // Derived "low stock" pseudo-list; pinned before the real, draggable chips.
+            item(key = "low-stock") {
+                FilterChip(
+                    selected = lowStockSelected,
+                    onClick = onSelectLowStock,
+                    label = {
+                        Text(
+                            text = stringResource(R.string.low_stock_list, lowStockCount),
+                            color = if (lowStockSelected) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                        )
+                    },
+                )
+            }
+        }
         items(orderedLists, key = { it.id }) { list ->
             ReorderableItem(reorderableState, key = list.id) { _ ->
                 val selected = list.id == selectedListId

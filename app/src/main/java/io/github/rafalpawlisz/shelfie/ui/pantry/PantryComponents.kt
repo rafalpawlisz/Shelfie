@@ -62,12 +62,20 @@ internal fun ProductListItem(
                     style = MaterialTheme.typography.titleMedium,
                     color = textColor,
                 )
+                val baseQuantity = product.unit
+                    ?.let { stringResource(R.string.quantity_with_unit, product.quantity, it) }
+                    ?: product.quantity.toString()
+                // Below the minimum: highlight the stock and show the threshold.
+                val minQuantity = product.minQuantity
+                val isLow = !dimmed && minQuantity != null && product.quantity < minQuantity
                 Text(
-                    text = product.unit
-                        ?.let { stringResource(R.string.quantity_with_unit, product.quantity, it) }
-                        ?: product.quantity.toString(),
+                    text = if (isLow) {
+                        stringResource(R.string.quantity_below_min, baseQuantity, minQuantity!!)
+                    } else {
+                        baseQuantity
+                    },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = textColor,
+                    color = if (isLow) MaterialTheme.colorScheme.error else textColor,
                 )
             }
             trailingContent()
