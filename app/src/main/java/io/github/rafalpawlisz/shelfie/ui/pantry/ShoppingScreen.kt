@@ -60,6 +60,7 @@ import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import io.github.rafalpawlisz.shelfie.ui.DragHandleIcon
+import io.github.rafalpawlisz.shelfie.ui.theme.warning
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -292,7 +293,7 @@ private fun ListChipsRow(
                             color = if (lowStockSelected) {
                                 MaterialTheme.colorScheme.onSecondaryContainer
                             } else {
-                                MaterialTheme.colorScheme.error
+                                MaterialTheme.colorScheme.warning
                             },
                         )
                     },

@@ -7,8 +7,19 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+
+private val LocalWarningColor = staticCompositionLocalOf { WarningLight }
+
+// M3 defines no warning role, so it rides alongside the scheme via a
+// CompositionLocal; call sites read MaterialTheme.colorScheme.warning.
+val ColorScheme.warning: Color
+    @Composable get() = LocalWarningColor.current
 
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryLight,
@@ -103,9 +114,13 @@ fun ShelfieTheme(
         else -> LightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalWarningColor provides if (darkTheme) WarningDark else WarningLight,
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

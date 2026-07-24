@@ -42,6 +42,11 @@ val SurfaceContainerLight = Color(0xFFE9EFE9)
 val SurfaceContainerHighLight = Color(0xFFE3EAE4)
 val SurfaceContainerHighestLight = Color(0xFFDEE4DE)
 
+// Semantic warning (amber) — M3 has no warning role; used for low-stock
+// markers, which are a heads-up, not an error.
+val WarningLight = Color(0xFF8A5200)
+val WarningDark = Color(0xFFFFB868)
+
 // Dark scheme
 val PrimaryDark = Color(0xFF93D5B4)
 val OnPrimaryDark = Color(0xFF003824)

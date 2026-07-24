@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.Product
+import io.github.rafalpawlisz.shelfie.ui.theme.warning
 
 @Composable
 internal fun ProductList(
@@ -75,7 +76,7 @@ internal fun ProductListItem(
                         baseQuantity
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isLow) MaterialTheme.colorScheme.error else textColor,
+                    color = if (isLow) MaterialTheme.colorScheme.warning else textColor,
                 )
             }
             trailingContent()
