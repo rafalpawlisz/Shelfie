@@ -1,35 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shelf with a jar, a bottle and a canister. Single fill color so the
-     same drawable doubles as the monochrome (themed icon) layer. -->
+<!-- Camera lens with a jar at its centre ("shelf + selfie"). Single colour so
+     the same drawable doubles as the monochrome (themed icon) layer. Content
+     sits within the adaptive-icon safe zone (central ~66dp of the 108 grid). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- shelf board -->
+    <!-- outer lens ring -->
     <path
-        android:fillColor="#FFF6E8"
-        android:pathData="M28.5,66 h51 a2.5,2.5 0 0 1 2.5,2.5 v0 a2.5,2.5 0 0 1 -2.5,2.5 h-51 a2.5,2.5 0 0 1 -2.5,-2.5 v0 a2.5,2.5 0 0 1 2.5,-2.5 z" />
+        android:fillColor="#00000000"
+        android:strokeColor="#F4EEE1"
+        android:strokeWidth="6"
+        android:pathData="M24,54 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0" />
 
-    <!-- jar: lid + body -->
+    <!-- inner ring (faint) -->
     <path
-        android:fillColor="#FFF6E8"
-        android:pathData="M32.5,43 h9 a1.5,1.5 0 0 1 1.5,1.5 v3.5 h-12 v-3.5 a1.5,1.5 0 0 1 1.5,-1.5 z" />
-    <path
-        android:fillColor="#FFF6E8"
-        android:pathData="M30.5,48 h13 a2.5,2.5 0 0 1 2.5,2.5 v15.5 h-18 v-15.5 a2.5,2.5 0 0 1 2.5,-2.5 z" />
+        android:fillColor="#00000000"
+        android:strokeColor="#F4EEE1"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.55"
+        android:pathData="M33,54 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0" />
 
-    <!-- bottle: neck + body -->
+    <!-- jar lid -->
     <path
-        android:fillColor="#FFF6E8"
-        android:pathData="M53.5,35 h3 a1,1 0 0 1 1,1 v8 h-5 v-8 a1,1 0 0 1 1,-1 z" />
-    <path
-        android:fillColor="#FFF6E8"
-        android:pathData="M51.5,44 h7 a2.5,2.5 0 0 1 2.5,2.5 v19.5 h-12 v-19.5 a2.5,2.5 0 0 1 2.5,-2.5 z" />
+        android:fillColor="#F4EEE1"
+        android:pathData="M46,44 v-2 a2,2 0 0 1 2,-2 h12 a2,2 0 0 1 2,2 v2 z" />
 
-    <!-- canister -->
+    <!-- jar body -->
     <path
-        android:fillColor="#FFF6E8"
-        android:pathData="M68,52 h10 a2,2 0 0 1 2,2 v12 h-14 v-12 a2,2 0 0 1 2,-2 z" />
+        android:fillColor="#F4EEE1"
+        android:pathData="M44,48 a4,4 0 0 1 4,-4 h12 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-12 a4,4 0 0 1 -4,-4 z" />
 </vector>
