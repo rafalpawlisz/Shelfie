@@ -22,10 +22,12 @@
     <string name="action_create">Utwórz</string>
     <string name="rename_list">Zmień nazwę listy</string>
     <string name="action_rename">Zmień nazwę</string>
-    <string name="action_delete_list">Usuń listę</string>
     <string name="delete_list_message">Usunąć „%1$s” wraz z zawartością?</string>
     <string name="action_delete">Usuń</string>
     <string name="cd_list_menu">Opcje listy %1$s</string>
+    <string name="archived_lists">Zarchiwizowane listy</string>
+    <string name="archived_short">Archiwum (%1$d)</string>
+    <string name="action_close">Zamknij</string>
     <string name="use_up_hint">Dotknij produktu, aby odjąć 1</string>
     <string name="use_up_empty_title">Nie ma czego zużyć</string>
     <string name="use_up_empty_message">Produkty, które masz w zapasie, pojawią się tutaj</string>

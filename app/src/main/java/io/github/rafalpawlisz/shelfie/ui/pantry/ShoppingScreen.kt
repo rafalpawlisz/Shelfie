@@ -58,11 +58,14 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun ShoppingScreen(
     lists: List<ShoppingList>,
+    archivedLists: List<ShoppingList>,
     selectedListId: String?,
     items: List<ShoppingListItem>,
     onSelectList: (String) -> Unit,
     onCreateList: (String) -> Unit,
     onRenameList: (id: String, name: String) -> Unit,
+    onArchiveList: (id: String) -> Unit,
+    onRestoreList: (id: String) -> Unit,
     onDeleteList: (id: String) -> Unit,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
@@ -72,10 +75,13 @@ fun ShoppingScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         ListChipsRow(
             lists = lists,
+            archivedLists = archivedLists,
             selectedListId = selectedListId,
             onSelectList = onSelectList,
             onCreateList = onCreateList,
             onRenameList = onRenameList,
+            onArchiveList = onArchiveList,
+            onRestoreList = onRestoreList,
             onDeleteList = onDeleteList,
         )
         when {
@@ -108,16 +114,20 @@ fun ShoppingScreen(
 @Composable
 private fun ListChipsRow(
     lists: List<ShoppingList>,
+    archivedLists: List<ShoppingList>,
     selectedListId: String?,
     onSelectList: (String) -> Unit,
     onCreateList: (String) -> Unit,
     onRenameList: (id: String, name: String) -> Unit,
+    onArchiveList: (id: String) -> Unit,
+    onRestoreList: (id: String) -> Unit,
     onDeleteList: (id: String) -> Unit,
 ) {
     var menuListId by rememberSaveable { mutableStateOf<String?>(null) }
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var renamingListId by rememberSaveable { mutableStateOf<String?>(null) }
-    var deletingListId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showArchiveDialog by rememberSaveable { mutableStateOf(false) }
+    var deletingArchivedId by rememberSaveable { mutableStateOf<String?>(null) }
 
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
@@ -153,8 +163,8 @@ private fun ListChipsRow(
                         onClick = { menuListId = null; renamingListId = list.id },
                     )
                     DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_delete_list)) },
-                        onClick = { menuListId = null; deletingListId = list.id },
+                        text = { Text(stringResource(R.string.action_archive)) },
+                        onClick = { menuListId = null; onArchiveList(list.id) },
                     )
                 }
             }
@@ -169,6 +179,14 @@ private fun ListChipsRow(
                     )
                 },
             )
+        }
+        if (archivedLists.isNotEmpty()) {
+            item {
+                AssistChip(
+                    onClick = { showArchiveDialog = true },
+                    label = { Text(stringResource(R.string.archived_short, archivedLists.size)) },
+                )
+            }
         }
     }
 
@@ -193,21 +211,52 @@ private fun ListChipsRow(
         )
     }
 
-    val deleting = lists.firstOrNull { it.id == deletingListId }
-    if (deleting != null) {
+    // Archive view: restore a list, or step into a confirmed permanent delete.
+    // Guarded on isNotEmpty() so it closes itself once the archive is emptied.
+    if (showArchiveDialog && archivedLists.isNotEmpty()) {
         AlertDialog(
-            onDismissRequest = { deletingListId = null },
+            onDismissRequest = { showArchiveDialog = false },
             confirmButton = {
-                TextButton(onClick = { onDeleteList(deleting.id); deletingListId = null }) {
+                TextButton(onClick = { showArchiveDialog = false }) {
+                    Text(stringResource(R.string.action_close))
+                }
+            },
+            title = { Text(stringResource(R.string.archived_lists)) },
+            text = {
+                Column {
+                    archivedLists.forEach { list ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = list.name, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { onRestoreList(list.id) }) {
+                                Text(stringResource(R.string.action_restore))
+                            }
+                            TextButton(onClick = { deletingArchivedId = list.id }) {
+                                Text(stringResource(R.string.action_delete))
+                            }
+                        }
+                    }
+                }
+            },
+        )
+    }
+
+    val deletingArchived = archivedLists.firstOrNull { it.id == deletingArchivedId }
+    if (deletingArchived != null) {
+        AlertDialog(
+            onDismissRequest = { deletingArchivedId = null },
+            confirmButton = {
+                TextButton(
+                    onClick = { onDeleteList(deletingArchived.id); deletingArchivedId = null },
+                ) {
                     Text(stringResource(R.string.action_delete))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deletingListId = null }) {
+                TextButton(onClick = { deletingArchivedId = null }) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
-            text = { Text(stringResource(R.string.delete_list_message, deleting.name)) },
+            text = { Text(stringResource(R.string.delete_list_message, deletingArchived.name)) },
         )
     }
 }

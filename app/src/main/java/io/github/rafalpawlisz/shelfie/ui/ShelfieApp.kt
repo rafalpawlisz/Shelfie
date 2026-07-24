@@ -126,11 +126,14 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                     )
                     ShelfieTab.SHOPPING -> ShoppingScreen(
                         lists = state.lists,
+                        archivedLists = state.archivedLists,
                         selectedListId = state.selectedListId,
                         items = state.shoppingList,
                         onSelectList = viewModel::selectList,
                         onCreateList = viewModel::createList,
                         onRenameList = viewModel::renameList,
+                        onArchiveList = viewModel::archiveList,
+                        onRestoreList = viewModel::restoreList,
                         onDeleteList = viewModel::deleteList,
                         onToggle = viewModel::setShoppingItemChecked,
                         onRemove = viewModel::removeShoppingItem,
