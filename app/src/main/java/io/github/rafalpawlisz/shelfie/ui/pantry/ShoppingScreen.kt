@@ -40,6 +40,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -525,6 +527,7 @@ private fun AmountDialog(
     var amountText by rememberSaveable { mutableStateOf(initialAmount?.toString().orEmpty()) }
     val amount = amountText.trim().toIntOrNull()
     val isValid = if (amountText.isBlank()) allowEmpty else amount != null && amount > 0
+    val amountFocus = remember { FocusRequester() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -536,7 +539,10 @@ private fun AmountDialog(
                 label = { Text(stringResource(R.string.shopping_amount_label)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.focusRequester(amountFocus),
             )
+            // The amount is the dialog's only input — focus it right away.
+            LaunchedEffect(Unit) { amountFocus.requestFocus() }
         },
         confirmButton = {
             TextButton(
