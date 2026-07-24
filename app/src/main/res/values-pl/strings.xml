@@ -5,7 +5,7 @@
     <string name="tab_products">Produkty</string>
     <string name="tab_shopping">Zakupy</string>
     <string name="tab_use_up">Zużycie</string>
-    <string name="shopping_hint">Dotknij pozycji, aby oznaczyć jako kupioną</string>
+    <string name="shopping_hint">Odhaczaj kupione; dotknij pozycji, aby zmienić ilość</string>
     <string name="shopping_empty_title">Lista zakupów jest pusta</string>
     <string name="shopping_empty_message">Dotknij +, aby dodać coś do kupienia</string>
     <string name="add_to_shopping_list">Dodaj do listy zakupów</string>

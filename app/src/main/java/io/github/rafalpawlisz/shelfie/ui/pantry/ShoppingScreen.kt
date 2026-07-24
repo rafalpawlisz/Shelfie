@@ -499,13 +499,14 @@ private fun ShoppingListRow(
         if (item.isChecked) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
     val decoration = if (item.isChecked) TextDecoration.LineThrough else null
 
-    Card(onClick = onToggle, modifier = Modifier.fillMaxWidth()) {
+    // The checkbox toggles (its natural role, with a 48dp touch target); tapping
+    // the rest of the row edits the amount.
+    Card(onClick = onEditAmount, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Visual indicator only; the whole row is the touch target.
-            Checkbox(checked = item.isChecked, onCheckedChange = null)
+            Checkbox(checked = item.isChecked, onCheckedChange = { onToggle() })
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
                 Text(
@@ -521,9 +522,6 @@ private fun ShoppingListRow(
                     style = MaterialTheme.typography.bodyMedium,
                     color = textColor,
                     textDecoration = decoration,
-                    // Tapping the amount edits it; padding widens the touch target
-                    // without shifting the visible layout much.
-                    modifier = Modifier.clickable(onClick = onEditAmount).padding(vertical = 2.dp),
                 )
             }
             // Remove and drag handle only on unchecked (to-buy) rows. Checked items
