@@ -3,7 +3,7 @@ package io.github.rafalpawlisz.shelfie.ui.pantry
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -12,14 +12,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,14 +36,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.ui.scanBarcode
 
 /**
- * Shared add/edit product form. [onArchive] renders a destructive Archive
- * action (active products), [onRestore] a Restore action (archived ones);
- * [stateKey] resets the fields when the edited product changes.
+ * Shared add/edit product form, shown as a full-screen dialog: the form has
+ * enough fields that a centered card felt cramped and the keyboard covered the
+ * confirm button. The confirm action lives in the top bar so it stays reachable
+ * above the keyboard; [onArchive] (active) / [onRestore] (archived) render at the
+ * bottom of the form. [stateKey] resets the fields when the edited product changes.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductFormDialog(
     title: String,
@@ -86,132 +93,152 @@ fun ProductFormDialog(
     val minQuantityValid = minQuantityText.isBlank() || (minQuantity != null && minQuantity >= 0)
     val isValid = name.isNotBlank() && quantity != null && quantity >= 0 && minQuantityValid
 
-    Dialog(onDismissRequest = onDismiss) {
-        Card {
-            Column(
-                modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.product_name_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = emoji,
-                    onValueChange = { emoji = it },
-                    label = { Text(stringResource(R.string.product_emoji_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = quantityText,
-                    onValueChange = { quantityText = it },
-                    label = { Text(stringResource(R.string.product_quantity_label)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = unit,
-                    onValueChange = { unit = it },
-                    label = { Text(stringResource(R.string.product_unit_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = minQuantityText,
-                    onValueChange = { minQuantityText = it },
-                    label = { Text(stringResource(R.string.product_min_quantity_label)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text(stringResource(R.string.product_notes_label)) },
-                    maxLines = 3,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(onClick = onDismiss) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = stringResource(R.string.action_close),
+                                )
+                            }
+                        },
+                        title = { Text(title) },
+                        actions = {
+                            TextButton(
+                                enabled = isValid,
+                                onClick = {
+                                    onConfirm(
+                                        name.trim(),
+                                        quantity ?: 0,
+                                        unit.trim().ifBlank { null },
+                                        minQuantity,
+                                        notes.trim().ifBlank { null },
+                                        emoji.trim().ifBlank { null },
+                                        barcodes,
+                                    )
+                                },
+                            ) {
+                                Text(confirmLabel)
+                            }
+                        },
+                    )
+                },
+            ) { innerPadding ->
                 val context = LocalContext.current
-                Text(
-                    text = stringResource(R.string.product_barcodes_label),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-                barcodes.forEach { code ->
-                    Row(
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text(stringResource(R.string.product_name_label)) },
+                        singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = code,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(onClick = { barcodes = barcodes - code }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription =
-                                    stringResource(R.string.cd_remove_barcode, code),
+                    )
+                    OutlinedTextField(
+                        value = emoji,
+                        onValueChange = { emoji = it },
+                        label = { Text(stringResource(R.string.product_emoji_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = quantityText,
+                        onValueChange = { quantityText = it },
+                        label = { Text(stringResource(R.string.product_quantity_label)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = unit,
+                        onValueChange = { unit = it },
+                        label = { Text(stringResource(R.string.product_unit_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = minQuantityText,
+                        onValueChange = { minQuantityText = it },
+                        label = { Text(stringResource(R.string.product_min_quantity_label)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text(stringResource(R.string.product_notes_label)) },
+                        maxLines = 3,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = stringResource(R.string.product_barcodes_label),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    barcodes.forEach { code ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = code,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
                             )
+                            IconButton(onClick = { barcodes = barcodes - code }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription =
+                                        stringResource(R.string.cd_remove_barcode, code),
+                                )
+                            }
                         }
                     }
-                }
-                OutlinedButton(
-                    onClick = {
-                        scanBarcode(context) { code ->
-                            if (code !in barcodes) barcodes = barcodes + code
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.scan_barcode))
-                }
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            scanBarcode(context) { code ->
+                                if (code !in barcodes) barcodes = barcodes + code
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.scan_barcode))
+                    }
+                    // Destructive/restore actions live at the bottom of the form;
+                    // confirm and close are in the top bar.
                     if (onArchive != null) {
                         TextButton(
                             onClick = onArchive,
                             colors = ButtonDefaults.textButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error,
                             ),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         ) {
                             Text(stringResource(R.string.action_archive))
                         }
                     }
                     if (onRestore != null) {
-                        TextButton(onClick = onRestore) {
+                        TextButton(
+                            onClick = onRestore,
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        ) {
                             Text(stringResource(R.string.action_restore))
                         }
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.action_cancel))
-                    }
-                    TextButton(
-                        enabled = isValid,
-                        onClick = {
-                            onConfirm(
-                                name.trim(),
-                                quantity ?: 0,
-                                unit.trim().ifBlank { null },
-                                minQuantity,
-                                notes.trim().ifBlank { null },
-                                emoji.trim().ifBlank { null },
-                                barcodes,
-                            )
-                        },
-                    ) {
-                        Text(confirmLabel)
                     }
                 }
             }
