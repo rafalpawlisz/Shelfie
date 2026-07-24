@@ -77,6 +77,10 @@ interface ShoppingListDao {
     )
     suspend fun increaseAmount(id: String, extra: Int, timestamp: Long)
 
+    // Direct edit of the amount to buy (> 0, enforced by the dialog and ViewModel).
+    @Query("UPDATE shopping_list_items SET amount = :amount, updatedAt = :timestamp WHERE id = :id")
+    suspend fun setAmount(id: String, amount: Int, timestamp: Long)
+
     @Query("DELETE FROM shopping_list_items WHERE id = :id")
     suspend fun delete(id: String)
 

@@ -475,6 +475,24 @@ class ShoppingListViewModelTest {
     }
 
     @Test
+    fun `setShoppingItemAmount changes the amount and rejects non-positive values`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        viewModel.addToShoppingList(productId, amount = 2)
+        val itemId = viewModel.uiState.value.shoppingList.single().id
+
+        viewModel.setShoppingItemAmount(itemId, 5)
+        assertEquals(5, viewModel.uiState.value.shoppingList.single().amount)
+
+        viewModel.setShoppingItemAmount(itemId, 0) // ignored
+        assertEquals(5, viewModel.uiState.value.shoppingList.single().amount)
+    }
+
+    @Test
     fun `checking an item does not change quantity and keeps it visible`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Milk", quantity = 1, unit = "l")

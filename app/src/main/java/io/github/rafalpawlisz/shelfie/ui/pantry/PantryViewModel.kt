@@ -284,6 +284,11 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.setChecked(id, checked) }
     }
 
+    fun setShoppingItemAmount(id: String, amount: Int) {
+        if (amount <= 0) return
+        viewModelScope.launch { shoppingListRepository.setItemAmount(id, amount) }
+    }
+
     fun removeShoppingItem(id: String) {
         viewModelScope.launch { shoppingListRepository.removeItem(id) }
     }

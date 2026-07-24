@@ -180,6 +180,7 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                         onMoveList = viewModel::moveList,
                         onToggle = viewModel::setShoppingItemChecked,
                         onRemove = viewModel::removeShoppingItem,
+                        onSetAmount = viewModel::setShoppingItemAmount,
                         onMove = viewModel::moveShoppingItem,
                         onFinishShopping = viewModel::finishShopping,
                     )

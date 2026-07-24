@@ -24,6 +24,7 @@ interface ShoppingListRepository {
     // used to keep the low-stock suggestion from nagging about planned items.
     suspend fun isOnAnyList(productId: String): Boolean
     suspend fun setChecked(id: String, checked: Boolean)
+    suspend fun setItemAmount(id: String, amount: Int)
     suspend fun removeItem(id: String)
     suspend fun finishShopping(listId: String)
 

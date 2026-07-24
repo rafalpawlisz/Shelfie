@@ -162,6 +162,10 @@ class FakeShoppingListRepository(
         }
     }
 
+    override suspend fun setItemAmount(id: String, amount: Int) {
+        items.update { list -> list.map { if (it.id == id) it.copy(amount = amount) else it } }
+    }
+
     override suspend fun removeItem(id: String) {
         // The order row persists (mirrors the real DB), so re-adding restores the slot.
         items.update { list -> list.filterNot { it.id == id } }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -48,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
@@ -72,6 +74,7 @@ fun ShoppingScreen(
     onMoveList: (fromIndex: Int, toIndex: Int) -> Unit,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
+    onSetAmount: (id: String, amount: Int) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onFinishShopping: () -> Unit,
 ) {
@@ -107,6 +110,7 @@ fun ShoppingScreen(
                 items = items,
                 onToggle = onToggle,
                 onRemove = onRemove,
+                onSetAmount = onSetAmount,
                 onMove = onMove,
                 onFinishShopping = onFinishShopping,
             )
@@ -298,6 +302,39 @@ private fun ListChipsRow(
 }
 
 @Composable
+private fun AmountDialog(
+    initialAmount: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var amountText by rememberSaveable { mutableStateOf(initialAmount.toString()) }
+    val amount = amountText.toIntOrNull()
+    val isValid = amount != null && amount > 0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.edit_amount)) },
+        text = {
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = { amountText = it },
+                label = { Text(stringResource(R.string.shopping_amount_label)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = isValid, onClick = { onConfirm(amount ?: 1) }) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}
+
+@Composable
 private fun ListNameDialog(
     title: String,
     initialName: String,
@@ -333,11 +370,13 @@ private fun ListItems(
     items: List<ShoppingListItem>,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
+    onSetAmount: (id: String, amount: Int) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onFinishShopping: () -> Unit,
 ) {
     val checkedCount = items.count { it.isChecked }
     var showFinishDialog by rememberSaveable { mutableStateOf(false) }
+    var editingAmountItemId by rememberSaveable { mutableStateOf<String?>(null) }
     val haptic = LocalHapticFeedback.current
 
     // Local mirror so a drag animates smoothly. It re-syncs from [items] whenever
@@ -405,11 +444,24 @@ private fun ListItems(
                         item = item,
                         onToggle = { onToggle(item.id, !item.isChecked) },
                         onRemove = { onRemove(item.id) },
+                        onEditAmount = { editingAmountItemId = item.id },
                         dragHandleModifier = handleModifier,
                     )
                 }
             }
         }
+    }
+
+    val editingItem = items.firstOrNull { it.id == editingAmountItemId }
+    if (editingItem != null) {
+        AmountDialog(
+            initialAmount = editingItem.amount,
+            onConfirm = { amount ->
+                onSetAmount(editingItem.id, amount)
+                editingAmountItemId = null
+            },
+            onDismiss = { editingAmountItemId = null },
+        )
     }
 
     if (showFinishDialog) {
@@ -440,6 +492,7 @@ private fun ShoppingListRow(
     item: ShoppingListItem,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
+    onEditAmount: () -> Unit,
     dragHandleModifier: Modifier,
 ) {
     val textColor =
@@ -468,6 +521,9 @@ private fun ShoppingListRow(
                     style = MaterialTheme.typography.bodyMedium,
                     color = textColor,
                     textDecoration = decoration,
+                    // Tapping the amount edits it; padding widens the touch target
+                    // without shifting the visible layout much.
+                    modifier = Modifier.clickable(onClick = onEditAmount).padding(vertical = 2.dp),
                 )
             }
             // Remove and drag handle only on unchecked (to-buy) rows. Checked items
