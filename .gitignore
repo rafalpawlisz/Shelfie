@@ -14,3 +14,6 @@
 .cxx
 # Firebase project config — per-developer, not for a public repo.
 app/google-services.json
+firestore-tests/node_modules
+firebase-debug.log
+firestore-debug.log
