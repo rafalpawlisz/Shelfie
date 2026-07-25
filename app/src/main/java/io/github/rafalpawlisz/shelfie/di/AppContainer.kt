@@ -2,7 +2,9 @@ package io.github.rafalpawlisz.shelfie.di
 
 import android.content.Context
 import androidx.room.Room
+import io.github.rafalpawlisz.shelfie.data.AuthRepository
 import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
+import io.github.rafalpawlisz.shelfie.data.FirebaseAuthRepository
 import io.github.rafalpawlisz.shelfie.data.OfflineBarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.OfflineProductRepository
 import io.github.rafalpawlisz.shelfie.data.OfflineShoppingListRepository
@@ -39,5 +41,9 @@ class AppContainer(private val context: Context) {
 
     val uiPreferences: UiPreferences by lazy {
         SharedPreferencesUiPreferences(context)
+    }
+
+    val authRepository: AuthRepository by lazy {
+        FirebaseAuthRepository()
     }
 }

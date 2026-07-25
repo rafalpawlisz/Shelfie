@@ -12,3 +12,5 @@
 /captures
 .externalNativeBuild
 .cxx
+# Firebase project config — per-developer, not for a public repo.
+app/google-services.json

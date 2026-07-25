@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -45,6 +47,8 @@ import io.github.rafalpawlisz.shelfie.ui.pantry.RestockDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.ShoppingScreen
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScanResult
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScreen
+import io.github.rafalpawlisz.shelfie.ui.settings.AuthViewModel
+import io.github.rafalpawlisz.shelfie.ui.settings.SettingsDialog
 
 enum class ShelfieTab(@field:StringRes val labelRes: Int, val icon: ImageVector) {
     PRODUCTS(R.string.tab_products, Icons.AutoMirrored.Filled.List),
@@ -54,11 +58,16 @@ enum class ShelfieTab(@field:StringRes val labelRes: Int, val icon: ImageVector)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.Factory)) {
+fun ShelfieApp(
+    viewModel: PantryViewModel = viewModel(factory = PantryViewModel.Factory),
+    authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Factory),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val authUser by authViewModel.user.collectAsStateWithLifecycle()
     var currentTab by rememberSaveable { mutableStateOf(ShelfieTab.PRODUCTS) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var showAddToListDialog by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     var editedProductId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
@@ -118,6 +127,12 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     }
 
     LaunchedEffect(Unit) {
+        authViewModel.errors.collectLatest { messageRes ->
+            snackbarHostState.showSnackbar(context.getString(messageRes))
+        }
+    }
+
+    LaunchedEffect(Unit) {
         // Separate collector from use-up events: removals and use-ups come from
         // different tabs, and each stream should replace only its own snackbar.
         viewModel.itemRemovedEvents.collectLatest { removed ->
@@ -136,7 +151,19 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = { TopAppBar(title = { Text(stringResource(currentTab.labelRes)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(currentTab.labelRes)) },
+                actions = {
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.settings_title),
+                        )
+                    }
+                },
+            )
+        },
         bottomBar = {
             NavigationBar {
                 ShelfieTab.entries.forEach { tab ->
@@ -229,6 +256,16 @@ fun ShelfieApp(viewModel: PantryViewModel = viewModel(factory = PantryViewModel.
                 }
             }
         }
+    }
+
+    if (showSettings) {
+        SettingsDialog(
+            user = authUser,
+            onSignIn = { authViewModel.signIn(context) },
+            onSignInWithEmail = authViewModel::signInWithEmail,
+            onSignOut = authViewModel::signOut,
+            onDismiss = { showSettings = false },
+        )
     }
 
     if (showAddDialog) {

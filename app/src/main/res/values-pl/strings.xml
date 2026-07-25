@@ -45,6 +45,16 @@
     <string name="action_add_all">Dodaj wszystkie</string>
     <string name="action_undo">Cofnij</string>
     <string name="shopping_item_removed">Usunięto: %1$s</string>
+    <string name="settings_title">Ustawienia</string>
+    <string name="settings_account_section">Konto</string>
+    <string name="settings_signed_out_hint">Zaloguj się, aby dzielić spiżarnię z domownikami</string>
+    <string name="sign_in_with_google">Zaloguj przez Google</string>
+    <string name="signed_in_as">Zalogowano jako %1$s</string>
+    <string name="sign_out">Wyloguj</string>
+    <string name="sign_in_failed">Logowanie nie powiodło się, spróbuj ponownie</string>
+    <string name="email_label">E-mail</string>
+    <string name="password_label">Hasło</string>
+    <string name="sign_in_with_email">Zaloguj e-mailem</string>
     <string name="use_up_scan_out_of_stock">%1$s: brak zapasu</string>
     <string name="use_up_scan_unknown">Nieznany kod: %1$s</string>
     <string name="add_product">Dodaj produkt</string>
