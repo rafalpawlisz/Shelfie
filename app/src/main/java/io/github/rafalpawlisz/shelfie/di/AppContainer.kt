@@ -5,6 +5,8 @@ import androidx.room.Room
 import io.github.rafalpawlisz.shelfie.data.AuthRepository
 import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.FirebaseAuthRepository
+import io.github.rafalpawlisz.shelfie.data.FirestoreHouseholdRepository
+import io.github.rafalpawlisz.shelfie.data.HouseholdRepository
 import io.github.rafalpawlisz.shelfie.data.OfflineBarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.OfflineProductRepository
 import io.github.rafalpawlisz.shelfie.data.OfflineShoppingListRepository
@@ -45,5 +47,9 @@ class AppContainer(private val context: Context) {
 
     val authRepository: AuthRepository by lazy {
         FirebaseAuthRepository()
+    }
+
+    val householdRepository: HouseholdRepository by lazy {
+        FirestoreHouseholdRepository()
     }
 }

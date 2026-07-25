@@ -64,6 +64,7 @@ fun ShelfieApp(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val authUser by authViewModel.user.collectAsStateWithLifecycle()
+    val household by authViewModel.household.collectAsStateWithLifecycle()
     var currentTab by rememberSaveable { mutableStateOf(ShelfieTab.PRODUCTS) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var showAddToListDialog by rememberSaveable { mutableStateOf(false) }
@@ -261,9 +262,12 @@ fun ShelfieApp(
     if (showSettings) {
         SettingsDialog(
             user = authUser,
+            household = household,
             onSignIn = { authViewModel.signIn(context) },
             onSignInWithEmail = authViewModel::signInWithEmail,
             onSignOut = authViewModel::signOut,
+            onCreateHousehold = authViewModel::createHousehold,
+            onJoinHousehold = authViewModel::joinHousehold,
             onDismiss = { showSettings = false },
         )
     }

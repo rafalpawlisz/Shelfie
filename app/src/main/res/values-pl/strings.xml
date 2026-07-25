@@ -55,6 +55,24 @@
     <string name="email_label">E-mail</string>
     <string name="password_label">Hasło</string>
     <string name="sign_in_with_email">Zaloguj e-mailem</string>
+    <string name="household_section">Gospodarstwo</string>
+    <string name="household_none_hint">Utwórz gospodarstwo i zaproś drugą osobę albo dołącz do jej gospodarstwa kodem</string>
+    <string name="household_name_label">Nazwa gospodarstwa</string>
+    <string name="household_create">Utwórz gospodarstwo</string>
+    <string name="household_code_label">Kod zaproszenia</string>
+    <string name="household_join">Dołącz kodem</string>
+    <string name="household_invite_code">Kod zaproszenia: %1$s</string>
+    <plurals name="household_members">
+        <item quantity="one">%1$d członek</item>
+        <item quantity="few">%1$d członków</item>
+        <item quantity="many">%1$d członków</item>
+        <item quantity="other">%1$d członka</item>
+    </plurals>
+    <string name="household_switch_title">Zmienić gospodarstwo?</string>
+    <string name="household_switch_message">Należysz już do „%1$s”. Dołączenie do innego gospodarstwa przeniesie Cię z niego.</string>
+    <string name="household_switch_confirm">Zmień</string>
+    <string name="join_invalid_code">Nie znaleziono gospodarstwa o tym kodzie</string>
+    <string name="household_error">Coś poszło nie tak, spróbuj ponownie</string>
     <string name="use_up_scan_out_of_stock">%1$s: brak zapasu</string>
     <string name="use_up_scan_unknown">Nieznany kod: %1$s</string>
     <string name="add_product">Dodaj produkt</string>

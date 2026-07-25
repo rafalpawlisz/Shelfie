@@ -18,20 +18,41 @@ import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.ShelfieApplication
 import io.github.rafalpawlisz.shelfie.data.AuthRepository
 import io.github.rafalpawlisz.shelfie.data.AuthUser
+import io.github.rafalpawlisz.shelfie.data.HouseholdRepository
+import io.github.rafalpawlisz.shelfie.data.InvalidInviteCodeException
+import io.github.rafalpawlisz.shelfie.model.Household
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
+@OptIn(ExperimentalCoroutinesApi::class)
+class AuthViewModel(
+    private val authRepository: AuthRepository,
+    private val householdRepository: HouseholdRepository,
+) : ViewModel() {
 
     val user: StateFlow<AuthUser?> = authRepository.observeUser().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = null,
     )
+
+    /** The signed-in user's household; null when signed out or not in one. */
+    val household: StateFlow<Household?> = authRepository.observeUser()
+        .flatMapLatest { user ->
+            if (user == null) flowOf(null) else householdRepository.observeHousehold(user.uid)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null,
+        )
 
     // One-shot sign-in failures (string resource ids) for a snackbar; user
     // cancellation is deliberately not an error.
@@ -94,12 +115,39 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         authRepository.signOut()
     }
 
+    fun createHousehold(name: String) {
+        val uid = user.value?.uid ?: return
+        viewModelScope.launch {
+            try {
+                householdRepository.createHousehold(uid, name.trim())
+            } catch (e: Exception) {
+                Log.w("AuthViewModel", "Household creation failed", e)
+                errorChannel.send(R.string.household_error)
+            }
+        }
+    }
+
+    /** The UI confirms switching households before calling this. */
+    fun joinHousehold(code: String) {
+        val uid = user.value?.uid ?: return
+        viewModelScope.launch {
+            try {
+                householdRepository.joinHousehold(uid, code)
+            } catch (e: InvalidInviteCodeException) {
+                errorChannel.send(R.string.join_invalid_code)
+            } catch (e: Exception) {
+                Log.w("AuthViewModel", "Household join failed", e)
+                errorChannel.send(R.string.household_error)
+            }
+        }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as ShelfieApplication
-                AuthViewModel(app.container.authRepository)
+                AuthViewModel(app.container.authRepository, app.container.householdRepository)
             }
         }
     }
