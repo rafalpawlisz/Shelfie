@@ -172,6 +172,32 @@ describe("households: rename and delete", () => {
   });
 });
 
+describe("household subcollections (synced pantry data)", () => {
+  it("a member reads and writes; a stranger and anonymous do not", async () => {
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    const productDoc = { name: "Milk", quantity: 2, updatedAt: 111 };
+    await assertSucceeds(
+      setDoc(doc(db(ANNA), "households/h1/products", "p1"), productDoc),
+    );
+    await assertSucceeds(getDoc(doc(db(ANNA), "households/h1/products", "p1")));
+    await assertSucceeds(deleteDoc(doc(db(ANNA), "households/h1/products", "p1")));
+    await assertFails(
+      setDoc(doc(db(EVE), "households/h1/products", "p2"), productDoc),
+    );
+    await assertFails(getDoc(doc(db(EVE), "households/h1/products", "p1")));
+    await assertFails(getDoc(doc(anonDb(), "households/h1/products", "p1")));
+  });
+
+  it("membership is checked per household, not globally", async () => {
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    await seedHousehold("h2", { [BOB]: true }, "CODE02");
+    // Bob is a member somewhere — just not of h1.
+    await assertFails(
+      setDoc(doc(db(BOB), "households/h1/items", "i1"), { listId: "l1" }),
+    );
+  });
+});
+
 describe("inviteCodes", () => {
   it("any signed-in user resolves a known code; anonymous does not", async () => {
     await seedHousehold("h1", { [ANNA]: true }, "CODE01");

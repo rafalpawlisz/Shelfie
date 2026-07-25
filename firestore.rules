@@ -63,6 +63,15 @@ service cloud.firestore {
       // Only the last remaining member may delete (cleanup of an orphan).
       allow delete: if signedIn()
         && resource.data.members.keys().hasOnly([request.auth.uid]);
+
+      // Synced pantry data (products/lists/items/barcodes/listOrder): any
+      // member reads and writes anything under their household; everyone
+      // else is locked out.
+      match /{collection}/{docId} {
+        allow read, write: if signedIn()
+          && get(/databases/$(database)/documents/households/$(hid))
+               .data.members[request.auth.uid] == true;
+      }
     }
 
     match /inviteCodes/{code} {

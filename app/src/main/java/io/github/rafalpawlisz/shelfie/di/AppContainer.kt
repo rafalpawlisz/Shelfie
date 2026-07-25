@@ -15,6 +15,15 @@ import io.github.rafalpawlisz.shelfie.data.SharedPreferencesUiPreferences
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.data.UiPreferences
 import io.github.rafalpawlisz.shelfie.data.local.ShelfieDatabase
+import io.github.rafalpawlisz.shelfie.data.sync.DiffSyncEngine
+import io.github.rafalpawlisz.shelfie.data.sync.FirestoreSyncWriter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 class AppContainer(private val context: Context) {
 
@@ -29,16 +38,41 @@ class AppContainer(private val context: Context) {
         .addMigrations(*ShelfieDatabase.MIGRATIONS)
         .build()
 
+    // One scope for app-lifetime background work (the sync engine); never cancelled.
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val syncEngine: DiffSyncEngine by lazy {
+        DiffSyncEngine(
+            householdIds = authRepository.observeUser()
+                .flatMapLatest { user ->
+                    if (user == null) {
+                        flowOf(null)
+                    } else {
+                        householdRepository.observeHousehold(user.uid)
+                    }
+                }
+                .map { it?.id },
+            products = database.productDao().observeAllRows(),
+            lists = database.shoppingListDao().observeAllListRows(),
+            items = database.shoppingListDao().observeAllItemRows(),
+            listOrders = database.shoppingListDao().observeAllOrderRows(),
+            barcodes = database.productBarcodeDao().observeAll(),
+            writer = FirestoreSyncWriter(),
+            scope = appScope,
+        )
+    }
+
     val productRepository: ProductRepository by lazy {
         OfflineProductRepository(database.productDao())
     }
 
     val shoppingListRepository: ShoppingListRepository by lazy {
-        OfflineShoppingListRepository(database.shoppingListDao())
+        OfflineShoppingListRepository(database.shoppingListDao(), syncEngine)
     }
 
     val barcodeRepository: BarcodeRepository by lazy {
-        OfflineBarcodeRepository(database.productBarcodeDao())
+        OfflineBarcodeRepository(database.productBarcodeDao(), syncEngine)
     }
 
     val uiPreferences: UiPreferences by lazy {

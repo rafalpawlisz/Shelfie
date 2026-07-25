@@ -39,6 +39,28 @@ interface ShoppingListDao {
     @Query("SELECT MAX(position) FROM shopping_lists")
     suspend fun maxListPosition(): Double?
 
+    // --- Sync mirror: full-content flows (archived included) ---
+
+    @Query("SELECT * FROM shopping_lists")
+    fun observeAllListRows(): Flow<List<ShoppingListEntity>>
+
+    @Query("SELECT * FROM shopping_list_items")
+    fun observeAllItemRows(): Flow<List<ShoppingListItemEntity>>
+
+    @Query("SELECT * FROM product_list_order")
+    fun observeAllOrderRows(): Flow<List<ProductListOrderEntity>>
+
+    // --- Sync deletion hooks: what a destructive operation will remove ---
+
+    @Query("SELECT id FROM shopping_list_items WHERE listId = :listId AND checkedAt IS NOT NULL")
+    suspend fun checkedItemIds(listId: String): List<String>
+
+    @Query("SELECT id FROM shopping_list_items WHERE listId = :listId")
+    suspend fun itemIdsOfList(listId: String): List<String>
+
+    @Query("SELECT productId FROM product_list_order WHERE listId = :listId")
+    suspend fun orderProductIdsOfList(listId: String): List<String>
+
     @Query("UPDATE shopping_lists SET position = :position, updatedAt = :timestamp WHERE id = :id")
     suspend fun setListPosition(id: String, position: Double, timestamp: Long)
 

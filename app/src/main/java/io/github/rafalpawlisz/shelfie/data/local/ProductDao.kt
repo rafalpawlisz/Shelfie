@@ -16,6 +16,10 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE archivedAt IS NOT NULL")
     fun observeArchived(): Flow<List<ProductEntity>>
 
+    // Sync mirror: every row, archived included.
+    @Query("SELECT * FROM products")
+    fun observeAllRows(): Flow<List<ProductEntity>>
+
     @Query("SELECT * FROM products WHERE id = :id AND archivedAt IS NULL")
     suspend fun getActive(id: String): ProductEntity?
 

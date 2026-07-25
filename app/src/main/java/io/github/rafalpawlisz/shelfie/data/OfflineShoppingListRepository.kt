@@ -1,6 +1,10 @@
 package io.github.rafalpawlisz.shelfie.data
 
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListDao
+import io.github.rafalpawlisz.shelfie.data.sync.NoopSyncEngine
+import io.github.rafalpawlisz.shelfie.data.sync.SyncCollection
+import io.github.rafalpawlisz.shelfie.data.sync.SyncEngine
+import io.github.rafalpawlisz.shelfie.data.sync.listOrderDocId
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemRow
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
@@ -11,7 +15,12 @@ import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class OfflineShoppingListRepository(private val dao: ShoppingListDao) : ShoppingListRepository {
+class OfflineShoppingListRepository(
+    private val dao: ShoppingListDao,
+    // Deletions must be reported at mutation time (the sync engine's snapshot
+    // diff can't see them across restarts); upserts need no hook.
+    private val sync: SyncEngine = NoopSyncEngine,
+) : ShoppingListRepository {
 
     override fun observeLists(): Flow<List<ShoppingList>> =
         dao.observeLists().map { it.toSortedDomain() }
@@ -58,7 +67,13 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
     }
 
     override suspend fun deleteList(id: String) {
+        // Capture what the FK cascade is about to remove, then mirror it.
+        val itemIds = dao.itemIdsOfList(id)
+        val orderProductIds = dao.orderProductIdsOfList(id)
         dao.deleteList(id)
+        sync.onDeleted(SyncCollection.ITEMS, itemIds)
+        sync.onDeleted(SyncCollection.LIST_ORDER, orderProductIds.map { listOrderDocId(id, it) })
+        sync.onDeleted(SyncCollection.LISTS, listOf(id))
     }
 
     override suspend fun setListPosition(id: String, position: Double) {
@@ -118,10 +133,14 @@ class OfflineShoppingListRepository(private val dao: ShoppingListDao) : Shopping
 
     override suspend fun removeItem(id: String) {
         dao.delete(id)
+        sync.onDeleted(SyncCollection.ITEMS, listOf(id))
     }
 
     override suspend fun finishShopping(listId: String) {
+        // Checkout deletes the checked rows — snapshot their ids first.
+        val checkedIds = dao.checkedItemIds(listId)
         dao.checkout(listId, System.currentTimeMillis())
+        sync.onDeleted(SyncCollection.ITEMS, checkedIds)
     }
 
     override suspend fun setItemPosition(listId: String, productId: String, position: Double) {
