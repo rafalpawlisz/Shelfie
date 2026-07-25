@@ -13,11 +13,13 @@ class OfflineBarcodeRepository(private val dao: ProductBarcodeDao) : BarcodeRepo
         dao.observeAll().map { entities -> entities.map(ProductBarcodeEntity::toDomain) }
 
     override suspend fun addBarcode(productId: String, barcode: String) {
+        val now = System.currentTimeMillis()
         dao.insert(
             ProductBarcodeEntity(
                 barcode = barcode.trim(),
                 productId = productId,
-                createdAt = System.currentTimeMillis(),
+                createdAt = now,
+                updatedAt = now,
             )
         )
     }

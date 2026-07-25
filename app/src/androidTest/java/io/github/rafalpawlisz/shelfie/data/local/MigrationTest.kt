@@ -3,6 +3,8 @@ package io.github.rafalpawlisz.shelfie.data.local
 import androidx.room.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,13 +31,45 @@ class MigrationTest {
 
     @Test
     fun exportedSchemaOpensAndValidatesAtCurrentVersion() {
-        // Guards two things: the exported 1.json stays in sync with the
-        // entities, and the (currently empty) MIGRATIONS array is wired up.
-        helper.createDatabase(TEST_DB, 1).close()
-        helper.runMigrationsAndValidate(TEST_DB, 1, true, *ShelfieDatabase.MIGRATIONS).close()
+        // Guards the exported current-version JSON staying in sync with the
+        // compiled entities.
+        helper.createDatabase(TEST_DB, CURRENT_VERSION).close()
+        helper.runMigrationsAndValidate(TEST_DB, CURRENT_VERSION, true).close()
+    }
+
+    @Test
+    fun migrate1To2_backfillsBarcodeUpdatedAtFromCreatedAt() {
+        helper.createDatabase(TEST_DB, 1).use { db ->
+            db.execSQL(
+                "INSERT INTO products " +
+                    "(id, name, quantity, unit, updatedAt, archivedAt, createdAt, " +
+                    "minQuantity, notes, emoji) " +
+                    "VALUES ('p1', 'Milk', 2, 'l', 111, NULL, 100, 4, NULL, NULL)"
+            )
+            db.execSQL(
+                "INSERT INTO product_barcodes (barcode, productId, createdAt) " +
+                    "VALUES ('5901234123457', 'p1', 222)"
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 2, true, *ShelfieDatabase.MIGRATIONS).use { db ->
+            db.query("SELECT createdAt, updatedAt FROM product_barcodes").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(222L, cursor.getLong(0))
+                assertEquals(222L, cursor.getLong(1)) // backfilled from createdAt
+                assertEquals(1, cursor.count) // the row survived, nothing else appeared
+            }
+            // The product row rode along untouched.
+            db.query("SELECT name, quantity FROM products").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("Milk", cursor.getString(0))
+                assertEquals(2, cursor.getInt(1))
+            }
+        }
     }
 
     private companion object {
         const val TEST_DB = "migration-test.db"
+        const val CURRENT_VERSION = 2
     }
 }
