@@ -29,6 +29,13 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      # google-services.json is gitignored (per-developer Firebase config);
+      # CI reconstructs it from a repository secret (base64 of the file).
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
+
       - name: Build and run unit tests
         run: ./gradlew :app:assembleDebug :app:testDebugUnitTest
 
