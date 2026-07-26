@@ -54,6 +54,8 @@
     <string name="sign_out_title">Wylogować?</string>
     <string name="sign_out_message">Dane pozostaną na tym urządzeniu i przestaną się synchronizować z gospodarstwem do ponownego zalogowania.</string>
     <string name="sign_in_failed">Logowanie nie powiodło się, spróbuj ponownie</string>
+    <string name="sign_in_error_network">Brak połączenia — sprawdź internet i spróbuj ponownie</string>
+    <string name="sign_in_error_credentials">Nieprawidłowy e-mail lub hasło</string>
     <string name="email_label">E-mail</string>
     <string name="password_label">Hasło</string>
     <string name="sign_in_with_email">Zaloguj e-mailem</string>

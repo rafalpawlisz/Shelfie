@@ -14,6 +14,9 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.ShelfieApplication
 import io.github.rafalpawlisz.shelfie.data.AuthRepository
@@ -95,7 +98,7 @@ class AuthViewModel(
                 errorChannel.send(R.string.sign_in_failed)
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Firebase sign-in failed", e)
-                errorChannel.send(R.string.sign_in_failed)
+                errorChannel.send(signInErrorMessage(e))
             }
         }
     }
@@ -106,9 +109,23 @@ class AuthViewModel(
                 authRepository.signInWithEmail(email.trim(), password)
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Email sign-in failed", e)
-                errorChannel.send(R.string.sign_in_failed)
+                errorChannel.send(signInErrorMessage(e))
             }
         }
+    }
+
+    /**
+     * "No network" and "wrong credentials" demand different user reactions
+     * (retry later vs retype) — a generic failure message conflates them,
+     * which already misled a real debugging session once.
+     */
+    private fun signInErrorMessage(e: Exception): Int = when (e) {
+        is FirebaseNetworkException -> R.string.sign_in_error_network
+        is FirebaseAuthInvalidUserException,
+        is FirebaseAuthInvalidCredentialsException,
+        -> R.string.sign_in_error_credentials
+
+        else -> R.string.sign_in_failed
     }
 
     fun signOut() {

@@ -56,6 +56,8 @@
     <string name="sign_out_title">Sign out?</string>
     <string name="sign_out_message">Your data stays on this device and stops syncing with the household until you sign in again.</string>
     <string name="sign_in_failed">Sign-in failed, try again</string>
+    <string name="sign_in_error_network">No connection — check the internet and try again</string>
+    <string name="sign_in_error_credentials">Wrong email or password</string>
     <string name="email_label">Email</string>
     <string name="password_label">Password</string>
     <string name="sign_in_with_email">Sign in with email</string>
