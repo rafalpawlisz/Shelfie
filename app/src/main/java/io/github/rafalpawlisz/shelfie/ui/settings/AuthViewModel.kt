@@ -154,6 +154,21 @@ class AuthViewModel(
         }
     }
 
+    fun renameHousehold(name: String) {
+        val householdId = household.value?.id ?: return
+        val trimmed = name.trim()
+        if (trimmed.isEmpty() || trimmed == household.value?.name) return
+        clearSettingsError()
+        viewModelScope.launch {
+            try {
+                householdRepository.renameHousehold(householdId, trimmed)
+            } catch (e: Exception) {
+                Log.w("AuthViewModel", "Household rename failed", e)
+                _settingsError.value = R.string.household_error
+            }
+        }
+    }
+
     /** The UI confirms leaving before calling this. */
     fun leaveHousehold() {
         val uid = user.value?.uid ?: return

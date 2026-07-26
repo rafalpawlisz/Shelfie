@@ -2,6 +2,7 @@ package io.github.rafalpawlisz.shelfie.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
@@ -16,11 +17,18 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -52,6 +60,7 @@ fun SettingsDialog(
     onSignOut: () -> Unit,
     onCreateHousehold: (name: String) -> Unit,
     onJoinHousehold: (code: String) -> Unit,
+    onRenameHousehold: (name: String) -> Unit,
     onLeaveHousehold: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -62,6 +71,7 @@ fun SettingsDialog(
     var pendingJoinCode by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmSignOut by rememberSaveable { mutableStateOf(false) }
     var confirmLeave by rememberSaveable { mutableStateOf(false) }
+    var renaming by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         // Same recipe as the product form: without these the IME overlaps the
@@ -160,6 +170,7 @@ fun SettingsDialog(
                         household = household,
                         syncStatus = syncStatus,
                         onCreate = onCreateHousehold,
+                        onRename = { renaming = true },
                         onLeave = { confirmLeave = true },
                         onJoin = { code ->
                             // Nothing to lose only when there is neither a
@@ -196,6 +207,49 @@ fun SettingsDialog(
             },
             dismissButton = {
                 TextButton(onClick = { confirmSignOut = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    if (renaming && household != null) {
+        // Cursor after the current name and focus up front — same as the
+        // list-name dialog.
+        var name by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+            mutableStateOf(
+                TextFieldValue(household.name, selection = TextRange(household.name.length)),
+            )
+        }
+        val nameFocus = remember { FocusRequester() }
+        AlertDialog(
+            onDismissRequest = { renaming = false },
+            modifier = Modifier.imePadding(),
+            properties = DialogProperties(decorFitsSystemWindows = false),
+            title = { Text(stringResource(R.string.household_rename_title)) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.household_name_label)) },
+                    singleLine = true,
+                    modifier = Modifier.focusRequester(nameFocus),
+                )
+                LaunchedEffect(Unit) { nameFocus.requestFocus() }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = name.text.isNotBlank(),
+                    onClick = {
+                        onRenameHousehold(name.text)
+                        renaming = false
+                    },
+                ) {
+                    Text(stringResource(R.string.action_save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { renaming = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
@@ -318,6 +372,7 @@ private fun HouseholdSection(
     household: Household?,
     syncStatus: SyncStatus,
     onCreate: (name: String) -> Unit,
+    onRename: () -> Unit,
     onLeave: () -> Unit,
     onJoin: (code: String) -> Unit,
 ) {
@@ -339,10 +394,21 @@ private fun HouseholdSection(
             Text(stringResource(R.string.household_create))
         }
     } else {
-        Text(
-            text = household.name,
-            style = MaterialTheme.typography.titleMedium,
-        )
+        // Name and its rename action on one line: no icon vocabulary to learn,
+        // and the section stays compact.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = household.name,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onRename) {
+                Text(stringResource(R.string.household_rename))
+            }
+        }
         Text(
             text = stringResource(R.string.household_invite_code, household.inviteCode),
         )

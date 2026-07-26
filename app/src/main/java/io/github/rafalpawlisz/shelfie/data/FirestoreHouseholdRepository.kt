@@ -129,6 +129,12 @@ class FirestoreHouseholdRepository(
         }.await()
     }
 
+    override suspend fun renameHousehold(householdId: String, name: String) {
+        db.collection(HOUSEHOLDS).document(householdId)
+            .update("name", name)
+            .await()
+    }
+
     override suspend fun markHouseholdActive(householdId: String) {
         // Server time on purpose: device clocks drift (a cloned emulator was
         // half an hour off), and this value exists to be compared across

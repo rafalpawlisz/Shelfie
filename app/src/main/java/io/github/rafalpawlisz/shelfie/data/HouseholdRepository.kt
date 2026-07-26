@@ -29,6 +29,9 @@ interface HouseholdRepository {
      */
     suspend fun leaveHousehold(uid: String)
 
+    /** Rename the household; every member sees it through [observeHousehold]. */
+    suspend fun renameHousehold(householdId: String, name: String)
+
     /**
      * Stamp the household as in use (server time). Written once per sync
      * session, so the project owner can tell live households from abandoned
