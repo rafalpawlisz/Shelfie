@@ -36,6 +36,7 @@ import io.github.rafalpawlisz.shelfie.model.Household
 fun SettingsDialog(
     user: AuthUser?,
     household: Household?,
+    errorMessage: Int?,
     onSignIn: () -> Unit,
     onSignInWithEmail: (email: String, password: String) -> Unit,
     onSignOut: () -> Unit,
@@ -60,6 +61,15 @@ fun SettingsDialog(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // Errors render inside the dialog — a snackbar would sit
+                // behind its scrim.
+                if (errorMessage != null) {
+                    Text(
+                        text = stringResource(errorMessage),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
                 if (user == null) {
                     Text(stringResource(R.string.settings_signed_out_hint))
                     Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) {

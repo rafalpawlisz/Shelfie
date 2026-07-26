@@ -128,12 +128,6 @@ fun ShelfieApp(
     }
 
     LaunchedEffect(Unit) {
-        authViewModel.errors.collectLatest { messageRes ->
-            snackbarHostState.showSnackbar(context.getString(messageRes))
-        }
-    }
-
-    LaunchedEffect(Unit) {
         // Separate collector from use-up events: removals and use-ups come from
         // different tabs, and each stream should replace only its own snackbar.
         viewModel.itemRemovedEvents.collectLatest { removed ->
@@ -260,15 +254,20 @@ fun ShelfieApp(
     }
 
     if (showSettings) {
+        val settingsError by authViewModel.settingsError.collectAsStateWithLifecycle()
         SettingsDialog(
             user = authUser,
             household = household,
+            errorMessage = settingsError,
             onSignIn = { authViewModel.signIn(context) },
             onSignInWithEmail = authViewModel::signInWithEmail,
             onSignOut = authViewModel::signOut,
             onCreateHousehold = authViewModel::createHousehold,
             onJoinHousehold = authViewModel::joinHousehold,
-            onDismiss = { showSettings = false },
+            onDismiss = {
+                showSettings = false
+                authViewModel.clearSettingsError()
+            },
         )
     }
 

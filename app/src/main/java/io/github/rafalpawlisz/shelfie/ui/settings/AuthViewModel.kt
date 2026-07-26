@@ -25,12 +25,11 @@ import io.github.rafalpawlisz.shelfie.data.HouseholdRepository
 import io.github.rafalpawlisz.shelfie.data.InvalidInviteCodeException
 import io.github.rafalpawlisz.shelfie.model.Household
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -57,10 +56,16 @@ class AuthViewModel(
             initialValue = null,
         )
 
-    // One-shot sign-in failures (string resource ids) for a snackbar; user
-    // cancellation is deliberately not an error.
-    private val errorChannel = Channel<Int>(Channel.BUFFERED)
-    val errors = errorChannel.receiveAsFlow()
+    // Sign-in/household failures shown INSIDE the settings dialog — a
+    // snackbar would render behind the dialog scrim. Cleared when a new
+    // attempt starts and when the dialog closes. User cancellation of the
+    // account picker is deliberately not an error.
+    private val _settingsError = MutableStateFlow<Int?>(null)
+    val settingsError: StateFlow<Int?> = _settingsError
+
+    fun clearSettingsError() {
+        _settingsError.value = null
+    }
 
     /**
      * Full Google sign-in round trip: Credential Manager picks the account
@@ -68,6 +73,7 @@ class AuthViewModel(
      * for a Firebase session. State updates arrive through [user].
      */
     fun signIn(activityContext: Context) {
+        clearSettingsError()
         viewModelScope.launch {
             try {
                 val option = GetGoogleIdOption.Builder()
@@ -89,27 +95,28 @@ class AuthViewModel(
                     val idToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
                     authRepository.signInWithGoogleIdToken(idToken)
                 } else {
-                    errorChannel.send(R.string.sign_in_failed)
+                    _settingsError.value = R.string.sign_in_failed
                 }
             } catch (_: GetCredentialCancellationException) {
                 // The user backed out of the account picker — not an error.
             } catch (e: GetCredentialException) {
                 Log.w("AuthViewModel", "Google sign-in failed", e)
-                errorChannel.send(R.string.sign_in_failed)
+                _settingsError.value = R.string.sign_in_failed
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Firebase sign-in failed", e)
-                errorChannel.send(signInErrorMessage(e))
+                _settingsError.value = signInErrorMessage(e)
             }
         }
     }
 
     fun signInWithEmail(email: String, password: String) {
+        clearSettingsError()
         viewModelScope.launch {
             try {
                 authRepository.signInWithEmail(email.trim(), password)
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Email sign-in failed", e)
-                errorChannel.send(signInErrorMessage(e))
+                _settingsError.value = signInErrorMessage(e)
             }
         }
     }
@@ -134,12 +141,13 @@ class AuthViewModel(
 
     fun createHousehold(name: String) {
         val uid = user.value?.uid ?: return
+        clearSettingsError()
         viewModelScope.launch {
             try {
                 householdRepository.createHousehold(uid, name.trim())
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household creation failed", e)
-                errorChannel.send(R.string.household_error)
+                _settingsError.value = R.string.household_error
             }
         }
     }
@@ -147,14 +155,15 @@ class AuthViewModel(
     /** The UI confirms switching households before calling this. */
     fun joinHousehold(code: String) {
         val uid = user.value?.uid ?: return
+        clearSettingsError()
         viewModelScope.launch {
             try {
                 householdRepository.joinHousehold(uid, code)
             } catch (e: InvalidInviteCodeException) {
-                errorChannel.send(R.string.join_invalid_code)
+                _settingsError.value = R.string.join_invalid_code
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household join failed", e)
-                errorChannel.send(R.string.household_error)
+                _settingsError.value = R.string.household_error
             }
         }
     }
