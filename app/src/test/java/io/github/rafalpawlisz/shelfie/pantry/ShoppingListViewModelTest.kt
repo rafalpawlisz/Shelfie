@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.pantry
 
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
+import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.ui.pantry.LowStockSuggestion
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
 import io.github.rafalpawlisz.shelfie.ui.pantry.RemovedShoppingItem
@@ -961,6 +962,65 @@ class ShoppingListViewModelTest {
         assertEquals(2, restored.amount)
         assertEquals("gouda", restored.note)
         assertFalse(restored.isChecked)
+    }
+
+    @Test
+    fun `undo does nothing but warn when the list was deleted meanwhile`() = runTest {
+        // The Undo snackbar lives ten seconds — long enough to archive the list
+        // and delete it from the archive. Re-adding into a list that is gone
+        // used to trip the foreign key and crash the app.
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val removals = mutableListOf<RemovedShoppingItem>()
+        val messages = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.itemRemovedEvents.collect { removals.add(it) }
+        }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.messages.collect { messages.add(it) }
+        }
+        viewModel.createList("Lidl")
+        val listId = viewModel.uiState.value.selectedListId!!
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.addToShoppingList(productId, amount = 1)
+        viewModel.removeShoppingItem(viewModel.uiState.value.shoppingList.single().id)
+        viewModel.deleteList(listId)
+
+        viewModel.undoRemoveItem(removals.single())
+
+        assertEquals(listOf(R.string.undo_list_gone), messages)
+        assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+    }
+
+    @Test
+    fun `undo still restores the item when the list was only archived`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val removals = mutableListOf<RemovedShoppingItem>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.itemRemovedEvents.collect { removals.add(it) }
+        }
+        viewModel.createList("Lidl")
+        val listId = viewModel.uiState.value.selectedListId!!
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.addToShoppingList(productId, amount = 1)
+        viewModel.removeShoppingItem(viewModel.uiState.value.shoppingList.single().id)
+        viewModel.archiveList(listId)
+
+        viewModel.undoRemoveItem(removals.single())
+
+        // The list is dormant, so the item is invisible — but it is back, and
+        // restoring the list brings it into view.
+        viewModel.restoreList(listId)
+        viewModel.selectList(listId)
+        assertEquals(
+            listOf("Milk"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
     }
 
     @Test

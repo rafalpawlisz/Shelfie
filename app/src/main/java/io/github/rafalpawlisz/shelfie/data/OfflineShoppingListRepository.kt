@@ -147,6 +147,8 @@ class OfflineShoppingListRepository(
         dao.setPosition(listId, productId, position, System.currentTimeMillis())
     }
 
+    override suspend fun listExists(id: String): Boolean = dao.listExists(id)
+
     override suspend fun isOnAnyList(productId: String): Boolean = dao.isOnActiveList(productId)
 
     override fun observePlannedEntries(): Flow<List<PlannedEntry>> = dao.observePlannedEntries()

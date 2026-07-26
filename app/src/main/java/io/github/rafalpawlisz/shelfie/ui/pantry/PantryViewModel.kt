@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.ShelfieApplication
 import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.ProductRepository
@@ -103,6 +104,11 @@ class PantryViewModel(
     // One-shot "item removed" events so the UI can offer Undo.
     private val itemRemovedChannel = Channel<RemovedShoppingItem>(Channel.BUFFERED)
     val itemRemovedEvents = itemRemovedChannel.receiveAsFlow()
+
+    // One-shot plain messages (string resource ids) for things the user should
+    // hear about but cannot act on.
+    private val messageChannel = Channel<Int>(Channel.BUFFERED)
+    val messages = messageChannel.receiveAsFlow()
 
     private data class ProductsBundle(
         val active: List<Product>,
@@ -393,6 +399,14 @@ class PantryViewModel(
      */
     fun undoRemoveItem(removed: RemovedShoppingItem) {
         viewModelScope.launch {
+            // The snackbar outlives its list: ten seconds is enough to archive
+            // the list (fine — the item returns to a dormant list) or delete it
+            // for good, and inserting into a list that is gone trips the
+            // foreign key and takes the app down.
+            if (!shoppingListRepository.listExists(removed.listId)) {
+                messageChannel.send(R.string.undo_list_gone)
+                return@launch
+            }
             shoppingListRepository.addItem(
                 removed.listId,
                 removed.productId,

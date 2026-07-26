@@ -46,6 +46,10 @@ interface ShoppingListDao {
     @Query("SELECT MAX(position) FROM shopping_lists")
     suspend fun maxListPosition(): Double?
 
+    // Archived lists count as existing: they still hold their items.
+    @Query("SELECT EXISTS(SELECT 1 FROM shopping_lists WHERE id = :id)")
+    suspend fun listExists(id: String): Boolean
+
     // --- Sync mirror: full-content flows (archived included) ---
 
     @Query("SELECT * FROM shopping_lists")

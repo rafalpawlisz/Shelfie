@@ -42,6 +42,13 @@ interface ShoppingListRepository {
     suspend fun removeItem(id: String)
     suspend fun finishShopping(listId: String)
 
+    /**
+     * Whether the list is still in the database (archived counts — it keeps its
+     * items). Guards writes that carry a list id captured earlier, such as
+     * undoing a removal seconds after the list itself was deleted.
+     */
+    suspend fun listExists(id: String): Boolean
+
     // Manual reorder: persist a product's sort position within the list. The
     // position lives in its own table, so it survives the item being removed.
     suspend fun setItemPosition(listId: String, productId: String, position: Double)

@@ -128,6 +128,12 @@ fun ShelfieApp(
     }
 
     LaunchedEffect(Unit) {
+        viewModel.messages.collectLatest { messageRes ->
+            snackbarHostState.showSnackbar(context.getString(messageRes))
+        }
+    }
+
+    LaunchedEffect(Unit) {
         // Separate collector from use-up events: removals and use-ups come from
         // different tabs, and each stream should replace only its own snackbar.
         viewModel.itemRemovedEvents.collectLatest { removed ->

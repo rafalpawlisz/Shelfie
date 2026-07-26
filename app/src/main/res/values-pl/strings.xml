@@ -45,6 +45,7 @@
     <string name="action_add_all">Dodaj wszystkie</string>
     <string name="action_undo">Cofnij</string>
     <string name="shopping_item_removed">Usunięto: %1$s</string>
+    <string name="undo_list_gone">Ta lista już nie istnieje</string>
     <string name="settings_title">Ustawienia</string>
     <string name="settings_account_section">Konto</string>
     <string name="settings_signed_out_hint">Zaloguj się, aby dzielić spiżarnię z domownikami</string>

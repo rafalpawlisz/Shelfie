@@ -205,6 +205,9 @@ class FakeShoppingListRepository(
         positions.update { it + ((listId to productId) to position) }
     }
 
+    // Mirrors the DAO: archived lists still exist (they keep their items).
+    override suspend fun listExists(id: String): Boolean = lists.value.any { it.id == id }
+
     override suspend fun isOnAnyList(productId: String): Boolean {
         val activeListIds = lists.value.filter { it.archivedAt == null }.map { it.id }.toSet()
         return items.value.any { it.productId == productId && it.listId in activeListIds }

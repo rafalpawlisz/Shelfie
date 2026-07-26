@@ -277,6 +277,26 @@ describe("inviteCodes", () => {
     );
   });
 
+  it("a member cannot mint an extra code for their own household", async () => {
+    // The backdoor this closes: mint a private code, leave cleanly, walk back
+    // in later. Nobody could see it (codes cannot be listed) or revoke it.
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    await assertFails(
+      setDoc(doc(db(ANNA), "inviteCodes", "MYSECRET"), { householdId: "h1" }),
+    );
+  });
+
+  it("a code whose household is gone can be cleared by anyone", async () => {
+    // Orphans are unresolvable, so every membership check on them fails
+    // forever; leaving them undeletable would also leave a hijack waiting for
+    // the day that household id is reused.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "inviteCodes", "ORPHAN"), { householdId: "gone" });
+    });
+
+    await assertSucceeds(deleteDoc(doc(db(EVE), "inviteCodes", "ORPHAN")));
+  });
+
   it("the last member's cleanup batch deletes household and code together", async () => {
     await seedHousehold("h1", { [ANNA]: true }, "CODE01");
     const anna = db(ANNA);

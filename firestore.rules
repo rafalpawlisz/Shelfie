@@ -89,18 +89,34 @@ service cloud.firestore {
 
       // Created in the same batch as the household (getAfter sees the batch
       // result); the author must end up a member of the pointed household.
+      //
+      // The document id must also BE that household's inviteCode. Without that
+      // tie a member could mint extra codes of their own choosing — invisible
+      // to everyone else, since members cannot list codes either, and
+      // unrevokable because the household's inviteCode field is immutable —
+      // and quietly let themselves back in after leaving.
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['householdId'])
         && getAfter(
              /databases/$(database)/documents/households/$(request.resource.data.householdId)
-           ).data.members[request.auth.uid] == true;
+           ).data.members[request.auth.uid] == true
+        && getAfter(
+             /databases/$(database)/documents/households/$(request.resource.data.householdId)
+           ).data.inviteCode == code;
 
-      // Deleted alongside the household by someone who was a member of it
-      // (pre-state read: works when the household is deleted in the batch).
-      allow delete: if signedIn()
-        && get(
+      // A member of the pointed household may delete its code (pre-state read,
+      // so it also works when the household goes in the same batch).
+      //
+      // A code whose household no longer exists may be cleared by anyone: such
+      // a code resolves to nothing, every membership check on it fails
+      // forever, so it would otherwise be undeletable — and it turns dangerous
+      // the day that household id gets reused.
+      allow delete: if signedIn() && (
+        !exists(/databases/$(database)/documents/households/$(resource.data.householdId))
+        || get(
              /databases/$(database)/documents/households/$(resource.data.householdId)
-           ).data.members[request.auth.uid] == true;
+           ).data.members[request.auth.uid] == true
+      );
     }
   }
 }
