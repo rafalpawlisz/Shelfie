@@ -129,25 +129,22 @@ class FirestoreHouseholdRepository(
     }
 
     /**
-     * Removes [uid] from [household]: the whole document goes when they were
-     * the last member (an empty household is an orphan, and its invite code
-     * with it), otherwise just their entry in the members map. Both shapes are
-     * what the security rules allow a member to do to themselves.
+     * Removes [uid] from [household]'s members — the only mutation the rules
+     * let a member make to themselves.
+     *
+     * A household emptied this way is deliberately NOT deleted: it keeps its
+     * invite code, and joining is allowed for non-members, so anyone holding
+     * the code can come back to the data later. That makes "everyone left by
+     * accident" recoverable, at the price of empty households lingering.
+     * Deleting them instead would strand the pantry subcollections as
+     * unreadable orphans anyway (Firestore has no cascade).
      */
     private fun WriteBatch.leave(household: DocumentSnapshot, uid: String) {
-        val members = household.get("members") as? Map<*, *> ?: emptyMap<Any, Any>()
-        if (members.size <= 1) {
-            delete(db.collection(HOUSEHOLDS).document(household.id))
-            household.getString("inviteCode")?.let { code ->
-                delete(db.collection(INVITE_CODES).document(code))
-            }
-        } else {
-            update(
-                db.collection(HOUSEHOLDS).document(household.id),
-                "members.$uid",
-                FieldValue.delete(),
-            )
-        }
+        update(
+            db.collection(HOUSEHOLDS).document(household.id),
+            "members.$uid",
+            FieldValue.delete(),
+        )
     }
 
     private fun DocumentSnapshot.toHousehold(): Household? {

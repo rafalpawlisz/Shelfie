@@ -76,8 +76,8 @@
     <string name="household_switch_message">Należysz już do „%1$s”. Dołączenie do innego gospodarstwa przeniesie Cię z niego, a dane na tym urządzeniu zostaną zastąpione danymi nowego gospodarstwa.</string>
     <string name="household_leave">Opuść gospodarstwo</string>
     <string name="household_leave_title">Opuścić gospodarstwo?</string>
-    <string name="household_leave_message">Dane pozostaną na tym urządzeniu i przestaną się synchronizować z „%1$s”. Możesz wrócić, używając kodu zaproszenia.</string>
-    <string name="household_leave_message_last">Jesteś ostatnim członkiem, więc „%1$s” zostanie usunięte razem z kodem zaproszenia. Dane pozostaną na tym urządzeniu.</string>
+    <string name="household_leave_message">Dane pozostaną na tym urządzeniu i przestaną się synchronizować z „%1$s”. Aby wrócić, potrzebny będzie kod zaproszenia: %2$s — zapisz go, po wyjściu nie będzie już widoczny.</string>
+    <string name="household_leave_message_last">Jesteś ostatnim członkiem, więc „%1$s” zostanie puste, ale nieusunięte — jego dane będą do odzyskania. Aby wrócić, potrzebny będzie kod zaproszenia: %2$s — zapisz go, po wyjściu nie będzie już widoczny.</string>
     <string name="household_join_title">Dołączyć do gospodarstwa?</string>
     <string name="household_join_message">Produkty i listy gospodarstwa zastąpią to, co jest na tym urządzeniu.</string>
     <string name="household_switch_confirm">Zmień</string>

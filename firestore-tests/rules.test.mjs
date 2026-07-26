@@ -56,7 +56,8 @@ async function seedHousehold(hid, members, code) {
       name: "Dom",
       members,
       inviteCode: code,
-      createdBy: Object.keys(members)[0],
+      // Seeds may be memberless (an emptied household kept for recovery).
+      createdBy: Object.keys(members)[0] ?? ANNA,
     });
     await setDoc(doc(f, "inviteCodes", code), { householdId: hid });
   });
@@ -154,6 +155,33 @@ describe("households: leaving", () => {
         members: { [BOB]: true },
       }),
     );
+  });
+});
+
+describe("households: emptied but kept (recovery by invite code)", () => {
+  it("a signed-in user may join a memberless household", async () => {
+    // What makes "everyone left" recoverable: the household survives empty
+    // and whoever holds the code can rejoin it.
+    await seedHousehold("h1", {}, "CODE01");
+    await assertSucceeds(getDoc(doc(db(BOB), "inviteCodes", "CODE01")));
+    await assertSucceeds(
+      updateDoc(doc(db(BOB), "households", "h1"), { [`members.${BOB}`]: true }),
+    );
+    // ...and then reads its data again.
+    await assertSucceeds(getDoc(doc(db(BOB), "households/h1/products", "p1")));
+  });
+
+  it("nobody can delete a memberless household", async () => {
+    // hasOnly() is trivially true for an empty members map — the delete rule
+    // must also require actual membership.
+    await seedHousehold("h1", {}, "CODE01");
+    await assertFails(deleteDoc(doc(db(EVE), "households", "h1")));
+  });
+
+  it("a memberless household stays unreadable until someone joins", async () => {
+    await seedHousehold("h1", {}, "CODE01");
+    await assertFails(getDoc(doc(db(EVE), "households", "h1")));
+    await assertFails(getDoc(doc(db(EVE), "households/h1/products", "p1")));
   });
 });
 

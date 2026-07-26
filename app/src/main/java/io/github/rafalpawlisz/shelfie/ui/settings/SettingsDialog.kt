@@ -210,14 +210,16 @@ fun SettingsDialog(
             text = {
                 Text(
                     stringResource(
-                        // The household disappears with its last member, so
-                        // say so instead of implying it waits for them.
+                        // An emptied household is kept, so the last member is
+                        // told their data stays recoverable — and both cases
+                        // get the code, which is invisible after leaving.
                         if (lastMember) {
                             R.string.household_leave_message_last
                         } else {
                             R.string.household_leave_message
                         },
                         household.name,
+                        household.inviteCode,
                     ),
                 )
             },

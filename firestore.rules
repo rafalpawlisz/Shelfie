@@ -60,9 +60,13 @@ service cloud.firestore {
         || (isMember() && changesOnly(['name']))
       );
 
-      // Only the last remaining member may delete (cleanup of an orphan).
+      // A sole member may delete their own household. The membership check is
+      // not redundant: hasOnly() is trivially true for an empty map, so
+      // without it any signed-in user could delete a memberless household —
+      // and those are kept on purpose so they can be rejoined by code.
       allow delete: if signedIn()
-        && resource.data.members.keys().hasOnly([request.auth.uid]);
+        && resource.data.members.keys().hasOnly([request.auth.uid])
+        && resource.data.members[request.auth.uid] == true;
 
       // Synced pantry data (products/lists/items/barcodes/listOrder): any
       // member reads and writes anything under their household; everyone
