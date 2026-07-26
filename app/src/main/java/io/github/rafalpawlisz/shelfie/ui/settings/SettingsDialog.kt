@@ -71,15 +71,6 @@ fun SettingsDialog(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                // Errors render inside the dialog — a snackbar would sit
-                // behind its scrim.
-                if (errorMessage != null) {
-                    Text(
-                        text = stringResource(errorMessage),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
                 if (user == null) {
                     Text(stringResource(R.string.settings_signed_out_hint))
                     Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) {
@@ -105,6 +96,15 @@ fun SettingsDialog(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    // Errors render inside the dialog (a snackbar would sit
+                    // behind its scrim), right by the form they concern.
+                    if (errorMessage != null) {
+                        Text(
+                            text = stringResource(errorMessage),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                     OutlinedButton(
                         onClick = { onSignInWithEmail(email, password) },
                         enabled = email.isNotBlank() && password.isNotBlank(),
@@ -138,6 +138,14 @@ fun SettingsDialog(
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    // Signed-in errors are household errors — show them here.
+                    if (errorMessage != null) {
+                        Text(
+                            text = stringResource(errorMessage),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                     HouseholdSection(
                         household = household,
                         onCreate = onCreateHousehold,
