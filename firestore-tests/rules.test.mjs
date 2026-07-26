@@ -14,6 +14,7 @@ import {
   getDoc,
   getDocs,
   collection,
+  serverTimestamp,
   setDoc,
   updateDoc,
   writeBatch,
@@ -190,6 +191,24 @@ describe("households: rename and delete", () => {
     await seedHousehold("h1", { [ANNA]: true }, "CODE01");
     await assertSucceeds(updateDoc(doc(db(ANNA), "households", "h1"), { name: "Chata" }));
     await assertFails(updateDoc(doc(db(EVE), "households", "h1"), { name: "Chata" }));
+  });
+
+  it("a member stamps lastActiveAt; a stranger does not", async () => {
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    await assertSucceeds(
+      updateDoc(doc(db(ANNA), "households", "h1"), { lastActiveAt: serverTimestamp() }),
+    );
+    await assertFails(
+      updateDoc(doc(db(EVE), "households", "h1"), { lastActiveAt: serverTimestamp() }),
+    );
+  });
+
+  it("a member cannot change the invite code", async () => {
+    // Guards the update clauses staying narrow: none of them covers this.
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    await assertFails(
+      updateDoc(doc(db(ANNA), "households", "h1"), { inviteCode: "STOLEN" }),
+    );
   });
 
   it("only the last remaining member may delete", async () => {

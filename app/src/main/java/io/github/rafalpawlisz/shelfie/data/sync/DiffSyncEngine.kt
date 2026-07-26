@@ -53,6 +53,9 @@ class DiffSyncEngine(
     private val remote: RemoteSource,
     private val applier: SyncApplier,
     private val scope: CoroutineScope,
+    // Called once per session so an abandoned household is recognisable
+    // later; failures must never take the session down with them.
+    private val onSessionStart: suspend (householdId: String) -> Unit = {},
 ) : SyncEngine {
 
     // Current household for deletion hooks; null → hooks are no-ops.
@@ -86,6 +89,14 @@ class DiffSyncEngine(
     }
 
     private suspend fun runSession(hid: String) = supervisorScope {
+        launch {
+            try {
+                onSessionStart(hid)
+            } catch (e: Exception) {
+                android.util.Log.w("SyncEngine", "marking household active failed", e)
+            }
+        }
+
         val snapshots = SyncCollection.entries.associateWith { collection ->
             remote.snapshots(hid, collection)
                 .shareIn(this, SharingStarted.Eagerly, replay = 1)

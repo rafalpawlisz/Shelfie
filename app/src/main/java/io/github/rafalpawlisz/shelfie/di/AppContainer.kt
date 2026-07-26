@@ -71,6 +71,7 @@ class AppContainer(private val context: Context) {
                 ),
             ),
             scope = appScope,
+            onSessionStart = householdRepository::markHouseholdActive,
         )
     }
 

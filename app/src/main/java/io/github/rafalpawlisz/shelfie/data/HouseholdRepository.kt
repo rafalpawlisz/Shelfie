@@ -28,4 +28,11 @@ interface HouseholdRepository {
      * deleted along with its invite code.
      */
     suspend fun leaveHousehold(uid: String)
+
+    /**
+     * Stamp the household as in use (server time). Written once per sync
+     * session, so the project owner can tell live households from abandoned
+     * ones — nothing in the app reads it.
+     */
+    suspend fun markHouseholdActive(householdId: String)
 }

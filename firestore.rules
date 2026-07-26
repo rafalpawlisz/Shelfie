@@ -58,6 +58,9 @@ service cloud.firestore {
         )
         // Members may rename the household.
         || (isMember() && changesOnly(['name']))
+        // Members stamp lastActiveAt once per sync session (housekeeping
+        // signal for the project owner; nothing in the app reads it).
+        || (isMember() && changesOnly(['lastActiveAt']))
       );
 
       // A sole member may delete their own household. The membership check is

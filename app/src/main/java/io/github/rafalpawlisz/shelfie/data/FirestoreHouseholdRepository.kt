@@ -64,6 +64,7 @@ class FirestoreHouseholdRepository(
                             "members" to mapOf(uid to true),
                             "inviteCode" to code,
                             "createdAt" to FieldValue.serverTimestamp(),
+                            FIELD_LAST_ACTIVE_AT to FieldValue.serverTimestamp(),
                             "createdBy" to uid,
                         ),
                     )
@@ -128,6 +129,15 @@ class FirestoreHouseholdRepository(
         }.await()
     }
 
+    override suspend fun markHouseholdActive(householdId: String) {
+        // Server time on purpose: device clocks drift (a cloned emulator was
+        // half an hour off), and this value exists to be compared across
+        // households and read by a human much later.
+        db.collection(HOUSEHOLDS).document(householdId)
+            .update(FIELD_LAST_ACTIVE_AT, FieldValue.serverTimestamp())
+            .await()
+    }
+
     /**
      * Removes [uid] from [household]'s members — the only mutation the rules
      * let a member make to themselves.
@@ -170,6 +180,7 @@ class FirestoreHouseholdRepository(
         const val USERS = "users"
         const val INVITE_CODES = "inviteCodes"
         const val FIELD_HOUSEHOLD_ID = "householdId"
+        const val FIELD_LAST_ACTIVE_AT = "lastActiveAt"
 
         // No 0/O/1/I — codes get read out loud between household members.
         const val CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
