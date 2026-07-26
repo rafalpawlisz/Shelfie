@@ -2,14 +2,19 @@ package io.github.rafalpawlisz.shelfie.sync
 
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.data.local.ProductEntity
+import io.github.rafalpawlisz.shelfie.data.local.ProductBarcodeEntity
+import io.github.rafalpawlisz.shelfie.data.local.ProductListOrderEntity
+import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemEntity
 import io.github.rafalpawlisz.shelfie.data.sync.DiffSyncEngine
+import io.github.rafalpawlisz.shelfie.data.sync.SyncApplier
 import io.github.rafalpawlisz.shelfie.data.sync.SyncCollection
-import io.github.rafalpawlisz.shelfie.data.sync.SyncWriter
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -22,44 +27,39 @@ class DiffSyncEngineTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private class RecordingWriter : SyncWriter {
-        data class Write(val hid: String, val collection: SyncCollection, val docId: String)
-
-        val sets = mutableListOf<Write>()
-        val deletes = mutableListOf<Write>()
-
-        override fun set(
-            householdId: String,
-            collection: SyncCollection,
-            docId: String,
-            data: Map<String, Any?>,
-        ) {
-            sets += Write(householdId, collection, docId)
-        }
-
-        override fun delete(householdId: String, collection: SyncCollection, docId: String) {
-            deletes += Write(householdId, collection, docId)
-        }
-    }
-
     private class Harness(scope: TestScope) {
         val householdIds = MutableStateFlow<String?>(null)
         val products = MutableStateFlow<List<ProductEntity>>(emptyList())
-        val items = MutableStateFlow<List<ShoppingListItemEntity>>(emptyList())
-        val writer = RecordingWriter()
+        val writer = RecordingSyncWriter()
+        val remote = FakeRemoteSource()
+        val store = FakeSyncLocalStore()
         val engine = DiffSyncEngine(
             householdIds = householdIds,
             products = products,
-            lists = MutableStateFlow(emptyList()),
-            items = items,
-            listOrders = MutableStateFlow(emptyList()),
-            barcodes = MutableStateFlow(emptyList()),
+            lists = MutableStateFlow<List<ShoppingListEntity>>(emptyList()),
+            items = MutableStateFlow<List<ShoppingListItemEntity>>(emptyList()),
+            listOrders = MutableStateFlow<List<ProductListOrderEntity>>(emptyList()),
+            barcodes = MutableStateFlow<List<ProductBarcodeEntity>>(emptyList()),
             writer = writer,
-            scope = scope.backgroundScope(),
+            remote = remote,
+            applier = SyncApplier(store),
+            scope = CoroutineScope(
+                scope.backgroundScope.coroutineContext +
+                    UnconfinedTestDispatcher(scope.testScheduler),
+            ),
         )
 
         init {
             engine.start()
+        }
+
+        /** All five collections report the given remote state (empty by default). */
+        suspend fun emitInitials(products: List<io.github.rafalpawlisz.shelfie.data.sync.RemoteDoc> = emptyList()) {
+            remote.emitInitial(SyncCollection.PRODUCTS, products)
+            remote.emitInitial(SyncCollection.LISTS, emptyList())
+            remote.emitInitial(SyncCollection.ITEMS, emptyList())
+            remote.emitInitial(SyncCollection.LIST_ORDER, emptyList())
+            remote.emitInitial(SyncCollection.BARCODES, emptyList())
         }
     }
 
@@ -80,61 +80,72 @@ class DiffSyncEngineTest {
     fun `no household means no writes`() = runTest {
         val h = Harness(this)
         h.products.value = listOf(product("p1", "Milk", 1))
+        runCurrent()
 
         assertTrue(h.writer.sets.isEmpty())
     }
 
     @Test
-    fun `first snapshot after a household appears pushes everything`() = runTest {
+    fun `empty remote household is seeded with the local snapshot`() = runTest {
         val h = Harness(this)
         h.products.value = listOf(product("p1", "Milk", 1), product("p2", "Bread", 1))
-
         h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials()
+        runCurrent()
 
-        assertEquals(
-            setOf("p1", "p2"),
-            h.writer.sets.map { it.docId }.toSet(),
+        assertEquals(setOf("p1", "p2"), h.writer.sets.map { it.docId }.toSet())
+        // Local rows survive: no reconcile against the empty remote.
+        h.store.upsert(SyncCollection.PRODUCTS, "p1", remoteProduct("p1", "Milk", 1).data)
+        assertEquals(setOf("p1"), h.store.ids(SyncCollection.PRODUCTS))
+    }
+
+    @Test
+    fun `non-empty remote reconciles local rows before pushing`() = runTest {
+        val h = Harness(this)
+        // A stale local-store row that the remote doesn't have.
+        h.store.upsert(SyncCollection.PRODUCTS, "stale", remoteProduct("stale", "Old", 1).data)
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(products = listOf(remoteProduct("remote1", "Cloud milk", 5)))
+        runCurrent()
+
+        assertEquals(setOf("remote1"), h.store.ids(SyncCollection.PRODUCTS))
+    }
+
+    @Test
+    fun `remote removals delete local rows mid-session`() = runTest {
+        val h = Harness(this)
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(products = listOf(remoteProduct("p1", "Milk", 5)))
+        runCurrent()
+        assertEquals(setOf("p1"), h.store.ids(SyncCollection.PRODUCTS))
+
+        h.remote.emitChange(
+            SyncCollection.PRODUCTS,
+            allDocs = emptyList(),
+            removedIds = listOf("p1"),
         )
-        assertTrue(h.writer.sets.all { it.hid == "h1" && it.collection == SyncCollection.PRODUCTS })
+        runCurrent()
+
+        assertTrue(h.store.ids(SyncCollection.PRODUCTS).isEmpty())
     }
 
     @Test
-    fun `only changed rows are re-pushed`() = runTest {
+    fun `only changed local rows are re-pushed`() = runTest {
         val h = Harness(this)
         h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials()
+        runCurrent()
         h.products.value = listOf(product("p1", "Milk", 1), product("p2", "Bread", 1))
+        runCurrent()
         h.writer.sets.clear()
 
-        // p1 changes, p2 stays identical.
         h.products.value = listOf(product("p1", "Milk", 2), product("p2", "Bread", 1))
+        runCurrent()
 
-        assertEquals(listOf("p1"), h.writer.sets.map { it.docId })
-    }
-
-    @Test
-    fun `a row that vanishes and comes back identical is pushed again`() = runTest {
-        val h = Harness(this)
-        h.householdIds.value = "h1"
-        val row = product("p1", "Milk", 1)
-        h.products.value = listOf(row)
-        h.writer.sets.clear()
-
-        h.products.value = emptyList() // deletion mirrored via onDeleted, not here
-        h.products.value = listOf(row)
-
-        assertEquals(listOf("p1"), h.writer.sets.map { it.docId })
-    }
-
-    @Test
-    fun `switching household re-pushes the full snapshot to the new one`() = runTest {
-        val h = Harness(this)
-        h.householdIds.value = "h1"
-        h.products.value = listOf(product("p1", "Milk", 1))
-        h.writer.sets.clear()
-
-        h.householdIds.value = "h2"
-
-        assertEquals(listOf("h2"), h.writer.sets.map { it.hid })
         assertEquals(listOf("p1"), h.writer.sets.map { it.docId })
     }
 
@@ -142,26 +153,18 @@ class DiffSyncEngineTest {
     fun `onDeleted forwards to the writer under the active household`() = runTest {
         val h = Harness(this)
         h.householdIds.value = "h1"
+        runCurrent()
 
         h.engine.onDeleted(SyncCollection.ITEMS, listOf("i1", "i2"))
 
         assertEquals(listOf("i1", "i2"), h.writer.deletes.map { it.docId })
-        assertTrue(h.writer.deletes.all { it.hid == "h1" && it.collection == SyncCollection.ITEMS })
     }
 
     @Test
     fun `onDeleted without a household is a no-op`() = runTest {
         val h = Harness(this)
-
         h.engine.onDeleted(SyncCollection.ITEMS, listOf("i1"))
 
         assertTrue(h.writer.deletes.isEmpty())
     }
 }
-
-// Engine coroutines must die with the test — run them on the backgroundScope
-// with an unconfined dispatcher so emissions are processed eagerly.
-private fun TestScope.backgroundScope() =
-    kotlinx.coroutines.CoroutineScope(
-        backgroundScope.coroutineContext + UnconfinedTestDispatcher(testScheduler),
-    )

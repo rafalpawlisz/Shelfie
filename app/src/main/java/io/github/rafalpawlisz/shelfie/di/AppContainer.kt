@@ -16,7 +16,10 @@ import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.data.UiPreferences
 import io.github.rafalpawlisz.shelfie.data.local.ShelfieDatabase
 import io.github.rafalpawlisz.shelfie.data.sync.DiffSyncEngine
+import io.github.rafalpawlisz.shelfie.data.sync.FirestoreRemoteSource
 import io.github.rafalpawlisz.shelfie.data.sync.FirestoreSyncWriter
+import io.github.rafalpawlisz.shelfie.data.sync.RoomSyncLocalStore
+import io.github.rafalpawlisz.shelfie.data.sync.SyncApplier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -59,6 +62,14 @@ class AppContainer(private val context: Context) {
             listOrders = database.shoppingListDao().observeAllOrderRows(),
             barcodes = database.productBarcodeDao().observeAll(),
             writer = FirestoreSyncWriter(),
+            remote = FirestoreRemoteSource(),
+            applier = SyncApplier(
+                RoomSyncLocalStore(
+                    productDao = database.productDao(),
+                    shoppingListDao = database.shoppingListDao(),
+                    barcodeDao = database.productBarcodeDao(),
+                ),
+            ),
             scope = appScope,
         )
     }

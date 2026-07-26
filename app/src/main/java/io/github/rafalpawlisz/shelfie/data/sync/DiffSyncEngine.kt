@@ -6,28 +6,41 @@ import io.github.rafalpawlisz.shelfie.data.local.ProductListOrderEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemEntity
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 
 /**
- * Push half of the sync: mirrors Room into households/{hid} subcollections.
+ * Two-way sync between Room and households/{hid} subcollections.
  *
- * Upserts work by observation — each table's full-content flow is diffed
- * against what was last pushed, so every mutation path in the app is covered
- * without hooks; the first emission after start (or after the household
- * changes) re-pushes everything, which doubles as self-repair. Deletions
- * arrive via [SyncEngine.onDeleted] from the repositories (a snapshot diff
- * can't distinguish "deleted while the engine was down" from "never seen").
+ * Per household session (a new session starts whenever the household
+ * changes; none runs while signed out / without one):
  *
- * With no signed-in user or no household the engine idles and the app stays
- * fully local.
+ *  1. PULL FIRST. Await the initial snapshot of every collection. If the
+ *     remote household holds any data, reconcile Room to it in FK-parent
+ *     order — LWW upserts plus deletion of rows absent remotely; this is
+ *     what replaces local content after joining an existing household. An
+ *     empty remote household skips the reconcile: local data becomes its
+ *     seed via the push below.
+ *  2. Keep applying every subsequent snapshot (LWW upserts + explicit
+ *     REMOVED deletions; absence is never interpreted as deletion past the
+ *     initial reconcile).
+ *  3. PUSH. Mirror the full-content Room flows by diffing against what was
+ *     last pushed — covers every local mutation path by construction; the
+ *     session's first diff re-pushes current state (idempotent under LWW
+ *     on other devices). Local deletions arrive via [onDeleted] from the
+ *     repositories and go straight to the writer.
+ *
+ * Own-write echoes are harmless by design: pulled rows equal their source
+ * documents, so the push diff skips them; pushed docs echo back with an
+ * equal updatedAt, so the LWW upsert skips those.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 class DiffSyncEngine(
     private val householdIds: Flow<String?>,
     private val products: Flow<List<ProductEntity>>,
@@ -36,6 +49,8 @@ class DiffSyncEngine(
     private val listOrders: Flow<List<ProductListOrderEntity>>,
     private val barcodes: Flow<List<ProductBarcodeEntity>>,
     private val writer: SyncWriter,
+    private val remote: RemoteSource,
+    private val applier: SyncApplier,
     private val scope: CoroutineScope,
 ) : SyncEngine {
 
@@ -43,17 +58,18 @@ class DiffSyncEngine(
     private val activeHousehold = MutableStateFlow<String?>(null)
 
     fun start() {
-        scope.launch { householdIds.collect { activeHousehold.value = it } }
-        mirror(SyncCollection.PRODUCTS, products, { it.id }, ProductEntity::toSyncDoc)
-        mirror(SyncCollection.LISTS, lists, { it.id }, ShoppingListEntity::toSyncDoc)
-        mirror(SyncCollection.ITEMS, items, { it.id }, ShoppingListItemEntity::toSyncDoc)
-        mirror(
-            SyncCollection.LIST_ORDER,
-            listOrders,
-            { listOrderDocId(it.listId, it.productId) },
-            ProductListOrderEntity::toSyncDoc,
-        )
-        mirror(SyncCollection.BARCODES, barcodes, { it.barcode }, ProductBarcodeEntity::toSyncDoc)
+        scope.launch {
+            // distinctUntilChanged is load-bearing: the household document
+            // re-emits on membership/metadata changes, and collectLatest would
+            // otherwise cancel and restart the whole session (fresh initial
+            // snapshots + reconcile) on every such blip.
+            householdIds.distinctUntilChanged().collectLatest { hid ->
+                activeHousehold.value = hid
+                if (hid != null) {
+                    supervisorScope { runSession(hid) }
+                }
+            }
+        }
     }
 
     override fun onDeleted(collection: SyncCollection, docIds: List<String>) {
@@ -61,23 +77,60 @@ class DiffSyncEngine(
         docIds.forEach { writer.delete(hid, collection, it) }
     }
 
-    private fun <T> mirror(
+    private suspend fun runSession(hid: String) = supervisorScope {
+        val snapshots = SyncCollection.entries.associateWith { collection ->
+            remote.snapshots(hid, collection)
+                .shareIn(this, SharingStarted.Eagerly, replay = 1)
+        }
+
+        // 1) Initial snapshots, parents before children. Server-confirmed
+        // only: a cache-served snapshot can be incomplete, and reconcile
+        // deletes what it doesn't see.
+        val initials = APPLY_ORDER.associateWith { collection ->
+            snapshots.getValue(collection).first { !it.fromCache }
+        }
+        val remoteIsEmpty = initials.values.all { it.docs.isEmpty() }
+        if (!remoteIsEmpty) {
+            for (collection in APPLY_ORDER) {
+                applier.reconcile(collection, initials.getValue(collection).docs)
+            }
+        }
+
+        // 2) Ongoing pull. The replayed initial goes through apply() too —
+        // idempotent after the reconcile, and it seeds the orphan buffer
+        // correctly when the reconcile was skipped.
+        for (collection in APPLY_ORDER) {
+            launch {
+                snapshots.getValue(collection).collect { snap ->
+                    applier.apply(collection, snap.upserts, snap.removedIds)
+                }
+            }
+        }
+
+        // 3) Push mirrors.
+        mirror(hid, SyncCollection.PRODUCTS, products, { it.id }, ProductEntity::toSyncDoc)
+        mirror(hid, SyncCollection.LISTS, lists, { it.id }, ShoppingListEntity::toSyncDoc)
+        mirror(hid, SyncCollection.ITEMS, items, { it.id }, ShoppingListItemEntity::toSyncDoc)
+        mirror(
+            hid,
+            SyncCollection.LIST_ORDER,
+            listOrders,
+            { listOrderDocId(it.listId, it.productId) },
+            ProductListOrderEntity::toSyncDoc,
+        )
+        mirror(hid, SyncCollection.BARCODES, barcodes, { it.barcode }, ProductBarcodeEntity::toSyncDoc)
+    }
+
+    private fun <T> CoroutineScope.mirror(
+        hid: String,
         collection: SyncCollection,
         rows: Flow<List<T>>,
         docId: (T) -> String,
         toDoc: (T) -> Map<String, Any?>,
     ) {
-        scope.launch {
-            // Switching household resets the cache: everything gets pushed to
-            // the new household on its first emission.
-            householdIds.flatMapLatest { hid ->
-                if (hid == null) {
-                    emptyFlow()
-                } else {
-                    val lastPushed = mutableMapOf<String, Map<String, Any?>>()
-                    rows.map { snapshot -> Triple(hid, snapshot, lastPushed) }
-                }
-            }.collect { (hid, snapshot, lastPushed) ->
+        launch {
+            val lastPushed = mutableMapOf<String, Map<String, Any?>>()
+            rows.collect { snapshot ->
                 val seen = mutableSetOf<String>()
                 for (row in snapshot) {
                     val id = docId(row)
@@ -88,11 +141,23 @@ class DiffSyncEngine(
                         lastPushed[id] = doc
                     }
                 }
-                // Rows gone from Room (deletions came through onDeleted) must
-                // not leave stale cache entries behind, or a re-added row with
+                // Rows gone from Room (deletions went through onDeleted) must
+                // not leave stale cache entries, or a re-added row with
                 // identical content would be skipped.
                 lastPushed.keys.retainAll(seen)
             }
         }
+    }
+
+    private companion object {
+        // FK parents before children: items and listOrder reference products
+        // and lists; barcodes reference products.
+        val APPLY_ORDER = listOf(
+            SyncCollection.PRODUCTS,
+            SyncCollection.LISTS,
+            SyncCollection.ITEMS,
+            SyncCollection.LIST_ORDER,
+            SyncCollection.BARCODES,
+        )
     }
 }

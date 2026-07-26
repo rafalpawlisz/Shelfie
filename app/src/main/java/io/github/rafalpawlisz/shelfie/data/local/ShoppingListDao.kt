@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Upsert
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import kotlinx.coroutines.flow.Flow
 
@@ -49,6 +50,41 @@ interface ShoppingListDao {
 
     @Query("SELECT * FROM product_list_order")
     fun observeAllOrderRows(): Flow<List<ProductListOrderEntity>>
+
+    // --- Sync apply (pull direction) ---
+
+    @Upsert
+    suspend fun upsertList(list: ShoppingListEntity)
+
+    @Upsert
+    suspend fun upsertItem(item: ShoppingListItemEntity)
+
+    @Upsert
+    suspend fun upsertOrderRow(row: ProductListOrderEntity)
+
+    @Query("SELECT updatedAt FROM shopping_lists WHERE id = :id")
+    suspend fun listUpdatedAt(id: String): Long?
+
+    @Query("SELECT updatedAt FROM shopping_list_items WHERE id = :id")
+    suspend fun itemUpdatedAt(id: String): Long?
+
+    @Query(
+        "SELECT updatedAt FROM product_list_order " +
+            "WHERE listId = :listId AND productId = :productId"
+    )
+    suspend fun orderUpdatedAt(listId: String, productId: String): Long?
+
+    @Query("SELECT id FROM shopping_lists")
+    suspend fun allListIds(): List<String>
+
+    @Query("SELECT id FROM shopping_list_items")
+    suspend fun allItemIds(): List<String>
+
+    @Query("SELECT listId || '_' || productId FROM product_list_order")
+    suspend fun allOrderKeys(): List<String>
+
+    @Query("DELETE FROM product_list_order WHERE listId = :listId AND productId = :productId")
+    suspend fun deleteOrderRow(listId: String, productId: String)
 
     // --- Sync deletion hooks: what a destructive operation will remove ---
 

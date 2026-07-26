@@ -20,6 +20,17 @@ interface ProductDao {
     @Query("SELECT * FROM products")
     fun observeAllRows(): Flow<List<ProductEntity>>
 
+    // --- Sync apply (pull direction) ---
+
+    @Query("SELECT updatedAt FROM products WHERE id = :id")
+    suspend fun updatedAtOf(id: String): Long?
+
+    @Query("SELECT id FROM products")
+    suspend fun allIds(): List<String>
+
+    @Query("DELETE FROM products WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Query("SELECT * FROM products WHERE id = :id AND archivedAt IS NULL")
     suspend fun getActive(id: String): ProductEntity?
 

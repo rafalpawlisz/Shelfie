@@ -22,4 +22,12 @@ interface ProductBarcodeDao {
 
     @Query("DELETE FROM product_barcodes WHERE barcode = :barcode")
     suspend fun delete(barcode: String)
+
+    // --- Sync apply (pull direction) ---
+
+    @Query("SELECT updatedAt FROM product_barcodes WHERE barcode = :barcode")
+    suspend fun updatedAtOf(barcode: String): Long?
+
+    @Query("SELECT barcode FROM product_barcodes")
+    suspend fun allBarcodes(): List<String>
 }
