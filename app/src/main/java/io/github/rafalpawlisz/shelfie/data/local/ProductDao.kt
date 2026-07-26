@@ -25,8 +25,11 @@ interface ProductDao {
     @Query("SELECT updatedAt FROM products WHERE id = :id")
     suspend fun updatedAtOf(id: String): Long?
 
-    @Query("SELECT id FROM products")
-    suspend fun allIds(): List<String>
+    // Reconcile candidates: rows that were already part of a completed sync.
+    // Anything newer is local work that may not have reached the server yet,
+    // and deleting it would lose data.
+    @Query("SELECT id FROM products WHERE updatedAt <= :syncedUpTo")
+    suspend fun idsSyncedUpTo(syncedUpTo: Long): List<String>
 
     @Query("DELETE FROM products WHERE id = :id")
     suspend fun deleteById(id: String)

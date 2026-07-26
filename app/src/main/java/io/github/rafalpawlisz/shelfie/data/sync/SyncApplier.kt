@@ -19,13 +19,24 @@ class SyncApplier(private val store: SyncLocalStore) {
 
     /**
      * Full-state reconcile for a collection: LWW-upsert every remote doc and
-     * delete local rows that don't exist remotely. Used for the initial
-     * snapshot of a session — it is what replaces local content after
-     * joining another household.
+     * delete local rows that don't exist remotely. Runs on a session's initial
+     * snapshot — the only place deletions made while this device was away can
+     * be noticed, since a fresh listener reports every document as ADDED and
+     * never REMOVED.
+     *
+     * [syncedUpTo] bounds the deletions: only rows that were already part of a
+     * completed sync may go. Rows written after it (offline work, or work done
+     * while this session was still waiting for the server) are kept and left
+     * for the push mirror. Pass [Long.MAX_VALUE] to replace local content
+     * wholesale, which is what joining someone else's household means.
      */
-    suspend fun reconcile(collection: SyncCollection, docs: List<RemoteDoc>) {
+    suspend fun reconcile(
+        collection: SyncCollection,
+        docs: List<RemoteDoc>,
+        syncedUpTo: Long,
+    ) {
         val remoteIds = docs.map { it.id }.toSet()
-        for (localId in store.allIds(collection)) {
+        for (localId in store.idsSyncedUpTo(collection, syncedUpTo)) {
             if (localId !in remoteIds) store.delete(collection, localId)
         }
         upsertAll(collection, docs)

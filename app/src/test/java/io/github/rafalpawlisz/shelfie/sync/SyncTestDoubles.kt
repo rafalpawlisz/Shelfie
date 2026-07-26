@@ -5,6 +5,7 @@ import io.github.rafalpawlisz.shelfie.data.sync.RemoteSnapshot
 import io.github.rafalpawlisz.shelfie.data.sync.RemoteSource
 import io.github.rafalpawlisz.shelfie.data.sync.SyncCollection
 import io.github.rafalpawlisz.shelfie.data.sync.SyncLocalStore
+import io.github.rafalpawlisz.shelfie.data.sync.SyncStateStore
 import io.github.rafalpawlisz.shelfie.data.sync.SyncWriter
 import io.github.rafalpawlisz.shelfie.data.sync.UpsertResult
 import kotlinx.coroutines.flow.Flow
@@ -45,11 +46,20 @@ class FakeSyncLocalStore : SyncLocalStore {
         rows.getValue(collection).remove(docId)
     }
 
-    override suspend fun allIds(collection: SyncCollection): List<String> =
-        rows.getValue(collection).keys.toList()
+    override suspend fun idsSyncedUpTo(
+        collection: SyncCollection,
+        syncedUpTo: Long,
+    ): List<String> = rows.getValue(collection)
+        .filterValues { (it["updatedAt"] as? Number)?.toLong()?.let { at -> at <= syncedUpTo } == true }
+        .keys.toList()
 
     fun ids(collection: SyncCollection): Set<String> = rows.getValue(collection).keys.toSet()
 }
+
+class FakeSyncStateStore(
+    override var lastSyncedHouseholdId: String? = null,
+    override var lastSyncedAt: Long = 0,
+) : SyncStateStore
 
 class RecordingSyncWriter : SyncWriter {
     data class Write(val hid: String, val collection: SyncCollection, val docId: String)

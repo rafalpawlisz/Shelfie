@@ -19,6 +19,7 @@ import io.github.rafalpawlisz.shelfie.data.sync.DiffSyncEngine
 import io.github.rafalpawlisz.shelfie.data.sync.FirestoreRemoteSource
 import io.github.rafalpawlisz.shelfie.data.sync.FirestoreSyncWriter
 import io.github.rafalpawlisz.shelfie.data.sync.RoomSyncLocalStore
+import io.github.rafalpawlisz.shelfie.data.sync.SharedPreferencesSyncStateStore
 import io.github.rafalpawlisz.shelfie.data.sync.SyncApplier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +71,7 @@ class AppContainer(private val context: Context) {
                     barcodeDao = database.productBarcodeDao(),
                 ),
             ),
+            syncState = SharedPreferencesSyncStateStore(context),
             scope = appScope,
             onSessionStart = householdRepository::markHouseholdActive,
         )

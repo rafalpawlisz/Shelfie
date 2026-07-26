@@ -33,6 +33,7 @@ class DiffSyncEngineTest {
         val writer = RecordingSyncWriter()
         val remote = FakeRemoteSource()
         val store = FakeSyncLocalStore()
+        val syncState = FakeSyncStateStore()
         val engine = DiffSyncEngine(
             householdIds = householdIds,
             products = products,
@@ -43,6 +44,7 @@ class DiffSyncEngineTest {
             writer = writer,
             remote = remote,
             applier = SyncApplier(store),
+            syncState = syncState,
             scope = CoroutineScope(
                 scope.backgroundScope.coroutineContext +
                     UnconfinedTestDispatcher(scope.testScheduler),
@@ -111,6 +113,64 @@ class DiffSyncEngineTest {
         runCurrent()
 
         assertEquals(setOf("remote1"), h.store.ids(SyncCollection.PRODUCTS))
+    }
+
+    @Test
+    fun `rows written while the session waits for the server survive the reconcile`() = runTest {
+        // The offline data-loss case: a known household, the session parked on
+        // its initial server snapshot (indefinitely when offline), and the user
+        // keeps adding rows. They are absent remotely but must not be deleted.
+        val h = Harness(this)
+        h.syncState.lastSyncedHouseholdId = "h1"
+        h.syncState.lastSyncedAt = 100
+        h.store.upsert(SyncCollection.PRODUCTS, "old", remoteProduct("old", "Synced", 50).data)
+        h.householdIds.value = "h1"
+        runCurrent()
+
+        // Written after the last completed sync, while no server snapshot has
+        // arrived yet. In the app this is one Room row; the harness splits Room
+        // into the pull-side store and the push-side flow, so set both.
+        h.store.upsert(SyncCollection.PRODUCTS, "offline", remoteProduct("offline", "Fresh", 500).data)
+        h.products.value = listOf(product("offline", "Fresh", 500))
+        h.emitInitials(products = listOf(remoteProduct("remote", "Cloud", 200)))
+        runCurrent()
+
+        val ids = h.store.ids(SyncCollection.PRODUCTS)
+        assertTrue("offline row was deleted by the reconcile", "offline" in ids)
+        assertTrue("remote row was not pulled", "remote" in ids)
+        // The stale synced row is gone: absent remotely means deleted elsewhere.
+        assertTrue("stale synced row survived", "old" !in ids)
+        // ...and the surviving local row gets pushed.
+        assertTrue(h.writer.sets.any { it.docId == "offline" })
+    }
+
+    @Test
+    fun `a first session with a household still replaces local rows wholesale`() = runTest {
+        // Joining someone else's household: no lastSyncedHouseholdId match, so
+        // even freshly written local rows go — that is what the join dialog
+        // warns about.
+        val h = Harness(this)
+        h.store.upsert(SyncCollection.PRODUCTS, "mine", remoteProduct("mine", "Local", 999).data)
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(products = listOf(remoteProduct("theirs", "Household", 5)))
+        runCurrent()
+
+        assertEquals(setOf("theirs"), h.store.ids(SyncCollection.PRODUCTS))
+    }
+
+    @Test
+    fun `the household becomes known even when its remote side is empty`() = runTest {
+        // Creating a household seeds it from local data; the next session must
+        // not treat that household as someone else's and wipe local content.
+        val h = Harness(this)
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials()
+        runCurrent()
+
+        assertEquals("h1", h.syncState.lastSyncedHouseholdId)
+        assertTrue(h.syncState.lastSyncedAt > 0)
     }
 
     @Test

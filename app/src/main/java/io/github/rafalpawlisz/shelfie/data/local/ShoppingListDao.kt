@@ -74,14 +74,19 @@ interface ShoppingListDao {
     )
     suspend fun orderUpdatedAt(listId: String, productId: String): Long?
 
-    @Query("SELECT id FROM shopping_lists")
-    suspend fun allListIds(): List<String>
+    // Reconcile candidates: rows already part of a completed sync (see
+    // ProductDao.idsSyncedUpTo).
+    @Query("SELECT id FROM shopping_lists WHERE updatedAt <= :syncedUpTo")
+    suspend fun listIdsSyncedUpTo(syncedUpTo: Long): List<String>
 
-    @Query("SELECT id FROM shopping_list_items")
-    suspend fun allItemIds(): List<String>
+    @Query("SELECT id FROM shopping_list_items WHERE updatedAt <= :syncedUpTo")
+    suspend fun itemIdsSyncedUpTo(syncedUpTo: Long): List<String>
 
-    @Query("SELECT listId || '_' || productId FROM product_list_order")
-    suspend fun allOrderKeys(): List<String>
+    @Query(
+        "SELECT listId || '_' || productId FROM product_list_order " +
+            "WHERE updatedAt <= :syncedUpTo"
+    )
+    suspend fun orderKeysSyncedUpTo(syncedUpTo: Long): List<String>
 
     @Query("DELETE FROM product_list_order WHERE listId = :listId AND productId = :productId")
     suspend fun deleteOrderRow(listId: String, productId: String)

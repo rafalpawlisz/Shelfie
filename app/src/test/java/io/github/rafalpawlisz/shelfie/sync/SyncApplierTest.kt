@@ -19,9 +19,24 @@ class SyncApplierTest {
         applier.reconcile(
             SyncCollection.PRODUCTS,
             listOf(remoteProduct("kept", "Kept", 1), remoteProduct("new", "New", 5)),
+            syncedUpTo = Long.MAX_VALUE,
         )
 
         assertEquals(setOf("kept", "new"), store.ids(SyncCollection.PRODUCTS))
+    }
+
+    @Test
+    fun `reconcile keeps local rows written after the last completed sync`() = runTest {
+        val store = FakeSyncLocalStore()
+        val applier = SyncApplier(store)
+        // "synced" is part of the last sync; "fresh" was added afterwards
+        // (offline work) and has not reached the server.
+        store.upsert(SyncCollection.PRODUCTS, "synced", remoteProduct("synced", "Old", 50).data)
+        store.upsert(SyncCollection.PRODUCTS, "fresh", remoteProduct("fresh", "New", 150).data)
+
+        applier.reconcile(SyncCollection.PRODUCTS, docs = emptyList(), syncedUpTo = 100)
+
+        assertEquals(setOf("fresh"), store.ids(SyncCollection.PRODUCTS))
     }
 
     @Test

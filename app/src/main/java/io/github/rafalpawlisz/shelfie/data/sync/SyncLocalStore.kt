@@ -32,7 +32,14 @@ enum class UpsertResult {
 interface SyncLocalStore {
     suspend fun upsert(collection: SyncCollection, docId: String, data: Map<String, Any?>): UpsertResult
     suspend fun delete(collection: SyncCollection, docId: String)
-    suspend fun allIds(collection: SyncCollection): List<String>
+
+    /**
+     * Ids of rows whose updatedAt is at or before [syncedUpTo] — the rows a
+     * reconcile may delete. Rows written after that point have not provably
+     * reached the server, so their absence remotely means "not pushed yet",
+     * not "deleted elsewhere". Pass [Long.MAX_VALUE] to consider every row.
+     */
+    suspend fun idsSyncedUpTo(collection: SyncCollection, syncedUpTo: Long): List<String>
 }
 
 class RoomSyncLocalStore(
@@ -100,12 +107,15 @@ class RoomSyncLocalStore(
         }
     }
 
-    override suspend fun allIds(collection: SyncCollection): List<String> = when (collection) {
-        SyncCollection.PRODUCTS -> productDao.allIds()
-        SyncCollection.LISTS -> shoppingListDao.allListIds()
-        SyncCollection.ITEMS -> shoppingListDao.allItemIds()
-        SyncCollection.BARCODES -> barcodeDao.allBarcodes()
-        SyncCollection.LIST_ORDER -> shoppingListDao.allOrderKeys()
+    override suspend fun idsSyncedUpTo(
+        collection: SyncCollection,
+        syncedUpTo: Long,
+    ): List<String> = when (collection) {
+        SyncCollection.PRODUCTS -> productDao.idsSyncedUpTo(syncedUpTo)
+        SyncCollection.LISTS -> shoppingListDao.listIdsSyncedUpTo(syncedUpTo)
+        SyncCollection.ITEMS -> shoppingListDao.itemIdsSyncedUpTo(syncedUpTo)
+        SyncCollection.BARCODES -> barcodeDao.barcodesSyncedUpTo(syncedUpTo)
+        SyncCollection.LIST_ORDER -> shoppingListDao.orderKeysSyncedUpTo(syncedUpTo)
     }
 
     private fun productFrom(id: String, d: Map<String, Any?>): ProductEntity? {

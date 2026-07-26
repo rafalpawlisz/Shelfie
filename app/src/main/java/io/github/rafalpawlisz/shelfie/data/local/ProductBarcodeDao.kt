@@ -28,6 +28,8 @@ interface ProductBarcodeDao {
     @Query("SELECT updatedAt FROM product_barcodes WHERE barcode = :barcode")
     suspend fun updatedAtOf(barcode: String): Long?
 
-    @Query("SELECT barcode FROM product_barcodes")
-    suspend fun allBarcodes(): List<String>
+    // Reconcile candidates: rows already part of a completed sync (see
+    // ProductDao.idsSyncedUpTo).
+    @Query("SELECT barcode FROM product_barcodes WHERE updatedAt <= :syncedUpTo")
+    suspend fun barcodesSyncedUpTo(syncedUpTo: Long): List<String>
 }

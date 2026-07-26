@@ -52,6 +52,7 @@ class DiffSyncEngine(
     private val writer: SyncWriter,
     private val remote: RemoteSource,
     private val applier: SyncApplier,
+    private val syncState: SyncStateStore,
     private val scope: CoroutineScope,
     // Called once per session so an abandoned household is recognisable
     // later; failures must never take the session down with them.
@@ -108,12 +109,27 @@ class DiffSyncEngine(
         val initials = APPLY_ORDER.associateWith { collection ->
             snapshots.getValue(collection).first { !it.fromCache }
         }
+
+        // How much of the local content the reconcile is allowed to delete.
+        // First session with a household: everything, which is the documented
+        // meaning of joining. Otherwise only rows from the last completed
+        // sync — anything newer was written here since (typically offline,
+        // where this session can wait for the server indefinitely) and has not
+        // provably reached the server, so deleting it would lose it.
+        val firstSessionHere = syncState.lastSyncedHouseholdId != hid
+        val syncedUpTo = if (firstSessionHere) Long.MAX_VALUE else syncState.lastSyncedAt
+
         val remoteIsEmpty = initials.values.all { it.docs.isEmpty() }
         if (!remoteIsEmpty) {
             for (collection in APPLY_ORDER) {
-                applier.reconcile(collection, initials.getValue(collection).docs)
+                applier.reconcile(collection, initials.getValue(collection).docs, syncedUpTo)
             }
         }
+        // Recorded even for an empty household (whose local data seeds it):
+        // this device now knows the household, so later sessions must not
+        // replace local content wholesale.
+        syncState.lastSyncedHouseholdId = hid
+        syncState.lastSyncedAt = now()
 
         // 2) Ongoing pull. The replayed initial goes through apply() too —
         // idempotent after the reconcile, and it seeds the orphan buffer
