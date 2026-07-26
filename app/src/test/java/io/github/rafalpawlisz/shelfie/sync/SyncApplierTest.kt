@@ -99,6 +99,43 @@ class SyncApplierTest {
     }
 
     @Test
+    fun `a parked orphan deleted remotely does not come back when its parent lands`() = runTest {
+        val store = FakeSyncLocalStore()
+        val applier = SyncApplier(store)
+        applier.apply(
+            SyncCollection.ITEMS,
+            upserts = listOf(remoteItem("i1", "l1", "p1", 3)),
+            removedIds = emptyList(),
+        )
+
+        // Deleted remotely while still waiting for its parents.
+        applier.apply(SyncCollection.ITEMS, upserts = emptyList(), removedIds = listOf("i1"))
+
+        applier.apply(SyncCollection.PRODUCTS, listOf(remoteProduct("p1", "Milk", 1)), emptyList())
+        applier.apply(SyncCollection.LISTS, listOf(remoteList("l1", "Lidl", 1)), emptyList())
+
+        assertTrue(store.ids(SyncCollection.ITEMS).isEmpty())
+    }
+
+    @Test
+    fun `reset drops orphans so they cannot leak into another household`() = runTest {
+        val store = FakeSyncLocalStore()
+        val applier = SyncApplier(store)
+        applier.apply(
+            SyncCollection.ITEMS,
+            upserts = listOf(remoteItem("i1", "l1", "p1", 3)),
+            removedIds = emptyList(),
+        )
+
+        applier.reset()
+
+        // The parents arrive in the next household's session; nothing may apply.
+        applier.apply(SyncCollection.PRODUCTS, listOf(remoteProduct("p1", "Milk", 1)), emptyList())
+        applier.apply(SyncCollection.LISTS, listOf(remoteList("l1", "Lidl", 1)), emptyList())
+        assertTrue(store.ids(SyncCollection.ITEMS).isEmpty())
+    }
+
+    @Test
     fun `a newer copy of a parked orphan replaces the older one`() = runTest {
         val store = FakeSyncLocalStore()
         val applier = SyncApplier(store)

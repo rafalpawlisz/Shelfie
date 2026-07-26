@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.di
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Room
 import io.github.rafalpawlisz.shelfie.data.AuthRepository
 import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
@@ -21,6 +22,7 @@ import io.github.rafalpawlisz.shelfie.data.sync.FirestoreSyncWriter
 import io.github.rafalpawlisz.shelfie.data.sync.RoomSyncLocalStore
 import io.github.rafalpawlisz.shelfie.data.sync.SharedPreferencesSyncStateStore
 import io.github.rafalpawlisz.shelfie.data.sync.SyncApplier
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -42,8 +44,16 @@ class AppContainer(private val context: Context) {
         .addMigrations(*ShelfieDatabase.MIGRATIONS)
         .build()
 
-    // One scope for app-lifetime background work (the sync engine); never cancelled.
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // One scope for app-lifetime background work (the sync engine); never
+    // cancelled. The handler matters: a SupervisorJob isolates children from
+    // each other but still routes uncaught failures to the default handler,
+    // which kills the process. Sync breaking must not take the app down.
+    private val appScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default +
+            CoroutineExceptionHandler { _, throwable ->
+                Log.e("SyncEngine", "sync failed", throwable)
+            },
+    )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val syncEngine: DiffSyncEngine by lazy {

@@ -8,6 +8,12 @@ import androidx.room.Upsert
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import kotlinx.coroutines.flow.Flow
 
+/** Rows a list deletion removed, so the sync layer can mirror the cascade. */
+data class DeletedListRows(
+    val itemIds: List<String>,
+    val orderProductIds: List<String>,
+)
+
 @Dao
 interface ShoppingListDao {
 
@@ -101,6 +107,30 @@ interface ShoppingListDao {
 
     @Query("SELECT productId FROM product_list_order WHERE listId = :listId")
     suspend fun orderProductIdsOfList(listId: String): List<String>
+
+    /**
+     * Checkout, returning the item ids it removed. One transaction so the ids
+     * cannot go stale: an item checked between reading them and the checkout
+     * would be banked and deleted without being reported to sync, and the
+     * surviving remote document would resurrect it on the next pull.
+     */
+    @Transaction
+    suspend fun checkoutReportingRemoved(listId: String, timestamp: Long): List<String> {
+        val removed = checkedItemIds(listId)
+        checkout(listId, timestamp)
+        return removed
+    }
+
+    /** Delete a list, returning what its cascade removed, for the same reason. */
+    @Transaction
+    suspend fun deleteListReportingRemoved(listId: String): DeletedListRows {
+        val rows = DeletedListRows(
+            itemIds = itemIdsOfList(listId),
+            orderProductIds = orderProductIdsOfList(listId),
+        )
+        deleteList(listId)
+        return rows
+    }
 
     @Query("UPDATE shopping_lists SET position = :position, updatedAt = :timestamp WHERE id = :id")
     suspend fun setListPosition(id: String, position: Double, timestamp: Long)

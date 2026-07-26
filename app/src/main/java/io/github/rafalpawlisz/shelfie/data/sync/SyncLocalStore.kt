@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.data.sync
 
 import android.database.SQLException
+import android.util.Log
 import io.github.rafalpawlisz.shelfie.data.local.ProductBarcodeDao
 import io.github.rafalpawlisz.shelfie.data.local.ProductBarcodeEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductDao
@@ -21,6 +22,9 @@ enum class UpsertResult {
 
     /** FK parent not present (yet) — the applier buffers and retries. */
     MISSING_PARENT,
+
+    /** The write failed for a reason retrying will not fix; logged and dropped. */
+    FAILED,
 }
 
 /**
@@ -77,7 +81,9 @@ class RoomSyncLocalStore(
                     shoppingListDao.upsertList(listFrom(docId, data) ?: return UpsertResult.MALFORMED)
                 }
                 SyncCollection.ITEMS -> {
-                    shoppingListDao.upsertItem(itemFrom(docId, data) ?: return UpsertResult.MALFORMED)
+                    val item = itemFrom(docId, data) ?: return UpsertResult.MALFORMED
+                    resolveItemSlotClash(item)?.let { return it }
+                    shoppingListDao.upsertItem(item)
                 }
                 SyncCollection.BARCODES -> {
                     barcodeDao.insert(barcodeFrom(docId, data) ?: return UpsertResult.MALFORMED)
@@ -87,11 +93,43 @@ class RoomSyncLocalStore(
                 }
             }
             UpsertResult.APPLIED
-        } catch (_: SQLException) {
-            // The only constraint a well-formed sync row can trip is a
-            // missing FK parent (its snapshot just hasn't arrived yet).
-            UpsertResult.MISSING_PARENT
+        } catch (e: SQLException) {
+            // Only a missing FK parent is worth retrying (its snapshot just
+            // hasn't arrived yet). Treating every SQLException as such — as
+            // this did — parks unfixable rows in the orphan buffer forever,
+            // retrying them on every snapshot for the rest of the session.
+            if (e.message?.contains("FOREIGN KEY", ignoreCase = true) == true) {
+                UpsertResult.MISSING_PARENT
+            } else {
+                Log.w(TAG, "sync upsert failed: ${collection.path}/$docId", e)
+                UpsertResult.FAILED
+            }
         }
+    }
+
+    /**
+     * Two devices adding the same product to the same list each mint their own
+     * item id, so one slot ends up with two documents — and the unique
+     * (listId, productId) index makes the second one fail to insert.
+     *
+     * Resolved here rather than left to the constraint: the newer write wins,
+     * with the smaller id breaking exact ties, so every device independently
+     * converges on the same survivor. Returns null when there is no clash (the
+     * caller proceeds), or the result to report when the incoming doc loses.
+     *
+     * The losing document stays in Firestore, where it will lose this
+     * comparison forever — harmless, but it does mean a slot can resurrect if
+     * the winner is later deleted.
+     */
+    private suspend fun resolveItemSlotClash(item: ShoppingListItemEntity): UpsertResult? {
+        val clash = shoppingListDao.findByProduct(item.listId, item.productId)
+            ?: return null
+        if (clash.id == item.id) return null
+        val incomingWins = item.updatedAt > clash.updatedAt ||
+            (item.updatedAt == clash.updatedAt && item.id < clash.id)
+        if (!incomingWins) return UpsertResult.SKIPPED_OLDER
+        shoppingListDao.delete(clash.id)
+        return null
     }
 
     override suspend fun delete(collection: SyncCollection, docId: String) {
@@ -173,6 +211,10 @@ class RoomSyncLocalStore(
             position = d.double("position") ?: return null,
             updatedAt = d.long("updatedAt") ?: return null,
         )
+    }
+
+    private companion object {
+        const val TAG = "SyncEngine"
     }
 
     // UUIDs contain no underscore, so the first '_' splits a listOrder key.

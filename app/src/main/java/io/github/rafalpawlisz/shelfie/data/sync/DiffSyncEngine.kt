@@ -6,14 +6,14 @@ import io.github.rafalpawlisz.shelfie.data.local.ProductListOrderEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemEntity
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 
@@ -62,6 +62,10 @@ class DiffSyncEngine(
     // Current household for deletion hooks; null → hooks are no-ops.
     private val activeHousehold = MutableStateFlow<String?>(null)
 
+    // Deletions reported before any household session exists (see onDeleted).
+    private val pendingDeletesLock = Any()
+    private val pendingDeletes = mutableListOf<Pair<SyncCollection, String>>()
+
     private val _status = MutableStateFlow<SyncStatus>(SyncStatus.Off)
 
     /** Live sync state for the settings screen. */
@@ -85,11 +89,30 @@ class DiffSyncEngine(
     }
 
     override fun onDeleted(collection: SyncCollection, docIds: List<String>) {
-        val hid = activeHousehold.value ?: return
+        val hid = activeHousehold.value
+        if (hid == null) {
+            // Auth restore plus the household lookup take a moment after
+            // launch; a deletion in that window used to be dropped, and the
+            // surviving remote document resurrected the row on the first pull.
+            synchronized(pendingDeletesLock) {
+                docIds.forEach { pendingDeletes += collection to it }
+            }
+            return
+        }
         docIds.forEach { writer.delete(hid, collection, it) }
     }
 
+    private fun flushPendingDeletes(hid: String) {
+        val drained = synchronized(pendingDeletesLock) {
+            pendingDeletes.toList().also { pendingDeletes.clear() }
+        }
+        drained.forEach { (collection, docId) -> writer.delete(hid, collection, docId) }
+    }
+
     private suspend fun runSession(hid: String) = supervisorScope {
+        // Parked orphans belong to the previous household's documents.
+        applier.reset()
+        flushPendingDeletes(hid)
         launch {
             try {
                 onSessionStart(hid)
@@ -98,17 +121,24 @@ class DiffSyncEngine(
             }
         }
 
-        val snapshots = SyncCollection.entries.associateWith { collection ->
-            remote.snapshots(hid, collection)
-                .shareIn(this, SharingStarted.Eagerly, replay = 1)
+        // Snapshots are queued from the moment the session starts. A shared flow
+        // with replay = 1 dropped everything emitted while the session was
+        // still waiting for its first server snapshot — and since snapshots
+        // carry per-snapshot deltas, a lost REMOVED was never applied, so the
+        // push mirror re-uploaded the row and undid another device's deletion.
+        val streams = APPLY_ORDER.associateWith { collection ->
+            Channel<RemoteSnapshot>(Channel.UNLIMITED).also { channel ->
+                launch { remote.snapshots(hid, collection).collect { channel.send(it) } }
+            }
         }
 
-        // 1) Initial snapshots, parents before children. Server-confirmed
-        // only: a cache-served snapshot can be incomplete, and reconcile
-        // deletes what it doesn't see.
-        val initials = APPLY_ORDER.associateWith { collection ->
-            snapshots.getValue(collection).first { !it.fromCache }
-        }
+        // 1) Initial snapshot per collection, awaited in parallel. Server-
+        // confirmed only: a cache-served snapshot can be incomplete, and
+        // reconcile deletes what it doesn't see.
+        val initials = APPLY_ORDER
+            .map { collection -> async { collection to streams.getValue(collection).firstFromServer() } }
+            .awaitAll()
+            .toMap()
 
         // How much of the local content the reconcile is allowed to delete.
         // First session with a household: everything, which is the documented
@@ -130,13 +160,13 @@ class DiffSyncEngine(
         // replace local content wholesale.
         syncState.lastSyncedHouseholdId = hid
         syncState.lastSyncedAt = now()
+        _status.value = SyncStatus.Online(now())
 
-        // 2) Ongoing pull. The replayed initial goes through apply() too —
-        // idempotent after the reconcile, and it seeds the orphan buffer
-        // correctly when the reconcile was skipped.
+        // 2) Ongoing pull: drain each queue in arrival order, so deltas that
+        // landed during the wait above are applied rather than lost.
         for (collection in APPLY_ORDER) {
             launch {
-                snapshots.getValue(collection).collect { snap ->
+                for (snap in streams.getValue(collection)) {
                     applier.apply(collection, snap.upserts, snap.removedIds)
                     // Server-confirmed snapshot = we are demonstrably in sync
                     // now; a cache-only one means Firestore is working from
@@ -189,6 +219,14 @@ class DiffSyncEngine(
                 // identical content would be skipped.
                 lastPushed.keys.retainAll(seen)
             }
+        }
+    }
+
+    /** Skips cache-served snapshots; only the server's view may drive a reconcile. */
+    private suspend fun Channel<RemoteSnapshot>.firstFromServer(): RemoteSnapshot {
+        while (true) {
+            val snapshot = receive()
+            if (!snapshot.fromCache) return snapshot
         }
     }
 

@@ -67,12 +67,14 @@ class OfflineShoppingListRepository(
     }
 
     override suspend fun deleteList(id: String) {
-        // Capture what the FK cascade is about to remove, then mirror it.
-        val itemIds = dao.itemIdsOfList(id)
-        val orderProductIds = dao.orderProductIdsOfList(id)
-        dao.deleteList(id)
-        sync.onDeleted(SyncCollection.ITEMS, itemIds)
-        sync.onDeleted(SyncCollection.LIST_ORDER, orderProductIds.map { listOrderDocId(id, it) })
+        // The DAO captures what the FK cascade removes inside the transaction;
+        // reading it separately could miss rows added in between.
+        val removed = dao.deleteListReportingRemoved(id)
+        sync.onDeleted(SyncCollection.ITEMS, removed.itemIds)
+        sync.onDeleted(
+            SyncCollection.LIST_ORDER,
+            removed.orderProductIds.map { listOrderDocId(id, it) },
+        )
         sync.onDeleted(SyncCollection.LISTS, listOf(id))
     }
 
@@ -137,10 +139,8 @@ class OfflineShoppingListRepository(
     }
 
     override suspend fun finishShopping(listId: String) {
-        // Checkout deletes the checked rows — snapshot their ids first.
-        val checkedIds = dao.checkedItemIds(listId)
-        dao.checkout(listId, System.currentTimeMillis())
-        sync.onDeleted(SyncCollection.ITEMS, checkedIds)
+        val removed = dao.checkoutReportingRemoved(listId, System.currentTimeMillis())
+        sync.onDeleted(SyncCollection.ITEMS, removed)
     }
 
     override suspend fun setItemPosition(listId: String, productId: String, position: Double) {

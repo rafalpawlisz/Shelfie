@@ -221,10 +221,50 @@ class DiffSyncEngineTest {
     }
 
     @Test
-    fun `onDeleted without a household is a no-op`() = runTest {
+    fun `deletions reported before a session exists are flushed when one starts`() = runTest {
+        // Auth restore and the household lookup take a moment after launch; a
+        // deletion in that window used to be dropped, and the surviving remote
+        // document brought the row back on the first pull.
         val h = Harness(this)
-        h.engine.onDeleted(SyncCollection.ITEMS, listOf("i1"))
 
-        assertTrue(h.writer.deletes.isEmpty())
+        h.engine.onDeleted(SyncCollection.ITEMS, listOf("i1", "i2"))
+        assertTrue("nothing can be written without a household", h.writer.deletes.isEmpty())
+
+        h.householdIds.value = "h1"
+        runCurrent()
+
+        assertEquals(listOf("i1", "i2"), h.writer.deletes.map { it.docId })
+    }
+
+    @Test
+    fun `a snapshot arriving before the session finished starting is still applied`() = runTest {
+        // Snapshots used to be shared with replay = 1, which dropped everything
+        // emitted while the session waited for its first server snapshot — a
+        // lost REMOVED left the row in place, and the push mirror then undid
+        // another device's deletion.
+        val h = Harness(this)
+        h.householdIds.value = "h1"
+        runCurrent()
+
+        // Products has its initial snapshot; the other collections do not yet,
+        // so the session is still starting up.
+        h.remote.emitInitial(SyncCollection.PRODUCTS, listOf(remoteProduct("p1", "Milk", 5)))
+        runCurrent()
+        // A delta lands during that gap, and another snapshot follows it.
+        h.remote.emitChange(SyncCollection.PRODUCTS, allDocs = emptyList(), removedIds = listOf("p1"))
+        h.remote.emitChange(SyncCollection.PRODUCTS, allDocs = emptyList())
+        runCurrent()
+
+        // The rest of the initial snapshots arrive and the session proceeds.
+        h.remote.emitInitial(SyncCollection.LISTS, emptyList())
+        h.remote.emitInitial(SyncCollection.ITEMS, emptyList())
+        h.remote.emitInitial(SyncCollection.LIST_ORDER, emptyList())
+        h.remote.emitInitial(SyncCollection.BARCODES, emptyList())
+        runCurrent()
+
+        assertTrue(
+            "the removal that landed mid-startup was dropped",
+            h.store.ids(SyncCollection.PRODUCTS).isEmpty(),
+        )
     }
 }
