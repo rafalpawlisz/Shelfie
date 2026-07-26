@@ -263,10 +263,14 @@ private fun ListChipsRow(
     val haptic = LocalHapticFeedback.current
 
     // Local mirror so a drag animates smoothly; re-synced from [lists] when the
-    // upstream order changes (after a move is persisted), but not mid-drag.
+    // upstream order changes (after a move is persisted) — but never mid-drag,
+    // or an emission from the household would rebuild the list under the
+    // finger and snap the chip back. Keyed on the flag too, so the mirror
+    // catches up the moment the gesture ends.
+    var draggingChip by remember { mutableStateOf(false) }
     val orderedLists = remember { mutableStateListOf<ShoppingList>().apply { addAll(lists) } }
-    LaunchedEffect(lists) {
-        if (orderedLists != lists) {
+    LaunchedEffect(lists, draggingChip) {
+        if (!draggingChip && orderedLists != lists) {
             orderedLists.clear()
             orderedLists.addAll(lists)
         }
@@ -313,11 +317,15 @@ private fun ListChipsRow(
                 val selected = list.id == selectedListId
                 // The whole chip is the drag handle on long-press; a tap still selects.
                 val handleModifier = Modifier.longPressDraggableHandle(
-                    onDragStarted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                    onDragStarted = {
+                        draggingChip = true
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    },
                     onDragStopped = {
                         val from = lists.indexOfFirst { it.id == list.id }
                         val to = orderedLists.indexOfFirst { it.id == list.id }
                         if (from != -1 && to != -1 && from != to) onMoveList(from, to)
+                        draggingChip = false
                     },
                 )
                 Box {
@@ -633,11 +641,14 @@ private fun ListItems(
     val haptic = LocalHapticFeedback.current
 
     // Local mirror so a drag animates smoothly. It re-syncs from [items] whenever
-    // the upstream order actually changes (e.g. after a move is persisted), but
-    // not mid-drag — nothing is persisted until the gesture ends.
+    // the upstream order actually changes (e.g. after a move is persisted) — but
+    // never mid-drag, or an emission from the household would rebuild the list
+    // under the finger and snap the row back. Keyed on the flag too, so the
+    // mirror catches up the moment the gesture ends.
+    var draggingRow by remember { mutableStateOf(false) }
     val ordered = remember { mutableStateListOf<ShoppingListItem>().apply { addAll(items) } }
-    LaunchedEffect(items) {
-        if (ordered != items) {
+    LaunchedEffect(items, draggingRow) {
+        if (!draggingRow && ordered != items) {
             ordered.clear()
             ordered.addAll(items)
         }
@@ -686,11 +697,15 @@ private fun ListItems(
                     // drop, translate the net move into indices over the upstream
                     // list so the ViewModel can persist the moved item's position.
                     val handleModifier = Modifier.draggableHandle(
-                        onDragStarted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                        onDragStarted = {
+                            draggingRow = true
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        },
                         onDragStopped = {
                             val from = items.indexOfFirst { it.id == item.id }
                             val to = ordered.indexOfFirst { it.id == item.id }
                             if (from != -1 && to != -1 && from != to) onMove(from, to)
+                            draggingRow = false
                         },
                     )
                     ShoppingListRow(

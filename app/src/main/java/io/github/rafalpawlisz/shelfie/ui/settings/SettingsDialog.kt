@@ -98,7 +98,11 @@ fun SettingsDialog(
                     }
                     HorizontalDivider()
                     var email by rememberSaveable { mutableStateOf("") }
-                    var password by rememberSaveable { mutableStateOf("") }
+                    // Deliberately not saveable: saved instance state is written
+                    // to a Bundle the system may persist, and a plaintext
+                    // password has no business there. Losing it on rotation is
+                    // the right trade.
+                    var password by remember { mutableStateOf("") }
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },

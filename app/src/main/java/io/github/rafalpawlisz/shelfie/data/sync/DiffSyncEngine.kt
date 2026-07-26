@@ -38,9 +38,13 @@ import kotlinx.coroutines.supervisorScope
  *     on other devices). Local deletions arrive via [onDeleted] from the
  *     repositories and go straight to the writer.
  *
- * Own-write echoes are harmless by design: pulled rows equal their source
- * documents, so the push diff skips them; pushed docs echo back with an
- * equal updatedAt, so the LWW upsert skips those.
+ * Echoes terminate but are not free. A pushed document comes back with an
+ * equal updatedAt, so the LWW upsert drops it — that side is silent. The other
+ * side is not: the push diff compares against what THIS device pushed, so a
+ * row applied from a pull looks new and is written straight back, which costs
+ * one redundant write per pulled change (plus a full re-push of every row when
+ * a session starts). Correctness is unaffected; seeding the diff cache from
+ * applied documents is the outstanding fix.
  */
 class DiffSyncEngine(
     private val householdIds: Flow<String?>,

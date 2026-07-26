@@ -25,6 +25,7 @@ import io.github.rafalpawlisz.shelfie.data.HouseholdRepository
 import io.github.rafalpawlisz.shelfie.data.InvalidInviteCodeException
 import io.github.rafalpawlisz.shelfie.data.sync.SyncStatus
 import io.github.rafalpawlisz.shelfie.model.Household
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -104,6 +105,8 @@ class AuthViewModel(
             } catch (e: GetCredentialException) {
                 Log.w("AuthViewModel", "Google sign-in failed", e)
                 _settingsError.value = R.string.sign_in_failed
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Firebase sign-in failed", e)
                 _settingsError.value = signInErrorMessage(e)
@@ -116,6 +119,8 @@ class AuthViewModel(
         viewModelScope.launch {
             try {
                 authRepository.signInWithEmail(email.trim(), password)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Email sign-in failed", e)
                 _settingsError.value = signInErrorMessage(e)
@@ -147,6 +152,8 @@ class AuthViewModel(
         viewModelScope.launch {
             try {
                 householdRepository.createHousehold(uid, name.trim())
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household creation failed", e)
                 _settingsError.value = R.string.household_error
@@ -162,6 +169,8 @@ class AuthViewModel(
         viewModelScope.launch {
             try {
                 householdRepository.renameHousehold(householdId, trimmed)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household rename failed", e)
                 _settingsError.value = R.string.household_error
@@ -176,6 +185,8 @@ class AuthViewModel(
         viewModelScope.launch {
             try {
                 householdRepository.leaveHousehold(uid)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Leaving household failed", e)
                 _settingsError.value = R.string.household_error
@@ -192,6 +203,8 @@ class AuthViewModel(
                 householdRepository.joinHousehold(uid, code)
             } catch (e: InvalidInviteCodeException) {
                 _settingsError.value = R.string.join_invalid_code
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household join failed", e)
                 _settingsError.value = R.string.household_error

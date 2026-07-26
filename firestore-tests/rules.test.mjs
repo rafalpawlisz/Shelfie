@@ -10,6 +10,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -128,6 +129,15 @@ describe("households: joining", () => {
     );
   });
 
+  it("a stranger cannot replace the members map with just themselves", async () => {
+    // The blunt version of hijacking: send a whole new map that drops the
+    // existing member. membersDiffOnlySelf() is what stops it.
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    await assertFails(
+      updateDoc(doc(db(BOB), "households", "h1"), { members: { [BOB]: true } }),
+    );
+  });
+
   it("joining while also renaming fails", async () => {
     await seedHousehold("h1", { [ANNA]: true }, "CODE01");
     await assertFails(
@@ -200,6 +210,22 @@ describe("households: rename and delete", () => {
     );
     await assertFails(
       updateDoc(doc(db(EVE), "households", "h1"), { lastActiveAt: serverTimestamp() }),
+    );
+  });
+
+  it("a rename must produce a real name", async () => {
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    const household = doc(db(ANNA), "households", "h1");
+    await assertFails(updateDoc(household, { name: deleteField() }));
+    await assertFails(updateDoc(household, { name: "" }));
+    await assertFails(updateDoc(household, { name: { sneaky: true } }));
+    await assertSucceeds(updateDoc(household, { name: "Chata" }));
+  });
+
+  it("a member cannot change createdBy", async () => {
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    await assertFails(
+      updateDoc(doc(db(ANNA), "households", "h1"), { createdBy: EVE }),
     );
   });
 

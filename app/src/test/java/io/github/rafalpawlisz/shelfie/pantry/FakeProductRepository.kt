@@ -14,11 +14,16 @@ class FakeProductRepository : ProductRepository {
     private val entries = MutableStateFlow<List<Entry>>(emptyList())
     private var nextId = 1
 
+    // Sorted and trimmed like the real repository, so a test cannot come to
+    // depend on behaviour the app does not have.
     override fun observeProducts(): Flow<List<Product>> =
-        entries.map { list -> list.filterNot { it.archived }.map { it.product } }
+        entries.map { list -> list.filterNot { it.archived }.map { it.product }.sortedByName() }
 
     override fun observeArchivedProducts(): Flow<List<Product>> =
-        entries.map { list -> list.filter { it.archived }.map { it.product } }
+        entries.map { list -> list.filter { it.archived }.map { it.product }.sortedByName() }
+
+    private fun List<Product>.sortedByName(): List<Product> =
+        sortedWith(compareBy(java.text.Collator.getInstance()) { it.name })
 
     override suspend fun getActiveProduct(id: String): Product? =
         entries.value.firstOrNull { !it.archived && it.product.id == id }?.product
@@ -36,7 +41,7 @@ class FakeProductRepository : ProductRepository {
             it + Entry(
                 product = Product(
                     id = id,
-                    name = name,
+                    name = name.trim(),
                     quantity = quantity,
                     unit = unit,
                     minQuantity = minQuantity,

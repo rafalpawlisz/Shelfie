@@ -15,7 +15,9 @@ data class ProductEntity(
     val updatedAt: Long,
     // Soft delete: null = active. Kept as a tombstone for future sync.
     val archivedAt: Long? = null,
-    // defaultValue matches the DEFAULT used by MIGRATION_2_3's ALTER TABLE.
+    // Kept from the pre-release history, when this column arrived by ALTER
+    // TABLE; harmless now that v1 is the baseline, and removing it would be a
+    // schema change for nothing.
     @ColumnInfo(defaultValue = "0") val createdAt: Long,
     // Restock threshold; null = feature off for this product.
     val minQuantity: Int? = null,

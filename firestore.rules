@@ -56,8 +56,15 @@ service cloud.firestore {
           && membersDiffOnlySelf()
           && !(request.auth.uid in request.resource.data.members)
         )
-        // Members may rename the household.
-        || (isMember() && changesOnly(['name']))
+        // Members may rename the household — to an actual name. changesOnly()
+        // counts a removed key as affected, so without the type and length
+        // check a "rename" could delete the field or set it to a map.
+        || (
+          isMember()
+          && changesOnly(['name'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+        )
         // Members stamp lastActiveAt once per sync session (housekeeping
         // signal for the project owner; nothing in the app reads it).
         || (isMember() && changesOnly(['lastActiveAt']))
