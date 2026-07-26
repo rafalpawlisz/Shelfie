@@ -51,6 +51,8 @@
     <string name="sign_in_with_google">Zaloguj przez Google</string>
     <string name="signed_in_as">Zalogowano jako %1$s</string>
     <string name="sign_out">Wyloguj</string>
+    <string name="sign_out_title">Wylogować?</string>
+    <string name="sign_out_message">Dane pozostaną na tym urządzeniu i przestaną się synchronizować z gospodarstwem do ponownego zalogowania.</string>
     <string name="sign_in_failed">Logowanie nie powiodło się, spróbuj ponownie</string>
     <string name="email_label">E-mail</string>
     <string name="password_label">Hasło</string>

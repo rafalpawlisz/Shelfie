@@ -46,6 +46,7 @@ fun SettingsDialog(
     // Switching households is destructive-ish — confirm before joining when
     // the user already belongs to one. Holds the pending code.
     var confirmSwitchCode by rememberSaveable { mutableStateOf<String?>(null) }
+    var confirmSignOut by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_title)) },
@@ -105,7 +106,10 @@ fun SettingsDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { confirmSignOut = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Text(stringResource(R.string.sign_out))
                     }
                     HorizontalDivider()
@@ -128,6 +132,29 @@ fun SettingsDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
         },
     )
+
+    if (confirmSignOut) {
+        AlertDialog(
+            onDismissRequest = { confirmSignOut = false },
+            title = { Text(stringResource(R.string.sign_out_title)) },
+            text = { Text(stringResource(R.string.sign_out_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onSignOut()
+                        confirmSignOut = false
+                    },
+                ) {
+                    Text(stringResource(R.string.sign_out))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmSignOut = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
 
     val pendingCode = confirmSwitchCode
     if (pendingCode != null && household != null) {
