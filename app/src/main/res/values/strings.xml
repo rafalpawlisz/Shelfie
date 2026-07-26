@@ -73,7 +73,9 @@
         <item quantity="other">%1$d members</item>
     </plurals>
     <string name="household_switch_title">Switch household?</string>
-    <string name="household_switch_message">You already belong to “%1$s”. Joining another household will move you out of it.</string>
+    <string name="household_switch_message">You already belong to “%1$s”. Joining another household moves you out of it, and this device\'s data will be replaced by the new household\'s.</string>
+    <string name="household_join_title">Join household?</string>
+    <string name="household_join_message">The household\'s products and lists will replace what is on this device.</string>
     <string name="household_switch_confirm">Switch</string>
     <string name="join_invalid_code">No household found for that code</string>
     <string name="household_error">Something went wrong, try again</string>

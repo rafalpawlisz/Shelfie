@@ -260,6 +260,10 @@ fun ShelfieApp(
             user = authUser,
             household = household,
             syncStatus = syncStatus,
+            hasLocalData = state.products.isNotEmpty() ||
+                state.archivedProducts.isNotEmpty() ||
+                state.lists.isNotEmpty() ||
+                state.archivedLists.isNotEmpty(),
             errorMessage = settingsError,
             onSignIn = { authViewModel.signIn(context) },
             onSignInWithEmail = authViewModel::signInWithEmail,

@@ -73,7 +73,9 @@
         <item quantity="other">%1$d członka</item>
     </plurals>
     <string name="household_switch_title">Zmienić gospodarstwo?</string>
-    <string name="household_switch_message">Należysz już do „%1$s”. Dołączenie do innego gospodarstwa przeniesie Cię z niego.</string>
+    <string name="household_switch_message">Należysz już do „%1$s”. Dołączenie do innego gospodarstwa przeniesie Cię z niego, a dane na tym urządzeniu zostaną zastąpione danymi nowego gospodarstwa.</string>
+    <string name="household_join_title">Dołączyć do gospodarstwa?</string>
+    <string name="household_join_message">Produkty i listy gospodarstwa zastąpią to, co jest na tym urządzeniu.</string>
     <string name="household_switch_confirm">Zmień</string>
     <string name="join_invalid_code">Nie znaleziono gospodarstwa o tym kodzie</string>
     <string name="household_error">Coś poszło nie tak, spróbuj ponownie</string>

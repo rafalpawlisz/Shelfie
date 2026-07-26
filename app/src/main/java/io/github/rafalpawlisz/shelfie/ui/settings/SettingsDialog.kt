@@ -44,6 +44,8 @@ fun SettingsDialog(
     user: AuthUser?,
     household: Household?,
     syncStatus: SyncStatus,
+    // Whether this device holds pantry data that joining would overwrite.
+    hasLocalData: Boolean,
     errorMessage: Int?,
     onSignIn: () -> Unit,
     onSignInWithEmail: (email: String, password: String) -> Unit,
@@ -52,9 +54,11 @@ fun SettingsDialog(
     onJoinHousehold: (code: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // Switching households is destructive-ish — confirm before joining when
-    // the user already belongs to one. Holds the pending code.
-    var confirmSwitchCode by rememberSaveable { mutableStateOf<String?>(null) }
+    // Joining an existing household replaces this device's data with the
+    // household's (there is no merge — two "Milk" rows with different ids
+    // would poison low-stock and barcode lookups). Never do that silently:
+    // hold the code until the user confirms.
+    var pendingJoinCode by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmSignOut by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -155,7 +159,13 @@ fun SettingsDialog(
                         syncStatus = syncStatus,
                         onCreate = onCreateHousehold,
                         onJoin = { code ->
-                            if (household != null) confirmSwitchCode = code else onJoinHousehold(code)
+                            // Nothing to lose only when there is neither a
+                            // current household nor local data.
+                            if (household != null || hasLocalData) {
+                                pendingJoinCode = code
+                            } else {
+                                onJoinHousehold(code)
+                            }
                         },
                     )
                 }
@@ -189,26 +199,50 @@ fun SettingsDialog(
         )
     }
 
-    val pendingCode = confirmSwitchCode
-    if (pendingCode != null && household != null) {
+    val pendingCode = pendingJoinCode
+    if (pendingCode != null) {
         AlertDialog(
-            onDismissRequest = { confirmSwitchCode = null },
-            title = { Text(stringResource(R.string.household_switch_title)) },
+            onDismissRequest = { pendingJoinCode = null },
+            title = {
+                Text(
+                    stringResource(
+                        if (household != null) {
+                            R.string.household_switch_title
+                        } else {
+                            R.string.household_join_title
+                        },
+                    ),
+                )
+            },
             text = {
-                Text(stringResource(R.string.household_switch_message, household.name))
+                Text(
+                    if (household != null) {
+                        stringResource(R.string.household_switch_message, household.name)
+                    } else {
+                        stringResource(R.string.household_join_message)
+                    },
+                )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         onJoinHousehold(pendingCode)
-                        confirmSwitchCode = null
+                        pendingJoinCode = null
                     },
                 ) {
-                    Text(stringResource(R.string.household_switch_confirm))
+                    Text(
+                        stringResource(
+                            if (household != null) {
+                                R.string.household_switch_confirm
+                            } else {
+                                R.string.household_join
+                            },
+                        ),
+                    )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmSwitchCode = null }) {
+                TextButton(onClick = { pendingJoinCode = null }) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
