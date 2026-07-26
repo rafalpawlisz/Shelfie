@@ -255,9 +255,11 @@ fun ShelfieApp(
 
     if (showSettings) {
         val settingsError by authViewModel.settingsError.collectAsStateWithLifecycle()
+        val syncStatus by authViewModel.syncStatus.collectAsStateWithLifecycle()
         SettingsDialog(
             user = authUser,
             household = household,
+            syncStatus = syncStatus,
             errorMessage = settingsError,
             onSignIn = { authViewModel.signIn(context) },
             onSignInWithEmail = authViewModel::signInWithEmail,

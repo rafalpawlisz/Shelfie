@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -57,6 +58,11 @@ class DiffSyncEngine(
     // Current household for deletion hooks; null → hooks are no-ops.
     private val activeHousehold = MutableStateFlow<String?>(null)
 
+    private val _status = MutableStateFlow<SyncStatus>(SyncStatus.Off)
+
+    /** Live sync state for the settings screen. */
+    val status: StateFlow<SyncStatus> = _status
+
     fun start() {
         scope.launch {
             // distinctUntilChanged is load-bearing: the household document
@@ -65,7 +71,9 @@ class DiffSyncEngine(
             // snapshots + reconcile) on every such blip.
             householdIds.distinctUntilChanged().collectLatest { hid ->
                 activeHousehold.value = hid
-                if (hid != null) {
+                if (hid == null) {
+                    _status.value = SyncStatus.Off
+                } else {
                     supervisorScope { runSession(hid) }
                 }
             }
@@ -103,6 +111,14 @@ class DiffSyncEngine(
             launch {
                 snapshots.getValue(collection).collect { snap ->
                     applier.apply(collection, snap.upserts, snap.removedIds)
+                    // Server-confirmed snapshot = we are demonstrably in sync
+                    // now; a cache-only one means Firestore is working from
+                    // the local queue (typically: offline).
+                    _status.value = if (snap.fromCache) {
+                        SyncStatus.Offline((_status.value as? SyncStatus.Online)?.lastSyncAt)
+                    } else {
+                        SyncStatus.Online(now())
+                    }
                 }
             }
         }
@@ -148,6 +164,8 @@ class DiffSyncEngine(
             }
         }
     }
+
+    private fun now(): Long = System.currentTimeMillis()
 
     private companion object {
         // FK parents before children: items and listOrder reference products

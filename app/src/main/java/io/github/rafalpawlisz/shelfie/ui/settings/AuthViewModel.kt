@@ -23,6 +23,7 @@ import io.github.rafalpawlisz.shelfie.data.AuthRepository
 import io.github.rafalpawlisz.shelfie.data.AuthUser
 import io.github.rafalpawlisz.shelfie.data.HouseholdRepository
 import io.github.rafalpawlisz.shelfie.data.InvalidInviteCodeException
+import io.github.rafalpawlisz.shelfie.data.sync.SyncStatus
 import io.github.rafalpawlisz.shelfie.model.Household
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,7 @@ import kotlinx.coroutines.launch
 class AuthViewModel(
     private val authRepository: AuthRepository,
     private val householdRepository: HouseholdRepository,
+    val syncStatus: StateFlow<SyncStatus>,
 ) : ViewModel() {
 
     val user: StateFlow<AuthUser?> = authRepository.observeUser().stateIn(
@@ -173,7 +175,11 @@ class AuthViewModel(
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as ShelfieApplication
-                AuthViewModel(app.container.authRepository, app.container.householdRepository)
+                AuthViewModel(
+                    app.container.authRepository,
+                    app.container.householdRepository,
+                    app.container.syncEngine.status,
+                )
             }
         }
     }

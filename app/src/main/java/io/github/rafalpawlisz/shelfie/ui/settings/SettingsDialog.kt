@@ -28,8 +28,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import io.github.rafalpawlisz.shelfie.R
+import android.text.format.DateUtils
 import io.github.rafalpawlisz.shelfie.data.AuthUser
+import io.github.rafalpawlisz.shelfie.data.sync.SyncStatus
 import io.github.rafalpawlisz.shelfie.model.Household
+import io.github.rafalpawlisz.shelfie.ui.theme.warning
 
 /**
  * Minimal settings surface. Today it's the account section (Google sign-in
@@ -40,6 +43,7 @@ import io.github.rafalpawlisz.shelfie.model.Household
 fun SettingsDialog(
     user: AuthUser?,
     household: Household?,
+    syncStatus: SyncStatus,
     errorMessage: Int?,
     onSignIn: () -> Unit,
     onSignInWithEmail: (email: String, password: String) -> Unit,
@@ -148,6 +152,7 @@ fun SettingsDialog(
                     }
                     HouseholdSection(
                         household = household,
+                        syncStatus = syncStatus,
                         onCreate = onCreateHousehold,
                         onJoin = { code ->
                             if (household != null) confirmSwitchCode = code else onJoinHousehold(code)
@@ -212,8 +217,30 @@ fun SettingsDialog(
 }
 
 @Composable
+private fun SyncStatusRow(status: SyncStatus) {
+    when (status) {
+        // No session (also right after opening, before the first snapshot).
+        SyncStatus.Off -> Unit
+        is SyncStatus.Online -> Text(
+            text = stringResource(
+                R.string.sync_status_synced,
+                DateUtils.getRelativeTimeSpanString(status.lastSyncAt).toString(),
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        is SyncStatus.Offline -> Text(
+            text = stringResource(R.string.sync_status_offline),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.warning,
+        )
+    }
+}
+
+@Composable
 private fun HouseholdSection(
     household: Household?,
+    syncStatus: SyncStatus,
     onCreate: (name: String) -> Unit,
     onJoin: (code: String) -> Unit,
 ) {
@@ -251,6 +278,7 @@ private fun HouseholdSection(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        SyncStatusRow(syncStatus)
     }
     // Joining is always available: with no household it's the first join,
     // with one it's a switch (confirmed by the caller).

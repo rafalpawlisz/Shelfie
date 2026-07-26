@@ -28,3 +28,18 @@ object NoopSyncEngine : SyncEngine {
 
 /** Composite doc id of a product_list_order row. */
 fun listOrderDocId(listId: String, productId: String): String = "${listId}_$productId"
+
+/** What the settings screen shows about syncing. */
+sealed interface SyncStatus {
+    /** Signed out or no household — nothing syncs. */
+    data object Off : SyncStatus
+
+    /** Last server-confirmed exchange happened at [lastSyncAt] (epoch ms). */
+    data class Online(val lastSyncAt: Long) : SyncStatus
+
+    /**
+     * The latest signals came from the local cache only — changes are queued
+     * and will flow once connectivity returns.
+     */
+    data class Offline(val lastSyncAt: Long?) : SyncStatus
+}

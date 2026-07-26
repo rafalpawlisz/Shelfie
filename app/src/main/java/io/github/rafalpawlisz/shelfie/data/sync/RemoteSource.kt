@@ -2,6 +2,7 @@ package io.github.rafalpawlisz.shelfie.data.sync
 
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.MetadataChanges
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -36,7 +37,15 @@ class FirestoreRemoteSource(
     ): Flow<RemoteSnapshot> = callbackFlow {
         val registration = db.collection("households").document(householdId)
             .collection(collection.path)
-            .addSnapshotListener { snapshot, _ ->
+            // MetadataChanges.INCLUDE is load-bearing: when the server state
+            // matches the cache, the cache→server confirmation is a
+            // metadata-only change and a default listener never fires it —
+            // the session would wait for its server-confirmed initial
+            // snapshot forever on an idle household.
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.w("SyncEngine", "listen ${collection.path} failed", error)
+                }
                 if (snapshot == null) return@addSnapshotListener
                 val upserts = mutableListOf<RemoteDoc>()
                 val removed = mutableListOf<String>()

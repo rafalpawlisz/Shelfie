@@ -77,6 +77,8 @@
     <string name="household_switch_confirm">Switch</string>
     <string name="join_invalid_code">No household found for that code</string>
     <string name="household_error">Something went wrong, try again</string>
+    <string name="sync_status_synced">Synced: %1$s</string>
+    <string name="sync_status_offline">Offline — changes will sync when the connection returns</string>
     <string name="use_up_scan_out_of_stock">%1$s: nothing in stock</string>
     <string name="use_up_scan_unknown">Unknown barcode: %1$s</string>
     <string name="add_product">Add product</string>

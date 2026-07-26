@@ -77,6 +77,8 @@
     <string name="household_switch_confirm">Zmień</string>
     <string name="join_invalid_code">Nie znaleziono gospodarstwa o tym kodzie</string>
     <string name="household_error">Coś poszło nie tak, spróbuj ponownie</string>
+    <string name="sync_status_synced">Zsynchronizowano: %1$s</string>
+    <string name="sync_status_offline">Offline — zmiany zsynchronizują się po odzyskaniu połączenia</string>
     <string name="use_up_scan_out_of_stock">%1$s: brak zapasu</string>
     <string name="use_up_scan_unknown">Nieznany kod: %1$s</string>
     <string name="add_product">Dodaj produkt</string>
