@@ -965,6 +965,45 @@ class ShoppingListViewModelTest {
     }
 
     @Test
+    fun `checkout leaves items of archived products alone`() = runTest {
+        // The list screen hides them, so the finish dialog never counts them —
+        // banking their amounts would grow the stock of a product the user
+        // cannot see and delete a row they could not uncheck.
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        repository.addProduct(name = "Bread", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        fun pid(name: String) = viewModel.uiState.value.products.first { it.name == name }.id
+        val milkId = pid("Milk")
+        viewModel.addToShoppingList(milkId, amount = 3)
+        viewModel.addToShoppingList(pid("Bread"), amount = 1)
+        viewModel.uiState.value.shoppingList.forEach {
+            viewModel.setShoppingItemChecked(it.id, checked = true)
+        }
+
+        viewModel.archive(milkId)
+        viewModel.finishShopping()
+
+        // Bread banked and gone; Milk untouched at 0 and still archived.
+        assertEquals(
+            listOf("Bread" to 1),
+            viewModel.uiState.value.products.map { it.name to it.quantity },
+        )
+        assertEquals(
+            listOf("Milk" to 0),
+            viewModel.uiState.value.archivedProducts.map { it.name to it.quantity },
+        )
+        // Restoring the product brings its dormant, still-checked row back.
+        viewModel.restore(milkId)
+        assertEquals(
+            listOf("Milk"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
+    @Test
     fun `undo does nothing but warn when the list was deleted meanwhile`() = runTest {
         // The Undo snackbar lives ten seconds — long enough to archive the list
         // and delete it from the archive. Re-adding into a list that is gone

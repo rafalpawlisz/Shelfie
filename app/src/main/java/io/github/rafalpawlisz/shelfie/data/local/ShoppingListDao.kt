@@ -103,7 +103,12 @@ interface ShoppingListDao {
 
     // --- Sync deletion hooks: what a destructive operation will remove ---
 
-    @Query("SELECT id FROM shopping_list_items WHERE listId = :listId AND checkedAt IS NOT NULL")
+    // Matches what deleteChecked will actually remove, so the sync layer is told
+    // about exactly those rows and no others.
+    @Query(
+        "SELECT id FROM shopping_list_items WHERE listId = :listId AND checkedAt IS NOT NULL " +
+            "AND productId IN (SELECT id FROM products WHERE archivedAt IS NULL)"
+    )
     suspend fun checkedItemIds(listId: String): List<String>
 
     @Query("SELECT id FROM shopping_list_items WHERE listId = :listId")
@@ -215,7 +220,14 @@ interface ShoppingListDao {
     @Query("DELETE FROM shopping_list_items WHERE id = :id")
     suspend fun delete(id: String)
 
-    @Query("DELETE FROM shopping_list_items WHERE listId = :listId AND checkedAt IS NOT NULL")
+    // Archived products are dormant, exactly like items on an archived list:
+    // observeItems hides them, so checkout must not touch them either. Without
+    // the filter, stock was banked into a product the user cannot see and the
+    // invisible row was deleted — an action they could neither watch nor undo.
+    @Query(
+        "DELETE FROM shopping_list_items WHERE listId = :listId AND checkedAt IS NOT NULL " +
+            "AND productId IN (SELECT id FROM products WHERE archivedAt IS NULL)"
+    )
     suspend fun deleteChecked(listId: String)
 
     // Pure in-cart marker: checkedAt = timestamp (in cart) or null (back to buy).
@@ -236,7 +248,7 @@ interface ShoppingListDao {
             "WHERE i.productId = products.id AND i.checkedAt IS NOT NULL " +
             "AND i.amount IS NOT NULL AND i.listId = :listId), " +
             "updatedAt = :timestamp " +
-            "WHERE id IN (SELECT productId FROM shopping_list_items " +
+            "WHERE archivedAt IS NULL AND id IN (SELECT productId FROM shopping_list_items " +
             "WHERE checkedAt IS NOT NULL AND amount IS NOT NULL AND listId = :listId)"
     )
     suspend fun applyCheckedAmountsToProducts(listId: String, timestamp: Long)

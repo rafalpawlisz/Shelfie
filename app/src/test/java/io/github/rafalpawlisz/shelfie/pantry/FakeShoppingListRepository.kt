@@ -195,10 +195,15 @@ class FakeShoppingListRepository(
     }
 
     override suspend fun finishShopping(listId: String) {
-        items.value.filter { it.listId == listId && it.checkedAt != null }
-            .forEach { item -> item.amount?.let { products.adjustQuantity(item.productId, it) } }
+        // Items of archived products are dormant (observeItems hides them), so
+        // checkout skips them exactly as the DAO does.
+        val processed = items.value
+            .filter { it.listId == listId && it.checkedAt != null }
+            .filter { products.getActiveProduct(it.productId) != null }
+        processed.forEach { item -> item.amount?.let { products.adjustQuantity(item.productId, it) } }
         // Checked items are removed but their order rows persist.
-        items.update { list -> list.filterNot { it.listId == listId && it.checkedAt != null } }
+        val processedIds = processed.map { it.id }.toSet()
+        items.update { list -> list.filterNot { it.id in processedIds } }
     }
 
     override suspend fun setItemPosition(listId: String, productId: String, position: Double) {
