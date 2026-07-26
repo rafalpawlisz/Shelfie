@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.data
 
 import io.github.rafalpawlisz.shelfie.data.local.ProductDao
+import io.github.rafalpawlisz.shelfie.data.sync.SyncClock
 import io.github.rafalpawlisz.shelfie.data.local.ProductEntity
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
 import io.github.rafalpawlisz.shelfie.model.Product
@@ -8,7 +9,11 @@ import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class OfflineProductRepository(private val dao: ProductDao) : ProductRepository {
+class OfflineProductRepository(
+    private val dao: ProductDao,
+    // Server-corrected: a raw device clock splits a household under LWW.
+    private val clock: SyncClock = SyncClock { System.currentTimeMillis() },
+) : ProductRepository {
 
     override fun observeProducts(): Flow<List<Product>> =
         dao.observeActive().map { entities -> entities.map(ProductEntity::toDomain).sortedByName() }
@@ -32,7 +37,7 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
         notes: String?,
         emoji: String?,
     ): String {
-        val now = System.currentTimeMillis()
+        val now = clock.now()
         val id = UUID.randomUUID().toString()
         dao.upsert(
             ProductEntity(
@@ -67,19 +72,19 @@ class OfflineProductRepository(private val dao: ProductDao) : ProductRepository 
             minQuantity = minQuantity,
             notes = notes,
             emoji = emoji,
-            updatedAt = System.currentTimeMillis(),
+            updatedAt = clock.now(),
         )
     }
 
     override suspend fun adjustQuantity(id: String, delta: Int) {
-        dao.adjustQuantity(id = id, delta = delta, updatedAt = System.currentTimeMillis())
+        dao.adjustQuantity(id = id, delta = delta, updatedAt = clock.now())
     }
 
     override suspend fun archiveProduct(id: String) {
-        dao.archive(id = id, timestamp = System.currentTimeMillis())
+        dao.archive(id = id, timestamp = clock.now())
     }
 
     override suspend fun restoreProduct(id: String) {
-        dao.restore(id = id, timestamp = System.currentTimeMillis())
+        dao.restore(id = id, timestamp = clock.now())
     }
 }

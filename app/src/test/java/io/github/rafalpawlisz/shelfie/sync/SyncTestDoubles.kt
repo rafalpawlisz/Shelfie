@@ -59,6 +59,7 @@ class FakeSyncLocalStore : SyncLocalStore {
 class FakeSyncStateStore(
     override var lastSyncedHouseholdId: String? = null,
     override var lastSyncedAt: Long = 0,
+    override var clockOffsetMillis: Long = 0,
 ) : SyncStateStore
 
 class RecordingSyncWriter : SyncWriter {

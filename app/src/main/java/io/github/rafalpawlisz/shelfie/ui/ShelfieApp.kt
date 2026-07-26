@@ -290,8 +290,9 @@ fun ShelfieApp(
             title = stringResource(R.string.add_product),
             confirmLabel = stringResource(R.string.action_add),
             autoFocusName = true,
-            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, barcodes ->
-                viewModel.addProduct(name, quantity, unit, minQuantity, notes, emoji, barcodes)
+            // A new product has nothing to remove from.
+            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, added, _ ->
+                viewModel.addProduct(name, quantity, unit, minQuantity, notes, emoji, added)
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },
@@ -347,9 +348,11 @@ fun ShelfieApp(
             initialEmoji = editedProduct.emoji,
             initialBarcodes = state.barcodesByProduct[editedProduct.id].orEmpty(),
             stateKey = editedProduct.id,
-            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, barcodes ->
+            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, added, removed ->
                 viewModel.updateProduct(
-                    editedProduct.id, name, quantity, unit, minQuantity, notes, emoji, barcodes,
+                    editedProduct.id, name, quantity, unit, minQuantity, notes, emoji,
+                    addedBarcodes = added,
+                    removedBarcodes = removed,
                 )
                 editedProductId = null
             },

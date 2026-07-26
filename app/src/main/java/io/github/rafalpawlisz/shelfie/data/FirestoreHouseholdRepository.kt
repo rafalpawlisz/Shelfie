@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
+import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.WriteBatch
 import io.github.rafalpawlisz.shelfie.model.Household
 import java.security.SecureRandom
@@ -135,13 +136,22 @@ class FirestoreHouseholdRepository(
             .await()
     }
 
-    override suspend fun markHouseholdActive(householdId: String) {
+    override suspend fun markHouseholdActive(householdId: String): Long? {
         // Server time on purpose: device clocks drift (a cloned emulator was
         // half an hour off), and this value exists to be compared across
         // households and read by a human much later.
-        db.collection(HOUSEHOLDS).document(householdId)
-            .update(FIELD_LAST_ACTIVE_AT, FieldValue.serverTimestamp())
-            .await()
+        val document = db.collection(HOUSEHOLDS).document(householdId)
+        val before = System.currentTimeMillis()
+        document.update(FIELD_LAST_ACTIVE_AT, FieldValue.serverTimestamp()).await()
+        val after = System.currentTimeMillis()
+
+        // Reading the stamp back turns it into a clock reference. The server
+        // assigned it somewhere inside the round trip, so the midpoint bounds
+        // the error by half an RTT — nothing next to the skew this corrects.
+        val serverTime = document.get(Source.SERVER).await()
+            .getTimestamp(FIELD_LAST_ACTIVE_AT)?.toDate()?.time
+            ?: return null
+        return serverTime - (before + after) / 2
     }
 
     /**

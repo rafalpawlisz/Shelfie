@@ -19,9 +19,12 @@ import io.github.rafalpawlisz.shelfie.data.local.ShelfieDatabase
 import io.github.rafalpawlisz.shelfie.data.sync.DiffSyncEngine
 import io.github.rafalpawlisz.shelfie.data.sync.FirestoreRemoteSource
 import io.github.rafalpawlisz.shelfie.data.sync.FirestoreSyncWriter
+import io.github.rafalpawlisz.shelfie.data.sync.OffsetSyncClock
 import io.github.rafalpawlisz.shelfie.data.sync.RoomSyncLocalStore
 import io.github.rafalpawlisz.shelfie.data.sync.SharedPreferencesSyncStateStore
 import io.github.rafalpawlisz.shelfie.data.sync.SyncApplier
+import io.github.rafalpawlisz.shelfie.data.sync.SyncClock
+import io.github.rafalpawlisz.shelfie.data.sync.SyncStateStore
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -81,22 +84,40 @@ class AppContainer(private val context: Context) {
                     barcodeDao = database.productBarcodeDao(),
                 ),
             ),
-            syncState = SharedPreferencesSyncStateStore(context),
+            syncState = syncStateStore,
+            clock = syncClock,
             scope = appScope,
-            onSessionStart = householdRepository::markHouseholdActive,
+            onSessionStart = { householdId ->
+                // The stamp doubles as a clock reference; storing the measured
+                // offset is what keeps this device's timestamps comparable with
+                // the other one's.
+                householdRepository.markHouseholdActive(householdId)?.let { offset ->
+                    if (offset != syncStateStore.clockOffsetMillis) {
+                        Log.i("SyncEngine", "clock offset vs server: ${offset}ms")
+                    }
+                    syncStateStore.clockOffsetMillis = offset
+                }
+            },
         )
     }
 
+    private val syncStateStore: SyncStateStore by lazy {
+        SharedPreferencesSyncStateStore(context)
+    }
+
+    /** Shared by the repositories and the engine — see DiffSyncEngine.clock. */
+    private val syncClock: SyncClock by lazy { OffsetSyncClock(syncStateStore) }
+
     val productRepository: ProductRepository by lazy {
-        OfflineProductRepository(database.productDao())
+        OfflineProductRepository(database.productDao(), syncClock)
     }
 
     val shoppingListRepository: ShoppingListRepository by lazy {
-        OfflineShoppingListRepository(database.shoppingListDao(), syncEngine)
+        OfflineShoppingListRepository(database.shoppingListDao(), syncEngine, syncClock)
     }
 
     val barcodeRepository: BarcodeRepository by lazy {
-        OfflineBarcodeRepository(database.productBarcodeDao(), syncEngine)
+        OfflineBarcodeRepository(database.productBarcodeDao(), syncEngine, syncClock)
     }
 
     val uiPreferences: UiPreferences by lazy {

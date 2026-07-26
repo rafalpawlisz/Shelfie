@@ -56,7 +56,10 @@ class BarcodeViewModelTest {
         val id = viewModel.uiState.value.products.single().id
 
         // Keep A, drop B, add C.
-        viewModel.updateProduct(id = id, name = "Milk", quantity = 0, unit = "l", barcodes = listOf("A", "C"))
+        viewModel.updateProduct(
+            id = id, name = "Milk", quantity = 0, unit = "l",
+            addedBarcodes = listOf("C"), removedBarcodes = listOf("B"),
+        )
 
         assertEquals(setOf("A", "C"), viewModel.uiState.value.barcodesByProduct[id]?.toSet())
     }
@@ -69,7 +72,10 @@ class BarcodeViewModelTest {
         viewModel.addProduct(name = "Milk", quantity = 0, unit = "l", barcodes = listOf("A"))
         val id = viewModel.uiState.value.products.single().id
 
-        viewModel.updateProduct(id = id, name = "Milk", quantity = 0, unit = "l", barcodes = emptyList())
+        viewModel.updateProduct(
+            id = id, name = "Milk", quantity = 0, unit = "l",
+            removedBarcodes = listOf("A"),
+        )
 
         assertNull(viewModel.uiState.value.barcodesByProduct[id])
     }
@@ -84,7 +90,10 @@ class BarcodeViewModelTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.useUpEvents.collect { events += it } }
         val id = viewModel.uiState.value.products.single().id
         viewModel.addProduct(name = "ignored", quantity = 0, unit = null) // noise product
-        viewModel.updateProduct(id = id, name = "Milk", quantity = 2, unit = "l", barcodes = listOf("5901234123457"))
+        viewModel.updateProduct(
+            id = id, name = "Milk", quantity = 2, unit = "l",
+            addedBarcodes = listOf("5901234123457"),
+        )
 
         viewModel.useUpByBarcode("5901234123457")
 
@@ -101,7 +110,10 @@ class BarcodeViewModelTest {
         val events = mutableListOf<UseUpScanResult>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.useUpEvents.collect { events += it } }
         val id = viewModel.uiState.value.products.single().id
-        viewModel.updateProduct(id = id, name = "Milk", quantity = 0, unit = "l", barcodes = listOf("5901234123457"))
+        viewModel.updateProduct(
+            id = id, name = "Milk", quantity = 0, unit = "l",
+            addedBarcodes = listOf("5901234123457"),
+        )
 
         viewModel.useUpByBarcode("5901234123457")
 
@@ -125,6 +137,31 @@ class BarcodeViewModelTest {
     }
 
     @Test
+    fun `saving a product leaves alone a code that has since moved elsewhere`() = runTest {
+        // The edit form was opened while "X" belonged to Milk; the code was then
+        // rescanned onto Cream. Saving Milk — which still reports dropping "X" —
+        // used to delete by code alone and took Cream's mapping with it.
+        val products = FakeProductRepository()
+        val viewModel = makeViewModel(products)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        viewModel.addProduct(name = "Milk", quantity = 0, unit = "l", barcodes = listOf("X"))
+        viewModel.addProduct(name = "Cream", quantity = 0, unit = "l")
+        val milkId = viewModel.uiState.value.products.first { it.name == "Milk" }.id
+        val creamId = viewModel.uiState.value.products.first { it.name == "Cream" }.id
+        viewModel.updateProduct(
+            id = creamId, name = "Cream", quantity = 0, unit = "l",
+            addedBarcodes = listOf("X"),
+        )
+
+        viewModel.updateProduct(
+            id = milkId, name = "Milk", quantity = 0, unit = "l",
+            removedBarcodes = listOf("X"),
+        )
+
+        assertEquals(listOf("X"), viewModel.uiState.value.barcodesByProduct[creamId])
+    }
+
+    @Test
     fun `a code assigned to another product moves on rescan`() = runTest {
         val products = FakeProductRepository()
         val viewModel = makeViewModel(products)
@@ -134,7 +171,10 @@ class BarcodeViewModelTest {
         val milkId = viewModel.uiState.value.products.first { it.name == "Milk" }.id
         val creamId = viewModel.uiState.value.products.first { it.name == "Cream" }.id
 
-        viewModel.updateProduct(id = creamId, name = "Cream", quantity = 0, unit = "l", barcodes = listOf("X"))
+        viewModel.updateProduct(
+            id = creamId, name = "Cream", quantity = 0, unit = "l",
+            addedBarcodes = listOf("X"),
+        )
 
         assertNull(viewModel.uiState.value.barcodesByProduct[milkId])
         assertEquals(listOf("X"), viewModel.uiState.value.barcodesByProduct[creamId])

@@ -53,6 +53,11 @@ class DiffSyncEngine(
     private val remote: RemoteSource,
     private val applier: SyncApplier,
     private val syncState: SyncStateStore,
+    // Must be the same clock the repositories stamp rows with: lastSyncedAt is
+    // compared against those updatedAt values, and mixing a corrected clock
+    // with a raw one would make every row look newer than the mark, disabling
+    // the reconcile's deletion arm.
+    private val clock: SyncClock = SyncClock { System.currentTimeMillis() },
     private val scope: CoroutineScope,
     // Called once per session so an abandoned household is recognisable
     // later; failures must never take the session down with them.
@@ -230,7 +235,7 @@ class DiffSyncEngine(
         }
     }
 
-    private fun now(): Long = System.currentTimeMillis()
+    private fun now(): Long = clock.now()
 
     private companion object {
         // FK parents before children: items and listOrder reference products

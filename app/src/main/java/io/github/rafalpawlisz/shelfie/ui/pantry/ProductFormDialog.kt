@@ -69,7 +69,11 @@ fun ProductFormDialog(
         minQuantity: Int?,
         notes: String?,
         emoji: String?,
-        barcodes: List<String>,
+        // The user's intent, not a snapshot: reporting the staged list whole
+        // would let a save wipe barcodes that arrived (from the household)
+        // while the form was open, since they look like removals.
+        addedBarcodes: List<String>,
+        removedBarcodes: List<String>,
     ) -> Unit,
     onDismiss: () -> Unit,
     initialName: String = "",
@@ -148,7 +152,8 @@ fun ProductFormDialog(
                                         minQuantity,
                                         notes.trim().ifBlank { null },
                                         emoji.trim().ifBlank { null },
-                                        barcodes,
+                                        barcodes - initialBarcodes.toSet(),
+                                        initialBarcodes - barcodes.toSet(),
                                     )
                                 },
                             ) {

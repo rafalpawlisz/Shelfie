@@ -20,6 +20,13 @@ interface SyncStateStore {
      * cross-device clock skew is irrelevant here.
      */
     var lastSyncedAt: Long
+
+    /**
+     * How far this device's clock is behind the server (negative if ahead),
+     * measured once per session and applied to every timestamp we write. See
+     * [SyncClock] for why an uncorrected clock splits a household.
+     */
+    var clockOffsetMillis: Long
 }
 
 class SharedPreferencesSyncStateStore(context: Context) : SyncStateStore {
@@ -39,8 +46,15 @@ class SharedPreferencesSyncStateStore(context: Context) : SyncStateStore {
             prefs.edit().putLong(KEY_LAST_SYNCED_AT, value).apply()
         }
 
+    override var clockOffsetMillis: Long
+        get() = prefs.getLong(KEY_CLOCK_OFFSET, 0L)
+        set(value) {
+            prefs.edit().putLong(KEY_CLOCK_OFFSET, value).apply()
+        }
+
     private companion object {
         const val KEY_HOUSEHOLD_ID = "lastSyncedHouseholdId"
         const val KEY_LAST_SYNCED_AT = "lastSyncedAt"
+        const val KEY_CLOCK_OFFSET = "clockOffsetMillis"
     }
 }

@@ -193,14 +193,16 @@ class PantryViewModel(
         minQuantity: Int? = null,
         notes: String? = null,
         emoji: String? = null,
-        barcodes: List<String> = emptyList(),
+        addedBarcodes: List<String> = emptyList(),
+        removedBarcodes: List<String> = emptyList(),
     ) {
         viewModelScope.launch {
             repository.updateProduct(id, name, quantity, unit, minQuantity, notes, emoji)
-            val current = uiState.value.barcodesByProduct[id].orEmpty().toSet()
-            val target = barcodes.toSet()
-            (target - current).forEach { barcodeRepository.addBarcode(id, it) }
-            (current - target).forEach { barcodeRepository.removeBarcode(it) }
+            // The form reports what the user changed, so a barcode that the
+            // household added while the form was open is left alone instead of
+            // looking like a removal. Removals are scoped to this product.
+            addedBarcodes.forEach { barcodeRepository.addBarcode(id, it) }
+            removedBarcodes.forEach { barcodeRepository.removeBarcode(id, it) }
         }
     }
 

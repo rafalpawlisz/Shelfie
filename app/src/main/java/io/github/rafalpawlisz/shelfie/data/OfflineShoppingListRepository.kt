@@ -2,6 +2,7 @@ package io.github.rafalpawlisz.shelfie.data
 
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListDao
 import io.github.rafalpawlisz.shelfie.data.sync.NoopSyncEngine
+import io.github.rafalpawlisz.shelfie.data.sync.SyncClock
 import io.github.rafalpawlisz.shelfie.data.sync.SyncCollection
 import io.github.rafalpawlisz.shelfie.data.sync.SyncEngine
 import io.github.rafalpawlisz.shelfie.data.sync.listOrderDocId
@@ -20,6 +21,7 @@ class OfflineShoppingListRepository(
     // Deletions must be reported at mutation time (the sync engine's snapshot
     // diff can't see them across restarts); upserts need no hook.
     private val sync: SyncEngine = NoopSyncEngine,
+    private val clock: SyncClock = SyncClock { System.currentTimeMillis() },
 ) : ShoppingListRepository {
 
     override fun observeLists(): Flow<List<ShoppingList>> =
@@ -39,7 +41,7 @@ class OfflineShoppingListRepository(
     }
 
     override suspend fun createList(name: String): String {
-        val now = System.currentTimeMillis()
+        val now = clock.now()
         val id = UUID.randomUUID().toString()
         val position = (dao.maxListPosition() ?: 0.0) + 1.0
         dao.insertList(
@@ -55,15 +57,15 @@ class OfflineShoppingListRepository(
     }
 
     override suspend fun renameList(id: String, name: String) {
-        dao.renameList(id = id, name = name.trim(), updatedAt = System.currentTimeMillis())
+        dao.renameList(id = id, name = name.trim(), updatedAt = clock.now())
     }
 
     override suspend fun archiveList(id: String) {
-        dao.archiveList(id, System.currentTimeMillis())
+        dao.archiveList(id, clock.now())
     }
 
     override suspend fun restoreList(id: String) {
-        dao.restoreList(id, System.currentTimeMillis())
+        dao.restoreList(id, clock.now())
     }
 
     override suspend fun deleteList(id: String) {
@@ -79,7 +81,7 @@ class OfflineShoppingListRepository(
     }
 
     override suspend fun setListPosition(id: String, position: Double) {
-        dao.setListPosition(id, position, System.currentTimeMillis())
+        dao.setListPosition(id, position, clock.now())
     }
 
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
@@ -112,25 +114,25 @@ class OfflineShoppingListRepository(
             amount = amount,
             note = note?.trim()?.ifBlank { null },
             newId = UUID.randomUUID().toString(),
-            timestamp = System.currentTimeMillis(),
+            timestamp = clock.now(),
         )
     }
 
     override suspend fun setChecked(id: String, checked: Boolean) {
-        val now = System.currentTimeMillis()
+        val now = clock.now()
         dao.setChecked(id = id, checkedAt = if (checked) now else null, updatedAt = now)
     }
 
     override suspend fun setItemAmount(id: String, amount: Int?) {
-        dao.setAmount(id, amount, System.currentTimeMillis())
+        dao.setAmount(id, amount, clock.now())
     }
 
     override suspend fun setItemDetails(id: String, amount: Int?, note: String?) {
-        dao.setDetails(id, amount, note?.trim()?.ifBlank { null }, System.currentTimeMillis())
+        dao.setDetails(id, amount, note?.trim()?.ifBlank { null }, clock.now())
     }
 
     override suspend fun moveItem(id: String, targetListId: String) {
-        dao.moveToList(id, targetListId, System.currentTimeMillis())
+        dao.moveToList(id, targetListId, clock.now())
     }
 
     override suspend fun removeItem(id: String) {
@@ -139,12 +141,12 @@ class OfflineShoppingListRepository(
     }
 
     override suspend fun finishShopping(listId: String) {
-        val removed = dao.checkoutReportingRemoved(listId, System.currentTimeMillis())
+        val removed = dao.checkoutReportingRemoved(listId, clock.now())
         sync.onDeleted(SyncCollection.ITEMS, removed)
     }
 
     override suspend fun setItemPosition(listId: String, productId: String, position: Double) {
-        dao.setPosition(listId, productId, position, System.currentTimeMillis())
+        dao.setPosition(listId, productId, position, clock.now())
     }
 
     override suspend fun listExists(id: String): Boolean = dao.listExists(id)

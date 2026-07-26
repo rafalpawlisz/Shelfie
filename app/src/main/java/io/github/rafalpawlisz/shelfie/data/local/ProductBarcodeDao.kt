@@ -23,6 +23,10 @@ interface ProductBarcodeDao {
     @Query("DELETE FROM product_barcodes WHERE barcode = :barcode")
     suspend fun delete(barcode: String)
 
+    /** Returns the number of rows removed, so a no-op is not mirrored as one. */
+    @Query("DELETE FROM product_barcodes WHERE barcode = :barcode AND productId = :productId")
+    suspend fun deleteFrom(productId: String, barcode: String): Int
+
     // --- Sync apply (pull direction) ---
 
     @Query("SELECT updatedAt FROM product_barcodes WHERE barcode = :barcode")

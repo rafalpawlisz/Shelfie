@@ -35,7 +35,11 @@ interface HouseholdRepository {
     /**
      * Stamp the household as in use (server time). Written once per sync
      * session, so the project owner can tell live households from abandoned
-     * ones — nothing in the app reads it.
+     * ones — nothing in the app reads it for that purpose.
+     *
+     * Returns how far this device's clock is behind the server, measured from
+     * the stamp it just wrote, or null when it could not be determined
+     * (offline). See [io.github.rafalpawlisz.shelfie.data.sync.SyncClock].
      */
-    suspend fun markHouseholdActive(householdId: String)
+    suspend fun markHouseholdActive(householdId: String): Long?
 }

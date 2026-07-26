@@ -19,8 +19,12 @@ class FakeBarcodeRepository : BarcodeRepository {
         }
     }
 
-    override suspend fun removeBarcode(barcode: String) {
-        barcodes.update { list -> list.filterNot { it.barcode == barcode } }
+    override suspend fun removeBarcode(productId: String, barcode: String) {
+        // Scoped like the DAO: a code that has since moved to another product
+        // is left alone.
+        barcodes.update { list ->
+            list.filterNot { it.barcode == barcode && it.productId == productId }
+        }
     }
 
     override suspend fun findProductId(barcode: String): String? =
