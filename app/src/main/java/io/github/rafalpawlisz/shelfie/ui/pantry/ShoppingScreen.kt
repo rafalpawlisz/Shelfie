@@ -578,7 +578,11 @@ private fun ListNameDialog(
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var name by rememberSaveable { mutableStateOf(initialName) }
+    // TextFieldValue so a rename opens with the cursor after the current name.
+    var name by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(initialName, selection = TextRange(initialName.length)))
+    }
+    val nameFocus = remember { FocusRequester() }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -588,10 +592,16 @@ private fun ListNameDialog(
                 onValueChange = { name = it },
                 label = { Text(stringResource(R.string.list_name_label)) },
                 singleLine = true,
+                modifier = Modifier.focusRequester(nameFocus),
             )
+            // The name is the dialog's only input — focus it right away.
+            LaunchedEffect(Unit) { nameFocus.requestFocus() }
         },
         confirmButton = {
-            TextButton(enabled = name.isNotBlank(), onClick = { onConfirm(name.trim()) }) {
+            TextButton(
+                enabled = name.text.isNotBlank(),
+                onClick = { onConfirm(name.text.trim()) },
+            ) {
                 Text(confirmLabel)
             }
         },
