@@ -74,6 +74,10 @@
     </plurals>
     <string name="household_switch_title">Switch household?</string>
     <string name="household_switch_message">You already belong to “%1$s”. Joining another household moves you out of it, and this device\'s data will be replaced by the new household\'s.</string>
+    <string name="household_leave">Leave household</string>
+    <string name="household_leave_title">Leave household?</string>
+    <string name="household_leave_message">Your data stays on this device and stops syncing with “%1$s”. You can rejoin with the invite code.</string>
+    <string name="household_leave_message_last">You are the last member, so “%1$s” will be deleted along with its invite code. Your data stays on this device.</string>
     <string name="household_join_title">Join household?</string>
     <string name="household_join_message">The household\'s products and lists will replace what is on this device.</string>
     <string name="household_switch_confirm">Switch</string>

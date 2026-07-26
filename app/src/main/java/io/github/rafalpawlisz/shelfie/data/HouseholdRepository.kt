@@ -21,4 +21,11 @@ interface HouseholdRepository {
      * The caller is responsible for confirming the switch with the user.
      */
     suspend fun joinHousehold(uid: String, code: String)
+
+    /**
+     * Leave the current household without joining another: the user goes back
+     * to solo mode (local data stays, syncing stops). An emptied household is
+     * deleted along with its invite code.
+     */
+    suspend fun leaveHousehold(uid: String)
 }

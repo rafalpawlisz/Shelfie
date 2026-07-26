@@ -52,6 +52,7 @@ fun SettingsDialog(
     onSignOut: () -> Unit,
     onCreateHousehold: (name: String) -> Unit,
     onJoinHousehold: (code: String) -> Unit,
+    onLeaveHousehold: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     // Joining an existing household replaces this device's data with the
@@ -60,6 +61,7 @@ fun SettingsDialog(
     // hold the code until the user confirms.
     var pendingJoinCode by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmSignOut by rememberSaveable { mutableStateOf(false) }
+    var confirmLeave by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         // Same recipe as the product form: without these the IME overlaps the
@@ -158,6 +160,7 @@ fun SettingsDialog(
                         household = household,
                         syncStatus = syncStatus,
                         onCreate = onCreateHousehold,
+                        onLeave = { confirmLeave = true },
                         onJoin = { code ->
                             // Nothing to lose only when there is neither a
                             // current household nor local data.
@@ -193,6 +196,43 @@ fun SettingsDialog(
             },
             dismissButton = {
                 TextButton(onClick = { confirmSignOut = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    if (confirmLeave && household != null) {
+        val lastMember = household.memberIds.size <= 1
+        AlertDialog(
+            onDismissRequest = { confirmLeave = false },
+            title = { Text(stringResource(R.string.household_leave_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        // The household disappears with its last member, so
+                        // say so instead of implying it waits for them.
+                        if (lastMember) {
+                            R.string.household_leave_message_last
+                        } else {
+                            R.string.household_leave_message
+                        },
+                        household.name,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onLeaveHousehold()
+                        confirmLeave = false
+                    },
+                ) {
+                    Text(stringResource(R.string.household_leave))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLeave = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
@@ -276,6 +316,7 @@ private fun HouseholdSection(
     household: Household?,
     syncStatus: SyncStatus,
     onCreate: (name: String) -> Unit,
+    onLeave: () -> Unit,
     onJoin: (code: String) -> Unit,
 ) {
     if (household == null) {
@@ -313,6 +354,9 @@ private fun HouseholdSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         SyncStatusRow(syncStatus)
+        OutlinedButton(onClick = onLeave, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.household_leave))
+        }
     }
     // Joining is always available: with no household it's the first join,
     // with one it's a switch (confirmed by the caller).

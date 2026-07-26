@@ -154,6 +154,20 @@ class AuthViewModel(
         }
     }
 
+    /** The UI confirms leaving before calling this. */
+    fun leaveHousehold() {
+        val uid = user.value?.uid ?: return
+        clearSettingsError()
+        viewModelScope.launch {
+            try {
+                householdRepository.leaveHousehold(uid)
+            } catch (e: Exception) {
+                Log.w("AuthViewModel", "Leaving household failed", e)
+                _settingsError.value = R.string.household_error
+            }
+        }
+    }
+
     /** The UI confirms switching households before calling this. */
     fun joinHousehold(code: String) {
         val uid = user.value?.uid ?: return

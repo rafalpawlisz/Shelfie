@@ -270,6 +270,7 @@ fun ShelfieApp(
             onSignOut = authViewModel::signOut,
             onCreateHousehold = authViewModel::createHousehold,
             onJoinHousehold = authViewModel::joinHousehold,
+            onLeaveHousehold = authViewModel::leaveHousehold,
             onDismiss = {
                 showSettings = false
                 authViewModel.clearSettingsError()

@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
+import com.google.firebase.firestore.WriteBatch
 import io.github.rafalpawlisz.shelfie.model.Household
 import java.security.SecureRandom
 import kotlinx.coroutines.channels.awaitClose
@@ -105,24 +106,48 @@ class FirestoreHouseholdRepository(
                 db.collection(USERS).document(uid),
                 mapOf(FIELD_HOUSEHOLD_ID to targetId),
             )
-            if (old != null) {
-                val members = old.get("members") as? Map<*, *> ?: emptyMap<Any, Any>()
-                if (members.size <= 1) {
-                    // Leaving empties the old household — clean up the orphan
-                    // and its code in the same batch.
-                    batch.delete(db.collection(HOUSEHOLDS).document(old.id))
-                    old.getString("inviteCode")?.let { oldCode ->
-                        batch.delete(db.collection(INVITE_CODES).document(oldCode))
-                    }
-                } else {
-                    batch.update(
-                        db.collection(HOUSEHOLDS).document(old.id),
-                        "members.$uid",
-                        FieldValue.delete(),
-                    )
-                }
-            }
+            if (old != null) batch.leave(old, uid)
         }.await()
+    }
+
+    override suspend fun leaveHousehold(uid: String) {
+        val userSnap = db.collection(USERS).document(uid).get().await()
+        val currentId = userSnap.getString(FIELD_HOUSEHOLD_ID) ?: return
+        val current = db.collection(HOUSEHOLDS).document(currentId).get().await()
+
+        db.runBatch { batch ->
+            // Drop the pointer even if the household document is already gone
+            // (e.g. the other member deleted it) — otherwise the user is stuck
+            // pointing at nothing with no way out.
+            batch.update(
+                db.collection(USERS).document(uid),
+                FIELD_HOUSEHOLD_ID,
+                FieldValue.delete(),
+            )
+            if (current.exists()) batch.leave(current, uid)
+        }.await()
+    }
+
+    /**
+     * Removes [uid] from [household]: the whole document goes when they were
+     * the last member (an empty household is an orphan, and its invite code
+     * with it), otherwise just their entry in the members map. Both shapes are
+     * what the security rules allow a member to do to themselves.
+     */
+    private fun WriteBatch.leave(household: DocumentSnapshot, uid: String) {
+        val members = household.get("members") as? Map<*, *> ?: emptyMap<Any, Any>()
+        if (members.size <= 1) {
+            delete(db.collection(HOUSEHOLDS).document(household.id))
+            household.getString("inviteCode")?.let { code ->
+                delete(db.collection(INVITE_CODES).document(code))
+            }
+        } else {
+            update(
+                db.collection(HOUSEHOLDS).document(household.id),
+                "members.$uid",
+                FieldValue.delete(),
+            )
+        }
     }
 
     private fun DocumentSnapshot.toHousehold(): Household? {
