@@ -6,6 +6,7 @@ import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.data.sync.SyncStatus
 import io.github.rafalpawlisz.shelfie.sync.FakeSyncStateStore
 import io.github.rafalpawlisz.shelfie.ui.settings.AuthViewModel
+import io.github.rafalpawlisz.shelfie.ui.settings.ErrorSpot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -64,7 +65,8 @@ class AuthViewModelTest {
 
         viewModel.createHousehold("Dom")
 
-        assertEquals(R.string.error_network, viewModel.errorMessage.value)
+        assertEquals(R.string.error_network, viewModel.error.value?.message)
+        assertEquals(ErrorSpot.CREATE, viewModel.error.value?.spot)
         assertNull(viewModel.household.value)
     }
 
@@ -80,7 +82,7 @@ class AuthViewModelTest {
 
         assertEquals("Dom", viewModel.household.value?.name)
         assertEquals(setOf("uid-other", "anon-1"), viewModel.household.value?.memberIds)
-        assertNull(viewModel.errorMessage.value)
+        assertNull(viewModel.error.value)
     }
 
     @Test
@@ -91,7 +93,10 @@ class AuthViewModelTest {
 
         viewModel.joinHousehold("NOPE12")
 
-        assertEquals(R.string.join_invalid_code, viewModel.errorMessage.value)
+        assertEquals(R.string.join_invalid_code, viewModel.error.value?.message)
+        // Placement is behaviour here: the section is tall, and this message
+        // belongs at the code field rather than above the create-household form.
+        assertEquals(ErrorSpot.JOIN, viewModel.error.value?.spot)
         assertNull(viewModel.household.value)
     }
 
@@ -161,6 +166,6 @@ class AuthViewModelTest {
         // The leave succeeded; a leftover account is not worth an error the
         // user can do nothing about.
         assertNull(viewModel.household.value)
-        assertNull(viewModel.errorMessage.value)
+        assertNull(viewModel.error.value)
     }
 }

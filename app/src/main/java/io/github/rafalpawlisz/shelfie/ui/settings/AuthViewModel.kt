@@ -25,6 +25,20 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/** Where in the household section a failure has to be shown. */
+enum class ErrorSpot {
+    /** By the name field and the create button. */
+    CREATE,
+
+    /** By the code field and the join button. */
+    JOIN,
+
+    /** Anything not tied to a form: renaming, leaving. */
+    SECTION,
+}
+
+data class HouseholdError(val message: Int, val spot: ErrorSpot)
+
 /**
  * The household half of the settings screen. There is no account half: the
  * install signs itself in anonymously and the invite code does the rest, so
@@ -50,10 +64,12 @@ class AuthViewModel(
         )
 
     // Failures show INSIDE the settings dialog — a snackbar would render
-    // behind its scrim. Cleared when a new attempt starts and when the dialog
-    // closes.
-    private val _errorMessage = MutableStateFlow<Int?>(null)
-    val errorMessage: StateFlow<Int?> = _errorMessage
+    // behind its scrim — and the message carries where it belongs, because the
+    // section holds two forms with a lot of screen between them: "no household
+    // found for that code" printed above the create-household field is a
+    // riddle. Cleared when a new attempt starts and when the dialog closes.
+    private val _error = MutableStateFlow<HouseholdError?>(null)
+    val error: StateFlow<HouseholdError?> = _error
 
     /**
      * Invite code of the household this device last belonged to. Shown when
@@ -77,7 +93,7 @@ class AuthViewModel(
     }
 
     fun clearError() {
-        _errorMessage.value = null
+        _error.value = null
     }
 
     fun createHousehold(name: String) {
@@ -89,7 +105,7 @@ class AuthViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household creation failed", e)
-                _errorMessage.value = errorMessageFor(e)
+                _error.value = HouseholdError(errorMessageFor(e), ErrorSpot.CREATE)
             }
         }
     }
@@ -106,7 +122,7 @@ class AuthViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household rename failed", e)
-                _errorMessage.value = errorMessageFor(e)
+                _error.value = HouseholdError(errorMessageFor(e), ErrorSpot.SECTION)
             }
         }
     }
@@ -138,7 +154,7 @@ class AuthViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Leaving household failed", e)
-                _errorMessage.value = errorMessageFor(e)
+                _error.value = HouseholdError(errorMessageFor(e), ErrorSpot.SECTION)
             }
         }
     }
@@ -165,12 +181,12 @@ class AuthViewModel(
             try {
                 householdRepository.joinHousehold(currentUid(), code)
             } catch (e: InvalidInviteCodeException) {
-                _errorMessage.value = R.string.join_invalid_code
+                _error.value = HouseholdError(R.string.join_invalid_code, ErrorSpot.JOIN)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household join failed", e)
-                _errorMessage.value = errorMessageFor(e)
+                _error.value = HouseholdError(errorMessageFor(e), ErrorSpot.JOIN)
             }
         }
     }

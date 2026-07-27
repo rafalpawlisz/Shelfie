@@ -62,7 +62,7 @@ fun SettingsDialog(
     hasLocalData: Boolean,
     // Code of the household this device last belonged to, if any.
     rememberedInviteCode: String?,
-    errorMessage: Int?,
+    error: HouseholdError?,
     onCreateHousehold: (name: String) -> Unit,
     onJoinHousehold: (code: String) -> Unit,
     onRenameHousehold: (name: String) -> Unit,
@@ -96,17 +96,14 @@ fun SettingsDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 // Errors render inside the dialog (a snackbar would sit behind
-                // its scrim), by the forms they concern.
-                if (errorMessage != null) {
-                    Text(
-                        text = stringResource(errorMessage),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+                // its scrim) and next to the form they concern — the section is
+                // tall enough that a message at the top would be orphaned from
+                // the field that caused it.
+                ErrorText(error, ErrorSpot.SECTION)
                 HouseholdSection(
                     household = household,
                     syncStatus = syncStatus,
+                    error = error,
                     rememberedInviteCode = rememberedInviteCode,
                     onCreate = onCreateHousehold,
                     onRename = { renaming = true },
@@ -363,10 +360,22 @@ private fun SyncStatusRow(status: SyncStatus) {
     }
 }
 
+/** Renders [error] only where it belongs, and nothing anywhere else. */
+@Composable
+private fun ErrorText(error: HouseholdError?, spot: ErrorSpot) {
+    if (error == null || error.spot != spot) return
+    Text(
+        text = stringResource(error.message),
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+}
+
 @Composable
 private fun HouseholdSection(
     household: Household?,
     syncStatus: SyncStatus,
+    error: HouseholdError?,
     rememberedInviteCode: String?,
     onCreate: (name: String) -> Unit,
     onRename: () -> Unit,
@@ -392,6 +401,7 @@ private fun HouseholdSection(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        ErrorText(error, ErrorSpot.CREATE)
         Button(
             onClick = { onCreate(name) },
             enabled = name.isNotBlank(),
@@ -447,6 +457,7 @@ private fun HouseholdSection(
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
+    ErrorText(error, ErrorSpot.JOIN)
     OutlinedButton(
         onClick = {
             onJoin(code)

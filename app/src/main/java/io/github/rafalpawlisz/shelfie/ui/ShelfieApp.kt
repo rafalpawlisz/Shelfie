@@ -259,7 +259,7 @@ fun ShelfieApp(
     }
 
     if (showSettings) {
-        val errorMessage by authViewModel.errorMessage.collectAsStateWithLifecycle()
+        val error by authViewModel.error.collectAsStateWithLifecycle()
         val rememberedInviteCode by
             authViewModel.rememberedInviteCode.collectAsStateWithLifecycle()
         val syncStatus by authViewModel.syncStatus.collectAsStateWithLifecycle()
@@ -271,7 +271,7 @@ fun ShelfieApp(
                 state.lists.isNotEmpty() ||
                 state.archivedLists.isNotEmpty(),
             rememberedInviteCode = rememberedInviteCode,
-            errorMessage = errorMessage,
+            error = error,
             onCreateHousehold = authViewModel::createHousehold,
             onJoinHousehold = authViewModel::joinHousehold,
             onRenameHousehold = authViewModel::renameHousehold,
