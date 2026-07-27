@@ -67,6 +67,10 @@ fun ShelfieApp(
     var currentTab by rememberSaveable { mutableStateOf(ShelfieTab.PRODUCTS) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var showAddToListDialog by rememberSaveable { mutableStateOf(false) }
+    // The picker's detour through the product form: the name on the way there,
+    // the created product's id on the way back.
+    var newProductForListName by rememberSaveable { mutableStateOf<String?>(null) }
+    var newProductForListId by rememberSaveable { mutableStateOf<String?>(null) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var editedProductId by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -316,19 +320,65 @@ fun ShelfieApp(
         )
     }
 
+    // A product created from the picker comes back through the ViewModel; the
+    // picker reopens with it chosen, so the trip through the product form ends
+    // where it started instead of dropping the user back on the list.
+    val createdForList by viewModel.productForList.collectAsStateWithLifecycle()
+    LaunchedEffect(createdForList) {
+        val id = createdForList ?: return@LaunchedEffect
+        newProductForListId = id
+        showAddToListDialog = true
+        viewModel.clearProductForList()
+    }
+
     if (showAddToListDialog) {
         AddShoppingItemDialog(
             products = state.products,
             items = state.shoppingList,
+            preselectProductId = newProductForListId,
             onConfirm = { productId, amount, note ->
                 viewModel.addToShoppingList(productId, amount, note)
                 showAddToListDialog = false
+                newProductForListId = null
             },
-            onCreateAndConfirm = { name, amount, note ->
-                viewModel.createAndAddToShoppingList(name, amount, note)
+            // Creating goes through the same full form as the Products tab —
+            // one meaning for "add a product". The picker steps aside for it.
+            onCreateProduct = { name ->
                 showAddToListDialog = false
+                newProductForListName = name
             },
-            onDismiss = { showAddToListDialog = false },
+            onDismiss = {
+                showAddToListDialog = false
+                newProductForListId = null
+            },
+        )
+    }
+
+    val newForListName = newProductForListName
+    if (newForListName != null) {
+        ProductFormDialog(
+            title = stringResource(R.string.add_product),
+            confirmLabel = stringResource(R.string.action_add),
+            initialName = newForListName,
+            stateKey = newForListName,
+            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, added, _ ->
+                viewModel.addProductForList(
+                    name = name,
+                    quantity = quantity,
+                    unit = unit,
+                    minQuantity = minQuantity,
+                    notes = notes,
+                    emoji = emoji,
+                    barcodes = added,
+                )
+                newProductForListName = null
+            },
+            onDismiss = {
+                // Backing out of the form returns to the picker with the typed
+                // name still there, rather than to the bare list.
+                newProductForListName = null
+                showAddToListDialog = true
+            },
         )
     }
 

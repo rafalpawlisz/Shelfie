@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -105,58 +106,63 @@ class PantryViewModelTest {
     }
 
     @Test
-    fun `a name the pantry lacks is created and listed in one step`() = runTest {
+    fun `a product created from the picker comes back for the amount step`() = runTest {
         val repository = FakeProductRepository()
-        val lists = FakeShoppingListRepository(repository)
-        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
-        lists.createList("Sklep")
 
-        viewModel.createAndAddToShoppingList("groszek", amount = 2, note = "puszka")
+        viewModel.addProductForList(
+            name = "groszek",
+            quantity = 0,
+            unit = "puszka",
+            minQuantity = 2,
+            emoji = "🫘",
+        )
 
         val product = viewModel.uiState.value.products.single()
         assertEquals("groszek", product.name)
-        // The same suggester the product form uses, so the row is not blank.
+        // The full form's fields survive the trip — that is the point of using
+        // it instead of creating from the name alone.
+        assertEquals("puszka", product.unit)
+        assertEquals(2, product.minQuantity)
         assertEquals("🫘", product.emoji)
-        val item = viewModel.uiState.value.shoppingList.single()
-        assertEquals(product.id, item.productId)
-        assertEquals(2, item.amount)
-        assertEquals("puszka", item.note)
+        // Handed back so the picker can continue with it, and only once.
+        assertEquals(product.id, viewModel.productForList.value)
+        viewModel.clearProductForList()
+        assertNull(viewModel.productForList.value)
     }
 
     @Test
     fun `an archived product of that name is restored instead of duplicated`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Groszek", quantity = 0, unit = null)
-        val lists = FakeShoppingListRepository(repository)
-        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
-        lists.createList("Sklep")
         val id = viewModel.uiState.value.products.single().id
         viewModel.archive(id)
 
-        // Typed with different case and spacing — still the same product.
-        viewModel.createAndAddToShoppingList("  groszek ", amount = null)
+        // Typed with different case and spacing — still the same product, now
+        // carrying what was entered in the form.
+        viewModel.addProductForList(name = "  groszek ", quantity = 1, unit = "puszka")
 
         assertTrue(viewModel.uiState.value.archivedProducts.isEmpty())
-        assertEquals(listOf("Groszek"), viewModel.uiState.value.products.map { it.name })
-        assertEquals(id, viewModel.uiState.value.shoppingList.single().productId)
+        val product = viewModel.uiState.value.products.single()
+        assertEquals(id, product.id)
+        assertEquals("groszek", product.name)
+        assertEquals("puszka", product.unit)
+        assertEquals(id, viewModel.productForList.value)
     }
 
     @Test
-    fun `creating from the picker needs a list and a name`() = runTest {
+    fun `a blank name creates nothing`() = runTest {
         val repository = FakeProductRepository()
-        val lists = FakeShoppingListRepository(repository)
-        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
 
-        // No list selected yet: nothing to add to, so nothing is created either.
-        viewModel.createAndAddToShoppingList("groszek", amount = null)
-        assertTrue(viewModel.uiState.value.products.isEmpty())
+        viewModel.addProductForList(name = "   ", quantity = 0, unit = null)
 
-        lists.createList("Sklep")
-        viewModel.createAndAddToShoppingList("   ", amount = null)
         assertTrue(viewModel.uiState.value.products.isEmpty())
+        assertNull(viewModel.productForList.value)
     }
 
     @Test

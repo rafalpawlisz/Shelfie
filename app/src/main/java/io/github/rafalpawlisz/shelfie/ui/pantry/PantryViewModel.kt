@@ -330,38 +330,56 @@ class PantryViewModel(
     }
 
     /**
-     * Put a product the pantry does not have yet on a list, creating it on the
-     * way. This is where people notice something is missing — mid-list, not on
-     * the Products tab — so the detour through that tab is removed.
+     * The product just created from the shopping-list picker, so the picker can
+     * carry on with it. Null once the UI has taken it, which
+     * [clearProductForList] says explicitly rather than leaving a stale id to
+     * reopen the dialog on the next recomposition.
+     */
+    private val _productForList = MutableStateFlow<String?>(null)
+    val productForList: StateFlow<String?> = _productForList
+
+    fun clearProductForList() {
+        _productForList.value = null
+    }
+
+    /**
+     * Create a product from inside the list picker, through the same full form
+     * the Products tab uses — one meaning for "add a product", not two.
+     * Publishes the id through [productForList] so the picker can continue to
+     * the amount step with it.
      *
      * A name the pantry already knows reaches that product instead of making a
-     * second one: an archived match is restored, because "groszek" typed here
-     * means the groszek that exists, not a duplicate of it. The emoji comes
-     * from the same suggester the product form uses.
+     * second one: an archived match is restored and updated with what was
+     * entered, because "groszek" typed here means the groszek that exists.
      */
-    fun createAndAddToShoppingList(name: String, amount: Int?, note: String? = null) {
-        val listId = selectedListId.value ?: return
+    fun addProductForList(
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int? = null,
+        notes: String? = null,
+        emoji: String? = null,
+        barcodes: List<String> = emptyList(),
+    ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
             val existing = repository.findByName(trimmed)
-            val productId = when {
-                existing == null -> repository.addProduct(
-                    name = trimmed,
-                    quantity = 0,
-                    unit = null,
-                    minQuantity = null,
-                    notes = null,
-                    emoji = EmojiSuggester.suggest(trimmed),
-                )
-                // Restore only what is actually archived; asked of the database
-                // rather than of uiState, which reports nothing when the screen
-                // is not collecting.
-                else -> existing.id.also { id ->
-                    if (repository.getActiveProduct(id) == null) repository.restoreProduct(id)
+            val id = if (existing == null) {
+                repository.addProduct(trimmed, quantity, unit, minQuantity, notes, emoji)
+            } else {
+                // Restoring is asked of the database rather than of uiState,
+                // which reports nothing when the screen is not collecting.
+                if (repository.getActiveProduct(existing.id) == null) {
+                    repository.restoreProduct(existing.id)
                 }
+                repository.updateProduct(
+                    existing.id, trimmed, quantity, unit, minQuantity, notes, emoji,
+                )
+                existing.id
             }
-            shoppingListRepository.addItem(listId, productId, amount, note)
+            barcodes.forEach { barcodeRepository.addBarcode(id, it) }
+            _productForList.value = id
         }
     }
 

@@ -27,7 +27,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import io.github.rafalpawlisz.shelfie.R
-import io.github.rafalpawlisz.shelfie.emoji.EmojiSuggester
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 
@@ -42,13 +41,16 @@ fun AddShoppingItemDialog(
     products: List<Product>,
     items: List<ShoppingListItem>,
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
-    // A name the pantry does not have yet: create the product and list it in
-    // one go. This is where the gap gets noticed, so this is where it is fixed.
-    onCreateAndConfirm: (name: String, amount: Int?, note: String?) -> Unit,
+    // A name the pantry does not have yet: hands it to the product form, which
+    // is the one place a product is created. The caller reopens this dialog
+    // with the new product in [preselectProductId] once it exists.
+    onCreateProduct: (name: String) -> Unit,
     onDismiss: () -> Unit,
+    preselectProductId: String? = null,
 ) {
-    var selectedProductId by rememberSaveable { mutableStateOf<String?>(null) }
-    var newProductName by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedProductId by rememberSaveable(preselectProductId) {
+        mutableStateOf(preselectProductId)
+    }
     val selectedProduct = products.firstOrNull { it.id == selectedProductId }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -62,8 +64,7 @@ fun AddShoppingItemDialog(
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
-                val pendingName = newProductName
-                if (selectedProduct == null && pendingName == null) {
+                if (selectedProduct == null) {
                     // The search stays even with an empty pantry: typing a name
                     // and creating it here is the shortest way out of "no
                     // products yet", better than a sign pointing at another tab.
@@ -86,7 +87,7 @@ fun AddShoppingItemDialog(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Button(
-                            onClick = { newProductName = query.trim() },
+                            onClick = { onCreateProduct(query.trim()) },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(stringResource(R.string.add_product_named, query.trim()))
@@ -109,7 +110,7 @@ fun AddShoppingItemDialog(
                             Text(stringResource(R.string.action_cancel))
                         }
                     }
-                } else if (selectedProduct != null) {
+                } else {
                     AmountPhase(
                         title = listOfNotNull(selectedProduct.emoji, selectedProduct.name)
                             .joinToString(" "),
@@ -117,20 +118,6 @@ fun AddShoppingItemDialog(
                         existing = items.firstOrNull { it.productId == selectedProduct.id },
                         onConfirm = { amount, note ->
                             onConfirm(selectedProduct.id, amount, note)
-                        },
-                        onDismiss = onDismiss,
-                    )
-                } else if (pendingName != null) {
-                    AmountPhase(
-                        // The emoji the product is about to get, shown before it
-                        // exists, so the guess is visible while it can be undone
-                        // by simply going back.
-                        title = listOfNotNull(EmojiSuggester.suggest(pendingName), pendingName)
-                            .joinToString(" "),
-                        resetKey = pendingName,
-                        existing = null,
-                        onConfirm = { amount, note ->
-                            onCreateAndConfirm(pendingName, amount, note)
                         },
                         onDismiss = onDismiss,
                     )
