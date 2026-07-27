@@ -62,12 +62,12 @@ class AppContainer(private val context: Context) {
     @OptIn(ExperimentalCoroutinesApi::class)
     val syncEngine: DiffSyncEngine by lazy {
         DiffSyncEngine(
-            householdIds = authRepository.observeUser()
-                .flatMapLatest { user ->
-                    if (user == null) {
+            householdIds = authRepository.observeUid()
+                .flatMapLatest { uid ->
+                    if (uid == null) {
                         flowOf(null)
                     } else {
-                        householdRepository.observeHousehold(user.uid)
+                        householdRepository.observeHousehold(uid)
                     }
                 }
                 .map { it?.id },
@@ -93,7 +93,7 @@ class AppContainer(private val context: Context) {
                 // offset is what keeps this device's timestamps comparable with
                 // the other one's. ensureSignedIn is a local read here: a
                 // session only exists because a signed-in user has a household.
-                val uid = authRepository.ensureSignedIn().uid
+                val uid = authRepository.ensureSignedIn()
                 householdRepository.markHouseholdActive(householdId, uid)?.let { offset ->
                     if (offset != syncStateStore.clockOffsetMillis) {
                         Log.i("SyncEngine", "clock offset vs server: ${offset}ms")

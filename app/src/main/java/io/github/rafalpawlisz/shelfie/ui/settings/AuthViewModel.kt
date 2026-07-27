@@ -1,30 +1,17 @@
 package io.github.rafalpawlisz.shelfie.ui.settings
 
-import android.content.Context
 import android.util.Log
-import androidx.credentials.CredentialManager
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.exceptions.GetCredentialCancellationException
-import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseNetworkException
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.ShelfieApplication
 import io.github.rafalpawlisz.shelfie.data.AuthRepository
-import io.github.rafalpawlisz.shelfie.data.AuthUser
 import io.github.rafalpawlisz.shelfie.data.HouseholdRepository
 import io.github.rafalpawlisz.shelfie.data.InvalidInviteCodeException
-import io.github.rafalpawlisz.shelfie.data.LinkOutcome
-import io.github.rafalpawlisz.shelfie.data.SignInResult
 import io.github.rafalpawlisz.shelfie.data.sync.SyncStateStore
 import io.github.rafalpawlisz.shelfie.data.sync.SyncStatus
 import io.github.rafalpawlisz.shelfie.model.Household
@@ -33,12 +20,16 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/**
+ * The household half of the settings screen. There is no account half: the
+ * install signs itself in anonymously and the invite code does the rest, so
+ * every action here starts by making sure a uid exists.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthViewModel(
     private val authRepository: AuthRepository,
@@ -47,16 +38,10 @@ class AuthViewModel(
     val syncStatus: StateFlow<SyncStatus>,
 ) : ViewModel() {
 
-    val user: StateFlow<AuthUser?> = authRepository.observeUser().stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = null,
-    )
-
-    /** The current user's household; null while they are not in one. */
-    val household: StateFlow<Household?> = authRepository.observeUser()
-        .flatMapLatest { user ->
-            if (user == null) flowOf(null) else householdRepository.observeHousehold(user.uid)
+    /** The current household; null while this device is not in one. */
+    val household: StateFlow<Household?> = authRepository.observeUid()
+        .flatMapLatest { uid ->
+            if (uid == null) flowOf(null) else householdRepository.observeHousehold(uid)
         }
         .stateIn(
             scope = viewModelScope,
@@ -65,29 +50,23 @@ class AuthViewModel(
         )
 
     // Failures show INSIDE the settings dialog — a snackbar would render
-    // behind its scrim — and next to the form they concern, which is why
-    // there are two channels rather than one: "no connection" can come from
-    // either half, and the half it came from is the useful part.
-    // Cleared when a new attempt starts and when the dialog closes. User
-    // cancellation of the account picker is deliberately not an error.
-    private val _accountError = MutableStateFlow<Int?>(null)
-    val accountError: StateFlow<Int?> = _accountError
-
-    private val _householdError = MutableStateFlow<Int?>(null)
-    val householdError: StateFlow<Int?> = _householdError
+    // behind its scrim. Cleared when a new attempt starts and when the dialog
+    // closes.
+    private val _errorMessage = MutableStateFlow<Int?>(null)
+    val errorMessage: StateFlow<Int?> = _errorMessage
 
     /**
      * Invite code of the household this device last belonged to. Shown when
-     * there is no current household, so a member who lost their identity (or
-     * simply left) can see the way back instead of being told a code exists.
+     * there is no current household, so whoever left can see the way back
+     * instead of being told a code exists.
      */
     private val _rememberedInviteCode = MutableStateFlow(syncState.lastHouseholdInviteCode)
     val rememberedInviteCode: StateFlow<String?> = _rememberedInviteCode
 
     init {
         // The invite code is only visible from inside the household, so it has
-        // to be captured while we are there — after an identity switch or a
-        // leave there is nothing left to read it from.
+        // to be captured while we are there — after leaving there is nothing
+        // left to read it from.
         viewModelScope.launch {
             household.collect { current ->
                 val code = current?.inviteCode ?: return@collect
@@ -97,129 +76,12 @@ class AuthViewModel(
         }
     }
 
-    fun clearErrors() {
-        _accountError.value = null
-        _householdError.value = null
-    }
-
-    /**
-     * Attach a Google account to this install: Credential Manager picks the
-     * account (needs an Activity context for its UI), then the token goes
-     * through [signInWithGoogleToken].
-     */
-    fun signIn(activityContext: Context) {
-        clearErrors()
-        viewModelScope.launch {
-            val idToken = requestGoogleIdToken(activityContext) ?: return@launch
-            authenticateAndSettle { authRepository.linkOrSignInWithGoogle(idToken) }
-        }
-    }
-
-    /**
-     * The device-independent half of the Google flow. Public because that
-     * boundary is where the interesting behaviour lives — linking versus
-     * taking over an account — and Credential Manager cannot run off-device.
-     */
-    fun signInWithGoogleToken(idToken: String) {
-        clearErrors()
-        viewModelScope.launch {
-            authenticateAndSettle { authRepository.linkOrSignInWithGoogle(idToken) }
-        }
-    }
-
-    fun signInWithEmail(email: String, password: String) {
-        clearErrors()
-        viewModelScope.launch {
-            authenticateAndSettle { authRepository.signInWithEmail(email.trim(), password) }
-        }
-    }
-
-    /** Null on cancellation (not an error) or a failure already reported. */
-    private suspend fun requestGoogleIdToken(activityContext: Context): String? {
-        val option = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)
-            .setServerClientId(activityContext.getString(R.string.default_web_client_id))
-            .build()
-        val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
-        try {
-            val credential = CredentialManager.create(activityContext)
-                .getCredential(activityContext, request)
-                .credential
-            if (
-                credential is CustomCredential &&
-                credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-            ) {
-                return GoogleIdTokenCredential.createFrom(credential.data).idToken
-            }
-            _accountError.value = R.string.sign_in_failed
-        } catch (_: GetCredentialCancellationException) {
-            // The user backed out of the account picker — not an error.
-        } catch (e: GetCredentialException) {
-            Log.w("AuthViewModel", "Google sign-in failed", e)
-            _accountError.value = R.string.sign_in_failed
-        }
-        return null
-    }
-
-    private suspend fun authenticateAndSettle(authenticate: suspend () -> SignInResult) {
-        try {
-            settle(authenticate())
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.w("AuthViewModel", "Sign-in failed", e)
-            _accountError.value = signInErrorMessage(e)
-        }
-    }
-
-    /**
-     * Finish a sign-in. Linking keeps the uid, so the household comes along by
-     * itself; taking over an existing identity does not, and that identity has
-     * to be put back into the household by code.
-     */
-    private suspend fun settle(result: SignInResult) {
-        if (result.outcome == LinkOutcome.LINKED) return
-        // The new identity's own household wins. The common case for a switch
-        // is the same person's second device, which is already in one, and
-        // joining over it would be a switch nobody asked for.
-        if (householdRepository.observeHousehold(result.user.uid).first() != null) return
-        val code = syncState.lastHouseholdInviteCode ?: return
-        try {
-            householdRepository.joinHousehold(result.user.uid, code)
-        } catch (e: InvalidInviteCodeException) {
-            // The household is gone (deleted while we were away). The sign-in
-            // itself succeeded, so say what failed, not that everything did.
-            Log.w("AuthViewModel", "household recovery found no household for the code", e)
-            _householdError.value = R.string.link_household_lost
-        }
-    }
-
-    /**
-     * "No network" and "wrong credentials" demand different user reactions
-     * (retry later vs retype) — a generic failure message conflates them,
-     * which already misled a real debugging session once.
-     */
-    private fun signInErrorMessage(e: Exception): Int = when (e) {
-        is FirebaseNetworkException -> R.string.sign_in_error_network
-        is FirebaseAuthInvalidUserException,
-        is FirebaseAuthInvalidCredentialsException,
-        -> R.string.sign_in_error_credentials
-
-        else -> R.string.sign_in_failed
-    }
-
-    /** Household actions can now be the first thing that ever needs an identity. */
-    private fun householdErrorMessage(e: Exception): Int = when (e) {
-        is FirebaseNetworkException -> R.string.sign_in_error_network
-        else -> R.string.household_error
-    }
-
-    fun signOut() {
-        authRepository.signOut()
+    fun clearError() {
+        _errorMessage.value = null
     }
 
     fun createHousehold(name: String) {
-        clearErrors()
+        clearError()
         viewModelScope.launch {
             try {
                 householdRepository.createHousehold(currentUid(), name.trim())
@@ -227,7 +89,7 @@ class AuthViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household creation failed", e)
-                _householdError.value = householdErrorMessage(e)
+                _errorMessage.value = errorMessageFor(e)
             }
         }
     }
@@ -236,7 +98,7 @@ class AuthViewModel(
         val householdId = household.value?.id ?: return
         val trimmed = name.trim()
         if (trimmed.isEmpty() || trimmed == household.value?.name) return
-        clearErrors()
+        clearError()
         viewModelScope.launch {
             try {
                 householdRepository.renameHousehold(householdId, trimmed)
@@ -244,51 +106,65 @@ class AuthViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household rename failed", e)
-                _householdError.value = R.string.household_error
+                _errorMessage.value = errorMessageFor(e)
             }
         }
     }
 
     /** The UI confirms leaving before calling this. */
     fun leaveHousehold() {
-        val uid = user.value?.uid ?: return
-        clearErrors()
+        clearError()
         viewModelScope.launch {
             try {
-                householdRepository.leaveHousehold(uid)
+                householdRepository.leaveHousehold(currentUid())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Leaving household failed", e)
-                _householdError.value = R.string.household_error
+                _errorMessage.value = errorMessageFor(e)
             }
         }
     }
 
     /** The UI confirms switching households before calling this. */
     fun joinHousehold(code: String) {
-        clearErrors()
+        clearError()
         viewModelScope.launch {
             try {
                 householdRepository.joinHousehold(currentUid(), code)
             } catch (e: InvalidInviteCodeException) {
-                _householdError.value = R.string.join_invalid_code
+                _errorMessage.value = R.string.join_invalid_code
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household join failed", e)
-                _householdError.value = householdErrorMessage(e)
+                _errorMessage.value = errorMessageFor(e)
             }
         }
     }
 
     /**
-     * The uid to act as, signing in anonymously if this install has no
-     * identity yet — which is the normal state on a first launch, and the
-     * reason nothing here is gated behind a sign-in screen.
+     * "No network" and "something broke" demand different reactions — retry
+     * later versus tell someone — and a household action can be the first
+     * thing on a fresh install that ever touches the network, since that is
+     * when the anonymous account gets created.
      */
-    private suspend fun currentUid(): String =
-        user.value?.uid ?: authRepository.ensureSignedIn().uid
+    private fun errorMessageFor(e: Exception): Int = when (e) {
+        is FirebaseNetworkException -> R.string.error_network
+        else -> R.string.household_error
+    }
+
+    /**
+     * The uid to act as, signing in anonymously if this install has no
+     * identity yet — normal on a first launch, and the reason nothing here is
+     * gated behind a sign-in screen.
+     *
+     * Deliberately asked for every time rather than cached in a StateFlow: a
+     * WhileSubscribed flow that nothing collects reports null forever, and the
+     * first version of this read one, which made leaving a household a no-op.
+     * The repository answers from memory when a session already exists.
+     */
+    private suspend fun currentUid(): String = authRepository.ensureSignedIn()
 
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {

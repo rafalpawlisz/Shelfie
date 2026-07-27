@@ -63,7 +63,6 @@ fun ShelfieApp(
     authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val authUser by authViewModel.user.collectAsStateWithLifecycle()
     val household by authViewModel.household.collectAsStateWithLifecycle()
     var currentTab by rememberSaveable { mutableStateOf(ShelfieTab.PRODUCTS) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
@@ -260,13 +259,11 @@ fun ShelfieApp(
     }
 
     if (showSettings) {
-        val accountError by authViewModel.accountError.collectAsStateWithLifecycle()
-        val householdError by authViewModel.householdError.collectAsStateWithLifecycle()
+        val errorMessage by authViewModel.errorMessage.collectAsStateWithLifecycle()
         val rememberedInviteCode by
             authViewModel.rememberedInviteCode.collectAsStateWithLifecycle()
         val syncStatus by authViewModel.syncStatus.collectAsStateWithLifecycle()
         SettingsDialog(
-            user = authUser,
             household = household,
             syncStatus = syncStatus,
             hasLocalData = state.products.isNotEmpty() ||
@@ -274,18 +271,14 @@ fun ShelfieApp(
                 state.lists.isNotEmpty() ||
                 state.archivedLists.isNotEmpty(),
             rememberedInviteCode = rememberedInviteCode,
-            accountError = accountError,
-            householdError = householdError,
-            onSignIn = { authViewModel.signIn(context) },
-            onSignInWithEmail = authViewModel::signInWithEmail,
-            onSignOut = authViewModel::signOut,
+            errorMessage = errorMessage,
             onCreateHousehold = authViewModel::createHousehold,
             onJoinHousehold = authViewModel::joinHousehold,
             onRenameHousehold = authViewModel::renameHousehold,
             onLeaveHousehold = authViewModel::leaveHousehold,
             onDismiss = {
                 showSettings = false
-                authViewModel.clearErrors()
+                authViewModel.clearError()
             },
         )
     }

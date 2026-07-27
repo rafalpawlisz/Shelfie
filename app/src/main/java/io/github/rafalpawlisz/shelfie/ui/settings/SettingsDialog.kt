@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,39 +29,31 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import io.github.rafalpawlisz.shelfie.R
 import android.text.format.DateUtils
-import io.github.rafalpawlisz.shelfie.data.AuthUser
 import io.github.rafalpawlisz.shelfie.data.sync.SyncStatus
 import io.github.rafalpawlisz.shelfie.model.Household
 import io.github.rafalpawlisz.shelfie.ui.theme.warning
 
 /**
- * Minimal settings surface: an account section and a household section.
+ * Minimal settings surface: the household this device shares its pantry with.
  *
- * Neither gates the other. The app gives every install an anonymous identity,
- * so a household can be created or joined without signing in anywhere; a
- * Google account is offered as insurance against losing the device, not as
- * the way in.
+ * There is no account section. The install gets an anonymous identity by
+ * itself, and the invite code is what reaches a household from anywhere — so
+ * a sign-in would add a screen without adding a capability. Designed to grow
+ * (a dynamic-color toggle, say) without changing its entry point.
  */
 @Composable
 fun SettingsDialog(
-    user: AuthUser?,
     household: Household?,
     syncStatus: SyncStatus,
     // Whether this device holds pantry data that joining would overwrite.
     hasLocalData: Boolean,
     // Code of the household this device last belonged to, if any.
     rememberedInviteCode: String?,
-    accountError: Int?,
-    householdError: Int?,
-    onSignIn: () -> Unit,
-    onSignInWithEmail: (email: String, password: String) -> Unit,
-    onSignOut: () -> Unit,
+    errorMessage: Int?,
     onCreateHousehold: (name: String) -> Unit,
     onJoinHousehold: (code: String) -> Unit,
     onRenameHousehold: (name: String) -> Unit,
@@ -75,7 +65,6 @@ fun SettingsDialog(
     // would poison low-stock and barcode lookups). Never do that silently:
     // hold the code until the user confirms.
     var pendingJoinCode by rememberSaveable { mutableStateOf<String?>(null) }
-    var confirmSignOut by rememberSaveable { mutableStateOf(false) }
     var confirmLeave by rememberSaveable { mutableStateOf(false) }
     var renaming by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
@@ -93,94 +82,22 @@ fun SettingsDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.settings_account_section),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                // No account, or one the app made for itself: offer to secure
-                // it. Signing out is deliberately absent here — an anonymous
-                // identity cannot be signed back into, so "sign out" would
-                // only throw away the way back into the household.
-                if (user == null || user.isAnonymous) {
-                    Text(stringResource(R.string.account_anonymous_hint))
-                    Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.account_secure_with_google))
-                    }
-                    // The email form exists for console-made test accounts, so
-                    // it stays out of the way until asked for.
-                    var showEmailForm by rememberSaveable { mutableStateOf(false) }
-                    if (showEmailForm) {
-                        var email by rememberSaveable { mutableStateOf("") }
-                        // Deliberately not saveable: saved instance state is
-                        // written to a Bundle the system may persist, and a
-                        // plaintext password has no business there. Losing it
-                        // on rotation is the right trade.
-                        var password by remember { mutableStateOf("") }
-                        OutlinedTextField(
-                            value = email,
-                            onValueChange = { email = it },
-                            label = { Text(stringResource(R.string.email_label)) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
-                            value = password,
-                            onValueChange = { password = it },
-                            label = { Text(stringResource(R.string.password_label)) },
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedButton(
-                            onClick = { onSignInWithEmail(email, password) },
-                            enabled = email.isNotBlank() && password.isNotBlank(),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(R.string.sign_in_with_email))
-                        }
-                    } else {
-                        TextButton(onClick = { showEmailForm = true }) {
-                            Text(stringResource(R.string.account_other_methods))
-                        }
-                    }
-                } else {
-                    Text(
-                        text = stringResource(
-                            R.string.signed_in_as,
-                            user.displayName ?: user.email ?: user.uid,
-                        ),
-                    )
-                    user.email?.takeIf { user.displayName != null }?.let { email ->
-                        Text(
-                            text = email,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    OutlinedButton(
-                        onClick = { confirmSignOut = true },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.sign_out))
-                    }
-                }
-                // Errors render inside the dialog (a snackbar would sit behind
-                // its scrim), each by the form it concerns.
-                ErrorText(accountError)
-
-                HorizontalDivider()
-                Text(
                     text = stringResource(R.string.household_section),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                ErrorText(householdError)
+                // Errors render inside the dialog (a snackbar would sit behind
+                // its scrim), by the forms they concern.
+                if (errorMessage != null) {
+                    Text(
+                        text = stringResource(errorMessage),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
                 HouseholdSection(
                     household = household,
                     syncStatus = syncStatus,
-                    isAnonymous = user == null || user.isAnonymous,
                     rememberedInviteCode = rememberedInviteCode,
                     onCreate = onCreateHousehold,
                     onRename = { renaming = true },
@@ -201,29 +118,6 @@ fun SettingsDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
         },
     )
-
-    if (confirmSignOut) {
-        AlertDialog(
-            onDismissRequest = { confirmSignOut = false },
-            title = { Text(stringResource(R.string.sign_out_title)) },
-            text = { Text(stringResource(R.string.sign_out_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onSignOut()
-                        confirmSignOut = false
-                    },
-                ) {
-                    Text(stringResource(R.string.sign_out))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmSignOut = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
-    }
 
     if (renaming && household != null) {
         // Cursor after the current name and focus up front — same as the
@@ -359,16 +253,6 @@ fun SettingsDialog(
 }
 
 @Composable
-private fun ErrorText(message: Int?) {
-    if (message == null) return
-    Text(
-        text = stringResource(message),
-        color = MaterialTheme.colorScheme.error,
-        style = MaterialTheme.typography.bodyMedium,
-    )
-}
-
-@Composable
 private fun SyncStatusRow(status: SyncStatus) {
     when (status) {
         // No session (also right after opening, before the first snapshot).
@@ -393,7 +277,6 @@ private fun SyncStatusRow(status: SyncStatus) {
 private fun HouseholdSection(
     household: Household?,
     syncStatus: SyncStatus,
-    isAnonymous: Boolean,
     rememberedInviteCode: String?,
     onCreate: (name: String) -> Unit,
     onRename: () -> Unit,
@@ -402,9 +285,8 @@ private fun HouseholdSection(
 ) {
     if (household == null) {
         Text(stringResource(R.string.household_none_hint))
-        // Whoever was in a household before — after leaving, or after an
-        // identity change that could not rejoin it — needs its code, and this
-        // is the only place left that knows it.
+        // Whoever was in a household before needs its code, and this is the
+        // only place left that knows it.
         rememberedInviteCode?.let { code ->
             Text(
                 text = stringResource(R.string.household_last_code, code),
@@ -446,15 +328,13 @@ private fun HouseholdSection(
         Text(
             text = stringResource(R.string.household_invite_code, household.inviteCode),
         )
-        // Without an account the code is not just an invitation, it is the only
-        // way back in. Say so where the code is, not in a help screen.
-        if (isAnonymous) {
-            Text(
-                text = stringResource(R.string.household_code_keep_hint),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.warning,
-            )
-        }
+        // The code is not just an invitation, it is the only way back in. Say
+        // so where the code is, not in a help screen.
+        Text(
+            text = stringResource(R.string.household_code_keep_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.warning,
+        )
         Text(
             text = pluralStringResource(
                 R.plurals.household_members,
