@@ -93,6 +93,13 @@ class FakeProductRepository : ProductRepository {
      */
     var referencedProductIds: Set<String> = emptySet()
 
+    override suspend fun findByName(name: String): Product? {
+        val wanted = name.trim()
+        return entries.value
+            .firstOrNull { it.product.name.trim().equals(wanted, ignoreCase = true) }
+            ?.product
+    }
+
     override suspend fun deleteArchivedProduct(id: String): Boolean {
         // Mirrors the DAO's transaction: archived and unreferenced, or nothing
         // happens at all.

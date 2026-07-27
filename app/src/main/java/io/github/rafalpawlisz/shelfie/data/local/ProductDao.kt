@@ -83,6 +83,11 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE id = :id AND archivedAt IS NULL")
     suspend fun getActive(id: String): ProductEntity?
 
+    // Name lookups are done in Kotlin: SQLite's NOCASE is ASCII-only, so it
+    // would consider "Żurawina" and "żurawina" different products.
+    @Query("SELECT * FROM products")
+    suspend fun getAll(): List<ProductEntity>
+
     @Upsert
     suspend fun upsert(product: ProductEntity)
 

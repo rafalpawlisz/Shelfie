@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.emoji.EmojiSuggester
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 
@@ -40,9 +42,13 @@ fun AddShoppingItemDialog(
     products: List<Product>,
     items: List<ShoppingListItem>,
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
+    // A name the pantry does not have yet: create the product and list it in
+    // one go. This is where the gap gets noticed, so this is where it is fixed.
+    onCreateAndConfirm: (name: String, amount: Int?, note: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedProductId by rememberSaveable { mutableStateOf<String?>(null) }
+    var newProductName by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedProduct = products.firstOrNull { it.id == selectedProductId }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -56,36 +62,45 @@ fun AddShoppingItemDialog(
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
-                if (selectedProduct == null) {
-                    if (products.isEmpty()) {
+                val pendingName = newProductName
+                if (selectedProduct == null && pendingName == null) {
+                    // The search stays even with an empty pantry: typing a name
+                    // and creating it here is the shortest way out of "no
+                    // products yet", better than a sign pointing at another tab.
+                    var query by rememberSaveable { mutableStateOf("") }
+                    val visibleProducts = products.filterByName(query)
+                    ProductSearchField(
+                        query = query,
+                        onQueryChange = { query = it },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (query.isBlank() && products.isEmpty()) {
                         Text(
                             text = stringResource(R.string.empty_state_go_to_products),
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                    } else {
-                        var query by rememberSaveable { mutableStateOf("") }
-                        val visibleProducts = products.filterByName(query)
-                        ProductSearchField(
-                            query = query,
-                            onQueryChange = { query = it },
-                            modifier = Modifier.fillMaxWidth(),
+                    }
+                    if (query.isNotBlank() && visibleProducts.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.search_no_results),
+                            style = MaterialTheme.typography.bodyMedium,
                         )
-                        if (query.isNotBlank() && visibleProducts.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.search_no_results),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                        LazyColumn(
-                            modifier = Modifier.heightIn(max = 360.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        Button(
+                            onClick = { newProductName = query.trim() },
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            items(visibleProducts, key = { it.id }) { product ->
-                                ProductListItem(
-                                    product = product,
-                                    onClick = { selectedProductId = product.id },
-                                )
-                            }
+                            Text(stringResource(R.string.add_product_named, query.trim()))
+                        }
+                    }
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(visibleProducts, key = { it.id }) { product ->
+                            ProductListItem(
+                                product = product,
+                                onClick = { selectedProductId = product.id },
+                            )
                         }
                     }
                     Row(modifier = Modifier.fillMaxWidth()) {
@@ -94,11 +109,29 @@ fun AddShoppingItemDialog(
                             Text(stringResource(R.string.action_cancel))
                         }
                     }
-                } else {
+                } else if (selectedProduct != null) {
                     AmountPhase(
-                        product = selectedProduct,
+                        title = listOfNotNull(selectedProduct.emoji, selectedProduct.name)
+                            .joinToString(" "),
+                        resetKey = selectedProduct.id,
                         existing = items.firstOrNull { it.productId == selectedProduct.id },
-                        onConfirm = onConfirm,
+                        onConfirm = { amount, note ->
+                            onConfirm(selectedProduct.id, amount, note)
+                        },
+                        onDismiss = onDismiss,
+                    )
+                } else if (pendingName != null) {
+                    AmountPhase(
+                        // The emoji the product is about to get, shown before it
+                        // exists, so the guess is visible while it can be undone
+                        // by simply going back.
+                        title = listOfNotNull(EmojiSuggester.suggest(pendingName), pendingName)
+                            .joinToString(" "),
+                        resetKey = pendingName,
+                        existing = null,
+                        onConfirm = { amount, note ->
+                            onCreateAndConfirm(pendingName, amount, note)
+                        },
                         onDismiss = onDismiss,
                     )
                 }
@@ -109,25 +142,24 @@ fun AddShoppingItemDialog(
 
 @Composable
 private fun AmountPhase(
-    product: Product,
+    title: String,
+    // Identifies what is being added, so the fields reset when it changes.
+    resetKey: Any,
     existing: ShoppingListItem?,
-    onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
+    onConfirm: (amount: Int?, note: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     // New items start empty (blank = no amount, "just buy it"); an already-listed
     // product shows its current values, so confirming replaces them knowingly.
-    var amountText by rememberSaveable(product.id) {
+    var amountText by rememberSaveable(resetKey) {
         mutableStateOf(existing?.amount?.toString().orEmpty())
     }
     // One-off shopping note; dies with the item at checkout.
-    var noteText by rememberSaveable(product.id) { mutableStateOf(existing?.note.orEmpty()) }
+    var noteText by rememberSaveable(resetKey) { mutableStateOf(existing?.note.orEmpty()) }
     val amount = amountText.trim().toIntOrNull()
     val isValid = amountText.isBlank() || (amount != null && amount > 0)
 
-    Text(
-        text = listOfNotNull(product.emoji, product.name).joinToString(" "),
-        style = MaterialTheme.typography.titleMedium,
-    )
+    Text(text = title, style = MaterialTheme.typography.titleMedium)
     OutlinedTextField(
         value = amountText,
         onValueChange = { amountText = it },
@@ -152,7 +184,6 @@ private fun AmountPhase(
             enabled = isValid,
             onClick = {
                 onConfirm(
-                    product.id,
                     if (amountText.isBlank()) null else amount,
                     noteText.trim().ifBlank { null },
                 )

@@ -105,6 +105,61 @@ class PantryViewModelTest {
     }
 
     @Test
+    fun `a name the pantry lacks is created and listed in one step`() = runTest {
+        val repository = FakeProductRepository()
+        val lists = FakeShoppingListRepository(repository)
+        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        lists.createList("Sklep")
+
+        viewModel.createAndAddToShoppingList("groszek", amount = 2, note = "puszka")
+
+        val product = viewModel.uiState.value.products.single()
+        assertEquals("groszek", product.name)
+        // The same suggester the product form uses, so the row is not blank.
+        assertEquals("🫘", product.emoji)
+        val item = viewModel.uiState.value.shoppingList.single()
+        assertEquals(product.id, item.productId)
+        assertEquals(2, item.amount)
+        assertEquals("puszka", item.note)
+    }
+
+    @Test
+    fun `an archived product of that name is restored instead of duplicated`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Groszek", quantity = 0, unit = null)
+        val lists = FakeShoppingListRepository(repository)
+        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        lists.createList("Sklep")
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.archive(id)
+
+        // Typed with different case and spacing — still the same product.
+        viewModel.createAndAddToShoppingList("  groszek ", amount = null)
+
+        assertTrue(viewModel.uiState.value.archivedProducts.isEmpty())
+        assertEquals(listOf("Groszek"), viewModel.uiState.value.products.map { it.name })
+        assertEquals(id, viewModel.uiState.value.shoppingList.single().productId)
+    }
+
+    @Test
+    fun `creating from the picker needs a list and a name`() = runTest {
+        val repository = FakeProductRepository()
+        val lists = FakeShoppingListRepository(repository)
+        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+
+        // No list selected yet: nothing to add to, so nothing is created either.
+        viewModel.createAndAddToShoppingList("groszek", amount = null)
+        assertTrue(viewModel.uiState.value.products.isEmpty())
+
+        lists.createList("Sklep")
+        viewModel.createAndAddToShoppingList("   ", amount = null)
+        assertTrue(viewModel.uiState.value.products.isEmpty())
+    }
+
+    @Test
     fun `deleting an archived product removes it from the archive`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Kasza", quantity = 0, unit = null)

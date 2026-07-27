@@ -39,6 +39,14 @@ interface ProductRepository {
     suspend fun restoreProduct(id: String)
 
     /**
+     * The product with this name, archived ones included, ignoring case and
+     * surrounding space. Used before creating one, so that typing a name the
+     * pantry already knows reaches that product instead of making a second
+     * one with the same name.
+     */
+    suspend fun findByName(name: String): Product?
+
+    /**
      * Delete an archived product for good, with its barcodes and list-order
      * rows. Returns false and changes nothing when the product is still on a
      * shopping list (archived lists count — they can be restored) or is not

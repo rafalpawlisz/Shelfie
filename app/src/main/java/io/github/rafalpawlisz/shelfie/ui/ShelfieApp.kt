@@ -324,6 +324,10 @@ fun ShelfieApp(
                 viewModel.addToShoppingList(productId, amount, note)
                 showAddToListDialog = false
             },
+            onCreateAndConfirm = { name, amount, note ->
+                viewModel.createAndAddToShoppingList(name, amount, note)
+                showAddToListDialog = false
+            },
             onDismiss = { showAddToListDialog = false },
         )
     }

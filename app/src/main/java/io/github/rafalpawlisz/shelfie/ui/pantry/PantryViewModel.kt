@@ -11,6 +11,7 @@ import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.ProductRepository
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.data.UiPreferences
+import io.github.rafalpawlisz.shelfie.emoji.EmojiSuggester
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
@@ -326,6 +327,42 @@ class PantryViewModel(
     fun addToList(listId: String, productId: String, amount: Int?) {
         uiPreferences.lastRestockListId = listId
         viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount) }
+    }
+
+    /**
+     * Put a product the pantry does not have yet on a list, creating it on the
+     * way. This is where people notice something is missing — mid-list, not on
+     * the Products tab — so the detour through that tab is removed.
+     *
+     * A name the pantry already knows reaches that product instead of making a
+     * second one: an archived match is restored, because "groszek" typed here
+     * means the groszek that exists, not a duplicate of it. The emoji comes
+     * from the same suggester the product form uses.
+     */
+    fun createAndAddToShoppingList(name: String, amount: Int?, note: String? = null) {
+        val listId = selectedListId.value ?: return
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            val existing = repository.findByName(trimmed)
+            val productId = when {
+                existing == null -> repository.addProduct(
+                    name = trimmed,
+                    quantity = 0,
+                    unit = null,
+                    minQuantity = null,
+                    notes = null,
+                    emoji = EmojiSuggester.suggest(trimmed),
+                )
+                // Restore only what is actually archived; asked of the database
+                // rather than of uiState, which reports nothing when the screen
+                // is not collecting.
+                else -> existing.id.also { id ->
+                    if (repository.getActiveProduct(id) == null) repository.restoreProduct(id)
+                }
+            }
+            shoppingListRepository.addItem(listId, productId, amount, note)
+        }
     }
 
     /**

@@ -89,6 +89,7 @@
     <string name="search_placeholder">Search products</string>
     <string name="search_clear">Clear search</string>
     <string name="search_no_results">No products match</string>
+    <string name="add_product_named">Add “%1$s” to your products</string>
     <string name="product_name_label">Name</string>
     <string name="product_quantity_label">Quantity</string>
     <string name="product_unit_label">Unit</string>

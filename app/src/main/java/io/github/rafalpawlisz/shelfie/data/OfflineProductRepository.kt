@@ -93,6 +93,13 @@ class OfflineProductRepository(
         dao.restore(id = id, timestamp = clock.now())
     }
 
+    override suspend fun findByName(name: String): Product? {
+        val wanted = name.trim()
+        return dao.getAll()
+            .firstOrNull { it.name.trim().equals(wanted, ignoreCase = true) }
+            ?.toDomain()
+    }
+
     override suspend fun deleteArchivedProduct(id: String): Boolean {
         val removed = dao.deleteArchivedIfUnused(id) ?: return false
         // A real deletion, so the other device has to hear about it: absence
