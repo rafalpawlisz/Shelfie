@@ -97,6 +97,9 @@
     <string name="cd_remove_barcode">Usuń kod %1$s</string>
     <string name="action_add">Dodaj</string>
     <string name="action_save">Zapisz</string>
+    <string name="action_copy">Kopiuj</string>
+    <string name="action_share">Udostępnij</string>
+    <string name="household_invite_share_text">Dołącz do mojego gospodarstwa w Shelfie tym kodem: %1$s</string>
     <string name="action_archive">Archiwizuj</string>
     <string name="action_restore">Przywróć</string>
     <string name="action_cancel">Anuluj</string>

@@ -19,12 +19,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.res.pluralStringResource
@@ -32,7 +36,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import io.github.rafalpawlisz.shelfie.R
+import android.content.ClipData
+import android.content.Intent
 import android.text.format.DateUtils
+import kotlinx.coroutines.launch
 import io.github.rafalpawlisz.shelfie.data.sync.SyncStatus
 import io.github.rafalpawlisz.shelfie.model.Household
 import io.github.rafalpawlisz.shelfie.ui.theme.warning
@@ -252,6 +259,57 @@ fun SettingsDialog(
     }
 }
 
+/**
+ * The code, with the two ways of getting it off this phone.
+ *
+ * Since there is no account to fall back on, "write it down" is advice the app
+ * has to make actionable: copying puts it somewhere durable, sharing sends it
+ * to the person who needs it. Both beat retyping six characters read off a
+ * screen — and a mistyped code is indistinguishable from a wrong one.
+ */
+@Composable
+private fun InviteCodeRow(code: String) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.household_invite_code, code),
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(
+            onClick = {
+                scope.launch {
+                    // Android 13+ shows its own "copied" confirmation, and a
+                    // dialog cannot host a snackbar anyway.
+                    clipboard.setClipEntry(
+                        ClipEntry(ClipData.newPlainText(code, code)),
+                    )
+                }
+            },
+        ) {
+            Text(stringResource(R.string.action_copy))
+        }
+        TextButton(
+            onClick = {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(
+                        Intent.EXTRA_TEXT,
+                        context.getString(R.string.household_invite_share_text, code),
+                    )
+                }
+                context.startActivity(Intent.createChooser(intent, null))
+            },
+        ) {
+            Text(stringResource(R.string.action_share))
+        }
+    }
+}
+
 @Composable
 private fun SyncStatusRow(status: SyncStatus) {
     when (status) {
@@ -325,9 +383,7 @@ private fun HouseholdSection(
                 Text(stringResource(R.string.household_rename))
             }
         }
-        Text(
-            text = stringResource(R.string.household_invite_code, household.inviteCode),
-        )
+        InviteCodeRow(household.inviteCode)
         // The code is not just an invitation, it is the only way back in. Say
         // so where the code is, not in a help screen.
         Text(
