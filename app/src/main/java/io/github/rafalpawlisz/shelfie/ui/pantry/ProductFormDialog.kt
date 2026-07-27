@@ -49,6 +49,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.emoji.EmojiSuggester
 import io.github.rafalpawlisz.shelfie.ui.scanBarcode
 
 /**
@@ -102,12 +103,20 @@ fun ProductFormDialog(
     }
     var notes by rememberSaveable(stateKey) { mutableStateOf(initialNotes.orEmpty()) }
     var emoji by rememberSaveable(stateKey) { mutableStateOf(initialEmoji.orEmpty()) }
+    var emojiTouched by rememberSaveable(stateKey) { mutableStateOf(!initialEmoji.isNullOrBlank()) }
     // Codes are staged locally and committed with the product on confirm
     // (a new product has no id to attach them to until it is saved).
     var barcodes by rememberSaveable(
         stateKey,
         stateSaver = listSaver<List<String>, String>(save = { it }, restore = { it }),
     ) { mutableStateOf(initialBarcodes) }
+
+    // The emoji fills itself in from the name while the field is untouched. A
+    // product that arrives with one counts as touched: editing "Mleko" must
+    // never silently swap the emoji somebody chose. Suggesting is deliberately
+    // not saved into `emoji` — that keeps "the user picked this" and "we
+    // guessed this" separable across recompositions.
+    val shownEmoji = if (emojiTouched) emoji else EmojiSuggester.suggest(name).orEmpty()
 
     val quantity = quantityText.toIntOrNull()
     val minQuantity = minQuantityText.trim().ifBlank { null }?.toIntOrNull()
@@ -156,7 +165,7 @@ fun ProductFormDialog(
                                         unit.trim().ifBlank { null },
                                         minQuantity,
                                         notes.trim().ifBlank { null },
-                                        emoji.trim().ifBlank { null },
+                                        shownEmoji.trim().ifBlank { null },
                                         barcodes - initialBarcodes.toSet(),
                                         initialBarcodes - barcodes.toSet(),
                                     )
@@ -184,8 +193,14 @@ fun ProductFormDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         OutlinedTextField(
-                            value = emoji,
-                            onValueChange = { emoji = it },
+                            value = shownEmoji,
+                            onValueChange = {
+                                // Touching the field ends the suggesting: from
+                                // here on the value is the user's, including
+                                // when they clear it.
+                                emojiTouched = true
+                                emoji = it
+                            },
                             label = { Text(stringResource(R.string.product_emoji_label)) },
                             singleLine = true,
                             modifier = Modifier.weight(0.3f),
