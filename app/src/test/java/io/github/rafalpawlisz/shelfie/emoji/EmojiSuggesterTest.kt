@@ -65,6 +65,44 @@ class EmojiSuggesterTest {
     }
 
     @Test
+    fun `fresh herbs are covered`() {
+        // "szczypiorek" was the first real miss reported from use, and it was
+        // one of many: a probe over ~125 plausible names missed 110 of them.
+        // These stand for the categories that pass added.
+        assertEquals("🌿", EmojiSuggester.suggest("szczypiorek"))
+        assertEquals("🌿", EmojiSuggester.suggest("koperek"))
+        assertEquals("🌿", EmojiSuggester.suggest("natka pietruszki"))
+        assertEquals("🌿", EmojiSuggester.suggest("mięta"))
+    }
+
+    @Test
+    fun `the second pass covers a real shopping list`() {
+        assertEquals("🥛", EmojiSuggester.suggest("śmietana 18%"))
+        assertEquals("🍮", EmojiSuggester.suggest("budyń waniliowy"))
+        assertEquals("🥕", EmojiSuggester.suggest("buraki"))
+        assertEquals("🍑", EmojiSuggester.suggest("śliwki"))
+        assertEquals("🥩", EmojiSuggester.suggest("mięso mielone"))
+        assertEquals("🐟", EmojiSuggester.suggest("paluszki rybne"))
+        assertEquals("🥖", EmojiSuggester.suggest("bagietka"))
+        assertEquals("🌾", EmojiSuggester.suggest("kasza gryczana"))
+        assertEquals("🥄", EmojiSuggester.suggest("cukier puder"))
+        assertEquals("🩸", EmojiSuggester.suggest("podpaski"))
+        assertEquals("🔌", EmojiSuggester.suggest("ładowarka"))
+    }
+
+    @Test
+    fun `a phrase wins over a word that would answer differently`() {
+        // Pickled things belong in a jar, not in the vegetable aisle — and the
+        // single-word answers are still there for the plain vegetables.
+        assertEquals("🥫", EmojiSuggester.suggest("ogórki kiszone"))
+        assertEquals("🥒", EmojiSuggester.suggest("ogórki"))
+        assertEquals("🥫", EmojiSuggester.suggest("kapusta kiszona"))
+        assertEquals("🥬", EmojiSuggester.suggest("kapusta"))
+        assertEquals("🍦", EmojiSuggester.suggest("bita śmietana"))
+        assertEquals("🥛", EmojiSuggester.suggest("śmietana"))
+    }
+
+    @Test
     fun `an unknown name suggests nothing`() {
         assertNull(EmojiSuggester.suggest("zgrzeblarka"))
         assertNull(EmojiSuggester.suggest(""))

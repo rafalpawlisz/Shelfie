@@ -191,6 +191,58 @@ object EmojiSuggester {
         "🌱" to listOf("nasiona kwiatow", "ziemia do kwiatow", "nawoz"),
         "📦" to listOf("paczka", "przesylka"),
         "✏️" to listOf("zeszyt", "olowek", "pisak", "kartki"),
+
+        // Second pass, driven by a coverage probe over ~125 plausible names:
+        // the first draft missed most of them. Appended rather than merged so
+        // earlier entries keep the words they already claim.
+        "🌿" to listOf(
+            "szczypiorek", "koperek", "koper", "natka", "pietruszka", "mieta", "kolendra",
+            "tymianek", "rozmaryn", "lubczyk", "szalwia", "estragon", "majeranek", "szczaw",
+        ),
+        "🥖" to listOf("bagietka", "ciabatta", "baton chleb"),
+        "🍮" to listOf("budyn", "kisiel", "galaretka", "panna cotta", "krem waniliowy"),
+        "🍠" to listOf("batat", "bataty"),
+        "🥄" to listOf(
+            "drozdze", "soda", "zelatyna", "skrobia", "budyn w proszku", "proszek do pieczenia",
+            "cukier", "puder", "wanilia", "aromat",
+        ),
+        "🍇" to listOf("rodzynki", "sliwki suszone"),
+        "🍑" to listOf("sliwki", "sliwka", "morele", "morela"),
+        "🫐" to listOf("porzeczki", "agrest", "zurawina", "aronia"),
+        "🍊" to listOf("grejpfrut", "grejpfruty"),
+        "🍎" to listOf("granat", "granaty"),
+        "🌰" to listOf("daktyle", "figi", "suszone owoce"),
+        "🥩" to listOf("mielone", "poledwica", "filet", "watrobka", "gulaszowe", "antrykot"),
+        "🥓" to listOf("pasztet", "salami", "poledwica sopocka", "smalec"),
+        "🌭" to listOf("kabanosy", "kabanos", "krakowska", "zywiecka"),
+        "🐟" to listOf("sardynki", "szprotki", "surimi", "paluszki rybne", "paluszki rybne mrozone"),
+        "🍪" to listOf("sucharki", "wafle", "wafelki", "andruty"),
+        "🌾" to listOf("kuskus", "bulgur", "quinoa", "komosa", "kasza gryczana", "platki owsiane"),
+        "🥣" to listOf("owsianka instant", "kaszka manna"),
+        "🧃" to listOf("kompot", "mus", "mus owocowy"),
+        "🥤" to listOf("smoothie", "tonik", "woda kokosowa"),
+        "🍬" to listOf("krowki", "michalki", "toffi", "irysy"),
+        "🍦" to listOf("bita smietana", "smietanka do kawy"),
+        "🥛" to listOf("smietana", "serwatka"),
+        "🧀" to listOf("mascarpone", "ricotta", "twarozek", "camembert", "brie"),
+        "🫙" to listOf("kajmak", "ajvar", "pesto", "tahini"),
+        "🥫" to listOf(
+            "sos sojowy", "keczup", "ogorki kiszone", "kapusta kiszona", "barszcz bialy",
+            "chrzan", "cwikla", "fasolka po bretonsku",
+        ),
+        "🧂" to listOf("kminek", "gorczyca", "liscie laurowe", "ziele angielskie", "kurkuma", "chili"),
+        "🥕" to listOf("buraki", "burak", "seler", "rzodkiewka", "kalarepa", "pasternak"),
+        "🥦" to listOf("brukselka", "jarmuz"),
+        "🥬" to listOf("szparagi", "botwina", "koperek swiezy"),
+        "🫘" to listOf("groszek", "bob", "soja"),
+        "🧻" to listOf("reczniki", "folia", "papier do pieczenia", "papier sniadaniowy"),
+        "🧴" to listOf("odplamiacz", "wybielacz", "odswiezacz", "plyn do szyb", "mleczko"),
+        "🩸" to listOf("podpaski", "tampony", "wkladki"),
+        "🩹" to listOf("wata", "patyczki", "gaziki"),
+        "🕯️" to listOf("zapalki", "znicz", "znicze", "podpalka"),
+        "✂️" to listOf("nozyczki", "nozyk"),
+        "🔌" to listOf("ladowarka", "przedluzacz", "kabel"),
+        "☂️" to listOf("parasol", "parasolka"),
     )
 
     /** Multi-word keys, kept in dictionary order, matched against the phrase. */
