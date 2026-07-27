@@ -35,6 +35,7 @@
     <string name="archived_lists">Zarchiwizowane listy</string>
     <string name="archived_short">Archiwum (%1$d)</string>
     <string name="action_close">Zamknij</string>
+    <string name="action_back">Wstecz</string>
     <string name="use_up_hint">Dotknij produktu, aby odjąć 1</string>
     <string name="use_up_empty_title">Nie ma czego zużyć</string>
     <string name="use_up_empty_message">Produkty, które masz w zapasie, pojawią się tutaj</string>
