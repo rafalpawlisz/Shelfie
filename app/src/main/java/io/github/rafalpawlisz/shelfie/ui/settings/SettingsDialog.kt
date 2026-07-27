@@ -43,9 +43,12 @@ import io.github.rafalpawlisz.shelfie.model.Household
 import io.github.rafalpawlisz.shelfie.ui.theme.warning
 
 /**
- * Minimal settings surface. Today it's the account section (Google sign-in
- * for the coming household sync); designed to grow (e.g. a dynamic-color
- * toggle) without changing its entry point.
+ * Minimal settings surface: an account section and a household section.
+ *
+ * Neither gates the other. The app gives every install an anonymous identity,
+ * so a household can be created or joined without signing in anywhere; a
+ * Google account is offered as insurance against losing the device, not as
+ * the way in.
  */
 @Composable
 fun SettingsDialog(
@@ -54,7 +57,10 @@ fun SettingsDialog(
     syncStatus: SyncStatus,
     // Whether this device holds pantry data that joining would overwrite.
     hasLocalData: Boolean,
-    errorMessage: Int?,
+    // Code of the household this device last belonged to, if any.
+    rememberedInviteCode: String?,
+    accountError: Int?,
+    householdError: Int?,
     onSignIn: () -> Unit,
     onSignInWithEmail: (email: String, password: String) -> Unit,
     onSignOut: () -> Unit,
@@ -91,50 +97,53 @@ fun SettingsDialog(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (user == null) {
-                    Text(stringResource(R.string.settings_signed_out_hint))
+                // No account, or one the app made for itself: offer to secure
+                // it. Signing out is deliberately absent here — an anonymous
+                // identity cannot be signed back into, so "sign out" would
+                // only throw away the way back into the household.
+                if (user == null || user.isAnonymous) {
+                    Text(stringResource(R.string.account_anonymous_hint))
                     Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.sign_in_with_google))
+                        Text(stringResource(R.string.account_secure_with_google))
                     }
-                    HorizontalDivider()
-                    var email by rememberSaveable { mutableStateOf("") }
-                    // Deliberately not saveable: saved instance state is written
-                    // to a Bundle the system may persist, and a plaintext
-                    // password has no business there. Losing it on rotation is
-                    // the right trade.
-                    var password by remember { mutableStateOf("") }
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text(stringResource(R.string.email_label)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text(stringResource(R.string.password_label)) },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    // Errors render inside the dialog (a snackbar would sit
-                    // behind its scrim), right by the form they concern.
-                    if (errorMessage != null) {
-                        Text(
-                            text = stringResource(errorMessage),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
+                    // The email form exists for console-made test accounts, so
+                    // it stays out of the way until asked for.
+                    var showEmailForm by rememberSaveable { mutableStateOf(false) }
+                    if (showEmailForm) {
+                        var email by rememberSaveable { mutableStateOf("") }
+                        // Deliberately not saveable: saved instance state is
+                        // written to a Bundle the system may persist, and a
+                        // plaintext password has no business there. Losing it
+                        // on rotation is the right trade.
+                        var password by remember { mutableStateOf("") }
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { email = it },
+                            label = { Text(stringResource(R.string.email_label)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            modifier = Modifier.fillMaxWidth(),
                         )
-                    }
-                    OutlinedButton(
-                        onClick = { onSignInWithEmail(email, password) },
-                        enabled = email.isNotBlank() && password.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.sign_in_with_email))
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text(stringResource(R.string.password_label)) },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedButton(
+                            onClick = { onSignInWithEmail(email, password) },
+                            enabled = email.isNotBlank() && password.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.sign_in_with_email))
+                        }
+                    } else {
+                        TextButton(onClick = { showEmailForm = true }) {
+                            Text(stringResource(R.string.account_other_methods))
+                        }
                     }
                 } else {
                     Text(
@@ -156,37 +165,36 @@ fun SettingsDialog(
                     ) {
                         Text(stringResource(R.string.sign_out))
                     }
-                    HorizontalDivider()
-                    Text(
-                        text = stringResource(R.string.household_section),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    // Signed-in errors are household errors — show them here.
-                    if (errorMessage != null) {
-                        Text(
-                            text = stringResource(errorMessage),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    HouseholdSection(
-                        household = household,
-                        syncStatus = syncStatus,
-                        onCreate = onCreateHousehold,
-                        onRename = { renaming = true },
-                        onLeave = { confirmLeave = true },
-                        onJoin = { code ->
-                            // Nothing to lose only when there is neither a
-                            // current household nor local data.
-                            if (household != null || hasLocalData) {
-                                pendingJoinCode = code
-                            } else {
-                                onJoinHousehold(code)
-                            }
-                        },
-                    )
                 }
+                // Errors render inside the dialog (a snackbar would sit behind
+                // its scrim), each by the form it concerns.
+                ErrorText(accountError)
+
+                HorizontalDivider()
+                Text(
+                    text = stringResource(R.string.household_section),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ErrorText(householdError)
+                HouseholdSection(
+                    household = household,
+                    syncStatus = syncStatus,
+                    isAnonymous = user == null || user.isAnonymous,
+                    rememberedInviteCode = rememberedInviteCode,
+                    onCreate = onCreateHousehold,
+                    onRename = { renaming = true },
+                    onLeave = { confirmLeave = true },
+                    onJoin = { code ->
+                        // Nothing to lose only when there is neither a current
+                        // household nor local data.
+                        if (household != null || hasLocalData) {
+                            pendingJoinCode = code
+                        } else {
+                            onJoinHousehold(code)
+                        }
+                    },
+                )
             }
         },
         confirmButton = {
@@ -351,6 +359,16 @@ fun SettingsDialog(
 }
 
 @Composable
+private fun ErrorText(message: Int?) {
+    if (message == null) return
+    Text(
+        text = stringResource(message),
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+}
+
+@Composable
 private fun SyncStatusRow(status: SyncStatus) {
     when (status) {
         // No session (also right after opening, before the first snapshot).
@@ -375,6 +393,8 @@ private fun SyncStatusRow(status: SyncStatus) {
 private fun HouseholdSection(
     household: Household?,
     syncStatus: SyncStatus,
+    isAnonymous: Boolean,
+    rememberedInviteCode: String?,
     onCreate: (name: String) -> Unit,
     onRename: () -> Unit,
     onLeave: () -> Unit,
@@ -382,6 +402,16 @@ private fun HouseholdSection(
 ) {
     if (household == null) {
         Text(stringResource(R.string.household_none_hint))
+        // Whoever was in a household before — after leaving, or after an
+        // identity change that could not rejoin it — needs its code, and this
+        // is the only place left that knows it.
+        rememberedInviteCode?.let { code ->
+            Text(
+                text = stringResource(R.string.household_last_code, code),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         var name by rememberSaveable { mutableStateOf("") }
         OutlinedTextField(
             value = name,
@@ -416,6 +446,15 @@ private fun HouseholdSection(
         Text(
             text = stringResource(R.string.household_invite_code, household.inviteCode),
         )
+        // Without an account the code is not just an invitation, it is the only
+        // way back in. Say so where the code is, not in a help screen.
+        if (isAnonymous) {
+            Text(
+                text = stringResource(R.string.household_code_keep_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.warning,
+            )
+        }
         Text(
             text = pluralStringResource(
                 R.plurals.household_members,

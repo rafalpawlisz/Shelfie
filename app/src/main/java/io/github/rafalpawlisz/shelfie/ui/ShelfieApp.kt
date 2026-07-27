@@ -260,7 +260,10 @@ fun ShelfieApp(
     }
 
     if (showSettings) {
-        val settingsError by authViewModel.settingsError.collectAsStateWithLifecycle()
+        val accountError by authViewModel.accountError.collectAsStateWithLifecycle()
+        val householdError by authViewModel.householdError.collectAsStateWithLifecycle()
+        val rememberedInviteCode by
+            authViewModel.rememberedInviteCode.collectAsStateWithLifecycle()
         val syncStatus by authViewModel.syncStatus.collectAsStateWithLifecycle()
         SettingsDialog(
             user = authUser,
@@ -270,7 +273,9 @@ fun ShelfieApp(
                 state.archivedProducts.isNotEmpty() ||
                 state.lists.isNotEmpty() ||
                 state.archivedLists.isNotEmpty(),
-            errorMessage = settingsError,
+            rememberedInviteCode = rememberedInviteCode,
+            accountError = accountError,
+            householdError = householdError,
             onSignIn = { authViewModel.signIn(context) },
             onSignInWithEmail = authViewModel::signInWithEmail,
             onSignOut = authViewModel::signOut,
@@ -280,7 +285,7 @@ fun ShelfieApp(
             onLeaveHousehold = authViewModel::leaveHousehold,
             onDismiss = {
                 showSettings = false
-                authViewModel.clearSettingsError()
+                authViewModel.clearErrors()
             },
         )
     }

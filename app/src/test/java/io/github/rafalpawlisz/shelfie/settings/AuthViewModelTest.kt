@@ -75,7 +75,7 @@ class AuthViewModelTest {
 
         viewModel.createHousehold("Dom")
 
-        assertEquals(R.string.sign_in_error_network, viewModel.settingsError.value)
+        assertEquals(R.string.sign_in_error_network, viewModel.householdError.value)
         assertNull(viewModel.household.value)
     }
 
@@ -95,7 +95,7 @@ class AuthViewModelTest {
         assertEquals("Dom", viewModel.household.value?.name)
         // Nothing to recover, so the household is never re-joined.
         assertTrue(households.joins.isEmpty())
-        assertNull(viewModel.settingsError.value)
+        assertNull(viewModel.accountError.value)
     }
 
     @Test
@@ -114,7 +114,7 @@ class AuthViewModelTest {
         assertEquals(listOf("google-uid" to "ABC123"), households.joins)
         assertEquals("Dom", viewModel.household.value?.name)
         assertEquals("ABC123", syncState.lastHouseholdInviteCode)
-        assertNull(viewModel.settingsError.value)
+        assertNull(viewModel.accountError.value)
     }
 
     @Test
@@ -146,7 +146,7 @@ class AuthViewModelTest {
 
         assertTrue(households.joins.isEmpty())
         assertNull(viewModel.household.value)
-        assertNull(viewModel.settingsError.value)
+        assertNull(viewModel.accountError.value)
     }
 
     @Test
@@ -162,8 +162,27 @@ class AuthViewModelTest {
 
         viewModel.signInWithGoogleToken("token")
 
-        assertEquals(R.string.link_household_lost, viewModel.settingsError.value)
+        assertEquals(R.string.link_household_lost, viewModel.householdError.value)
+        // The sign-in itself worked, so nothing is reported against it.
+        assertNull(viewModel.accountError.value)
         assertEquals("google-uid", viewModel.user.value?.uid)
+    }
+
+    @Test
+    fun `the last household's code survives leaving it`() = runTest {
+        val auth = FakeAuthRepository(initialUser = anonymous)
+        val households = FakeHouseholdRepository()
+        households.seed(name = "Dom", code = "ABC123", members = setOf("anon-1"))
+        val syncState = FakeSyncStateStore()
+        val viewModel = makeViewModel(auth, households, syncState)
+        observe(viewModel)
+
+        viewModel.leaveHousehold()
+
+        assertNull(viewModel.household.value)
+        // The only remaining trace of the code, and the way back in.
+        assertEquals("ABC123", viewModel.rememberedInviteCode.value)
+        assertEquals("ABC123", syncState.lastHouseholdInviteCode)
     }
 
     @Test
@@ -190,7 +209,7 @@ class AuthViewModelTest {
 
         viewModel.joinHousehold("NOPE12")
 
-        assertEquals(R.string.join_invalid_code, viewModel.settingsError.value)
+        assertEquals(R.string.join_invalid_code, viewModel.householdError.value)
         assertNull(viewModel.household.value)
     }
 }

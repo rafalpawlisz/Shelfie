@@ -64,15 +64,42 @@ class AuthViewModel(
             initialValue = null,
         )
 
-    // Sign-in/household failures shown INSIDE the settings dialog — a
-    // snackbar would render behind the dialog scrim. Cleared when a new
-    // attempt starts and when the dialog closes. User cancellation of the
-    // account picker is deliberately not an error.
-    private val _settingsError = MutableStateFlow<Int?>(null)
-    val settingsError: StateFlow<Int?> = _settingsError
+    // Failures show INSIDE the settings dialog — a snackbar would render
+    // behind its scrim — and next to the form they concern, which is why
+    // there are two channels rather than one: "no connection" can come from
+    // either half, and the half it came from is the useful part.
+    // Cleared when a new attempt starts and when the dialog closes. User
+    // cancellation of the account picker is deliberately not an error.
+    private val _accountError = MutableStateFlow<Int?>(null)
+    val accountError: StateFlow<Int?> = _accountError
 
-    fun clearSettingsError() {
-        _settingsError.value = null
+    private val _householdError = MutableStateFlow<Int?>(null)
+    val householdError: StateFlow<Int?> = _householdError
+
+    /**
+     * Invite code of the household this device last belonged to. Shown when
+     * there is no current household, so a member who lost their identity (or
+     * simply left) can see the way back instead of being told a code exists.
+     */
+    private val _rememberedInviteCode = MutableStateFlow(syncState.lastHouseholdInviteCode)
+    val rememberedInviteCode: StateFlow<String?> = _rememberedInviteCode
+
+    init {
+        // The invite code is only visible from inside the household, so it has
+        // to be captured while we are there — after an identity switch or a
+        // leave there is nothing left to read it from.
+        viewModelScope.launch {
+            household.collect { current ->
+                val code = current?.inviteCode ?: return@collect
+                syncState.lastHouseholdInviteCode = code
+                _rememberedInviteCode.value = code
+            }
+        }
+    }
+
+    fun clearErrors() {
+        _accountError.value = null
+        _householdError.value = null
     }
 
     /**
@@ -81,7 +108,7 @@ class AuthViewModel(
      * through [signInWithGoogleToken].
      */
     fun signIn(activityContext: Context) {
-        clearSettingsError()
+        clearErrors()
         viewModelScope.launch {
             val idToken = requestGoogleIdToken(activityContext) ?: return@launch
             authenticateAndSettle { authRepository.linkOrSignInWithGoogle(idToken) }
@@ -94,14 +121,14 @@ class AuthViewModel(
      * taking over an account — and Credential Manager cannot run off-device.
      */
     fun signInWithGoogleToken(idToken: String) {
-        clearSettingsError()
+        clearErrors()
         viewModelScope.launch {
             authenticateAndSettle { authRepository.linkOrSignInWithGoogle(idToken) }
         }
     }
 
     fun signInWithEmail(email: String, password: String) {
-        clearSettingsError()
+        clearErrors()
         viewModelScope.launch {
             authenticateAndSettle { authRepository.signInWithEmail(email.trim(), password) }
         }
@@ -124,35 +151,25 @@ class AuthViewModel(
             ) {
                 return GoogleIdTokenCredential.createFrom(credential.data).idToken
             }
-            _settingsError.value = R.string.sign_in_failed
+            _accountError.value = R.string.sign_in_failed
         } catch (_: GetCredentialCancellationException) {
             // The user backed out of the account picker — not an error.
         } catch (e: GetCredentialException) {
             Log.w("AuthViewModel", "Google sign-in failed", e)
-            _settingsError.value = R.string.sign_in_failed
+            _accountError.value = R.string.sign_in_failed
         }
         return null
     }
 
     private suspend fun authenticateAndSettle(authenticate: suspend () -> SignInResult) {
         try {
-            rememberHouseholdForRecovery()
             settle(authenticate())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w("AuthViewModel", "Sign-in failed", e)
-            _settingsError.value = signInErrorMessage(e)
+            _accountError.value = signInErrorMessage(e)
         }
-    }
-
-    /**
-     * Persist the invite code before touching the identity, because a switch
-     * makes the household unreachable — and therefore its code invisible —
-     * until we have rejoined it. See [SyncStateStore.lastHouseholdInviteCode].
-     */
-    private fun rememberHouseholdForRecovery() {
-        household.value?.let { syncState.lastHouseholdInviteCode = it.inviteCode }
     }
 
     /**
@@ -173,7 +190,7 @@ class AuthViewModel(
             // The household is gone (deleted while we were away). The sign-in
             // itself succeeded, so say what failed, not that everything did.
             Log.w("AuthViewModel", "household recovery found no household for the code", e)
-            _settingsError.value = R.string.link_household_lost
+            _householdError.value = R.string.link_household_lost
         }
     }
 
@@ -202,7 +219,7 @@ class AuthViewModel(
     }
 
     fun createHousehold(name: String) {
-        clearSettingsError()
+        clearErrors()
         viewModelScope.launch {
             try {
                 householdRepository.createHousehold(currentUid(), name.trim())
@@ -210,7 +227,7 @@ class AuthViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household creation failed", e)
-                _settingsError.value = householdErrorMessage(e)
+                _householdError.value = householdErrorMessage(e)
             }
         }
     }
@@ -219,7 +236,7 @@ class AuthViewModel(
         val householdId = household.value?.id ?: return
         val trimmed = name.trim()
         if (trimmed.isEmpty() || trimmed == household.value?.name) return
-        clearSettingsError()
+        clearErrors()
         viewModelScope.launch {
             try {
                 householdRepository.renameHousehold(householdId, trimmed)
@@ -227,7 +244,7 @@ class AuthViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household rename failed", e)
-                _settingsError.value = R.string.household_error
+                _householdError.value = R.string.household_error
             }
         }
     }
@@ -235,7 +252,7 @@ class AuthViewModel(
     /** The UI confirms leaving before calling this. */
     fun leaveHousehold() {
         val uid = user.value?.uid ?: return
-        clearSettingsError()
+        clearErrors()
         viewModelScope.launch {
             try {
                 householdRepository.leaveHousehold(uid)
@@ -243,24 +260,24 @@ class AuthViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Leaving household failed", e)
-                _settingsError.value = R.string.household_error
+                _householdError.value = R.string.household_error
             }
         }
     }
 
     /** The UI confirms switching households before calling this. */
     fun joinHousehold(code: String) {
-        clearSettingsError()
+        clearErrors()
         viewModelScope.launch {
             try {
                 householdRepository.joinHousehold(currentUid(), code)
             } catch (e: InvalidInviteCodeException) {
-                _settingsError.value = R.string.join_invalid_code
+                _householdError.value = R.string.join_invalid_code
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household join failed", e)
-                _settingsError.value = householdErrorMessage(e)
+                _householdError.value = householdErrorMessage(e)
             }
         }
     }

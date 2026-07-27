@@ -48,8 +48,9 @@
     <string name="undo_list_gone">Ta lista już nie istnieje</string>
     <string name="settings_title">Ustawienia</string>
     <string name="settings_account_section">Konto</string>
-    <string name="settings_signed_out_hint">Zaloguj się, aby dzielić spiżarnię z domownikami</string>
-    <string name="sign_in_with_google">Zaloguj przez Google</string>
+    <string name="account_anonymous_hint">To urządzenie działa bez konta. Dodaj Google, aby odzyskać spiżarnię po utracie telefonu.</string>
+    <string name="account_secure_with_google">Zabezpiecz kontem Google</string>
+    <string name="account_other_methods">Inne sposoby logowania</string>
     <string name="signed_in_as">Zalogowano jako %1$s</string>
     <string name="sign_out">Wyloguj</string>
     <string name="sign_out_title">Wylogować?</string>
@@ -62,6 +63,8 @@
     <string name="sign_in_with_email">Zaloguj e-mailem</string>
     <string name="household_section">Gospodarstwo</string>
     <string name="household_none_hint">Utwórz gospodarstwo i zaproś drugą osobę albo dołącz do jej gospodarstwa kodem</string>
+    <string name="household_last_code">Kod ostatniego gospodarstwa: %1$s</string>
+    <string name="household_code_keep_hint">Zapisz ten kod: bez konta jest jedyną drogą powrotu do tego gospodarstwa.</string>
     <string name="household_name_label">Nazwa gospodarstwa</string>
     <string name="household_create">Utwórz gospodarstwo</string>
     <string name="household_code_label">Kod zaproszenia</string>
