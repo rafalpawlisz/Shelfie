@@ -33,6 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 class AppContainer(private val context: Context) {
 
@@ -101,8 +102,24 @@ class AppContainer(private val context: Context) {
         )
     }
 
-    private val syncStateStore: SyncStateStore by lazy {
+    val syncStateStore: SyncStateStore by lazy {
         SharedPreferencesSyncStateStore(context)
+    }
+
+    /**
+     * Give the install an identity, anonymously, so nothing in the app has to
+     * ask for a sign-in first. Failure is normal (a first launch with no
+     * network) and costs nothing: without a household there is nothing to
+     * sync, and the actions that do need a uid sign in on demand.
+     */
+    fun bootstrapSession() {
+        appScope.launch {
+            try {
+                authRepository.ensureSignedIn()
+            } catch (e: Exception) {
+                Log.i("Auth", "anonymous sign-in deferred", e)
+            }
+        }
     }
 
     /** Shared by the repositories and the engine — see DiffSyncEngine.clock. */

@@ -40,6 +40,15 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            // The android.jar on the unit-test classpath throws from every
+            // method. android.util.Log is the one that reaches JVM tests: a
+            // ViewModel logging inside a catch block used to blow up there and
+            // replace the error it was reporting.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {

@@ -27,6 +27,19 @@ interface SyncStateStore {
      * [SyncClock] for why an uncorrected clock splits a household.
      */
     var clockOffsetMillis: Long
+
+    /**
+     * Invite code of the household this device belongs to, remembered so that
+     * an identity change can rejoin it.
+     *
+     * Securing an anonymous account with a Google account that already exists
+     * abandons the anonymous uid, and with it the membership entry — the new
+     * identity has to join again, by code. The code is normally still on
+     * screen, but not in the window between losing the old identity and
+     * regaining the household, which is exactly when a crash would make it
+     * unrecoverable.
+     */
+    var lastHouseholdInviteCode: String?
 }
 
 class SharedPreferencesSyncStateStore(context: Context) : SyncStateStore {
@@ -52,9 +65,16 @@ class SharedPreferencesSyncStateStore(context: Context) : SyncStateStore {
             prefs.edit().putLong(KEY_CLOCK_OFFSET, value).apply()
         }
 
+    override var lastHouseholdInviteCode: String?
+        get() = prefs.getString(KEY_INVITE_CODE, null)
+        set(value) {
+            prefs.edit().putString(KEY_INVITE_CODE, value).apply()
+        }
+
     private companion object {
         const val KEY_HOUSEHOLD_ID = "lastSyncedHouseholdId"
         const val KEY_LAST_SYNCED_AT = "lastSyncedAt"
         const val KEY_CLOCK_OFFSET = "clockOffsetMillis"
+        const val KEY_INVITE_CODE = "lastHouseholdInviteCode"
     }
 }

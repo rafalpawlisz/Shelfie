@@ -85,6 +85,7 @@
     <string name="household_join_message">Produkty i listy gospodarstwa zastąpią to, co jest na tym urządzeniu.</string>
     <string name="household_switch_confirm">Zmień</string>
     <string name="join_invalid_code">Nie znaleziono gospodarstwa o tym kodzie</string>
+    <string name="link_household_lost">Zalogowano, ale nie udało się odnaleźć gospodarstwa — dołącz do niego ponownie kodem</string>
     <string name="household_error">Coś poszło nie tak, spróbuj ponownie</string>
     <string name="sync_status_synced">Zsynchronizowano: %1$s</string>
     <string name="sync_status_offline">Offline — zmiany zsynchronizują się po odzyskaniu połączenia</string>
