@@ -71,6 +71,9 @@
     <string name="household_leave_title">Opuścić gospodarstwo?</string>
     <string name="household_leave_message">Dane pozostaną na tym urządzeniu i przestaną się synchronizować z „%1$s”. Aby wrócić, potrzebny będzie kod zaproszenia: %2$s — zapisz go, po wyjściu nie będzie już widoczny.</string>
     <string name="household_leave_message_last">Jesteś ostatnim członkiem, więc „%1$s” zostanie puste, ale nieusunięte — jego dane będą do odzyskania. Aby wrócić, potrzebny będzie kod zaproszenia: %2$s — zapisz go, po wyjściu nie będzie już widoczny.</string>
+    <string name="household_leave_delete_option">Usuń też gospodarstwo i jego dane</string>
+    <string name="household_leave_and_delete">Opuść i usuń</string>
+    <string name="household_leave_message_delete">„%1$s” wraz ze wszystkim, co zostało z nim zsynchronizowane, zostanie usunięte bezpowrotnie — kod %2$s przestanie działać. Spiżarnia zostaje na tym urządzeniu, przestaje się tylko synchronizować.</string>
     <string name="household_join_title">Dołączyć do gospodarstwa?</string>
     <string name="household_join_message">Produkty i listy gospodarstwa zastąpią to, co jest na tym urządzeniu.</string>
     <string name="household_switch_confirm">Zmień</string>

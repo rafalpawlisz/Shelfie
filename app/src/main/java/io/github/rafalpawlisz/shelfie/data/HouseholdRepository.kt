@@ -24,10 +24,25 @@ interface HouseholdRepository {
 
     /**
      * Leave the current household without joining another: the user goes back
-     * to solo mode (local data stays, syncing stops). An emptied household is
-     * deleted along with its invite code.
+     * to solo mode (local data stays, syncing stops). The household itself is
+     * kept even when emptied, so it can be rejoined by code.
      */
     suspend fun leaveHousehold(uid: String)
+
+    /**
+     * Leave and take the household with you: every document under it, its
+     * invite code, the household itself, and the caller's pointer. For a sole
+     * member who wants the shared copy gone rather than kept for recovery.
+     *
+     * Local data is not touched — this deletes the household, not the pantry.
+     *
+     * Order is forced by the rules and by Firestore having no cascade: the
+     * subcollections have to go while membership still grants access to them,
+     * and membership therefore goes last. An interrupted run leaves the caller
+     * a member of a partly emptied household, which is retryable; the reverse
+     * order would leave documents nobody can read or delete.
+     */
+    suspend fun deleteHousehold(uid: String)
 
     /** Rename the household; every member sees it through [observeHousehold]. */
     suspend fun renameHousehold(householdId: String, name: String)

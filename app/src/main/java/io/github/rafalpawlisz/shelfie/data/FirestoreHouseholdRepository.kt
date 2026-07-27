@@ -7,6 +7,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.WriteBatch
+import io.github.rafalpawlisz.shelfie.data.sync.SyncCollection
 import io.github.rafalpawlisz.shelfie.model.Household
 import java.security.SecureRandom
 import kotlinx.coroutines.channels.awaitClose
@@ -120,13 +121,40 @@ class FirestoreHouseholdRepository(
         db.runBatch { batch ->
             // Drop the pointer even if the household document is already gone
             // (e.g. the other member deleted it) — otherwise the user is stuck
-            // pointing at nothing with no way out.
-            batch.update(
-                db.collection(USERS).document(uid),
-                FIELD_HOUSEHOLD_ID,
-                FieldValue.delete(),
-            )
+            // pointing at nothing with no way out. The whole document goes,
+            // not just the field: outside a household it says nothing, and a
+            // pointer nobody owns is exactly the litter this app should not
+            // leave behind.
+            batch.delete(db.collection(USERS).document(uid))
             if (current.exists()) batch.leave(current, uid)
+        }.await()
+    }
+
+    override suspend fun deleteHousehold(uid: String) {
+        val userSnap = db.collection(USERS).document(uid).get().await()
+        val currentId = userSnap.getString(FIELD_HOUSEHOLD_ID) ?: return
+        val household = db.collection(HOUSEHOLDS).document(currentId)
+        val snapshot = household.get().await()
+
+        // 1) Everything under the household, while membership still grants
+        // access. Firestore has no cascade, so this is document by document;
+        // batches cap at 500 writes.
+        for (collection in SyncCollection.entries) {
+            val docs = household.collection(collection.path).get().await().documents
+            docs.chunked(BATCH_LIMIT).forEach { chunk ->
+                db.runBatch { batch -> chunk.forEach { batch.delete(it.reference) } }.await()
+            }
+        }
+
+        // 2) The code, the household and the pointer. The code first: its rule
+        // needs either a live membership or a household that no longer exists,
+        // and one batch satisfies the first.
+        db.runBatch { batch ->
+            snapshot.getString("inviteCode")?.let { code ->
+                batch.delete(db.collection(INVITE_CODES).document(code))
+            }
+            if (snapshot.exists()) batch.delete(household)
+            batch.delete(db.collection(USERS).document(uid))
         }.await()
     }
 
@@ -209,6 +237,9 @@ class FirestoreHouseholdRepository(
         const val FIELD_HOUSEHOLD_ID = "householdId"
         const val FIELD_LAST_ACTIVE_AT = "lastActiveAt"
         const val FIELD_MEMBER_ACTIVITY = "memberActivity"
+
+        // Firestore's hard limit on writes in one batch.
+        const val BATCH_LIMIT = 500
 
         // No 0/O/1/I — codes get read out loud between household members.
         const val CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"

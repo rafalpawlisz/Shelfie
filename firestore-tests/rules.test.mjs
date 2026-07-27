@@ -378,6 +378,41 @@ describe("inviteCodes", () => {
     await assertSucceeds(deleteDoc(doc(db(EVE), "inviteCodes", "ORPHAN")));
   });
 
+  it("a sole member can run the whole cleanup in the app's order", async () => {
+    // The order deleteHousehold() uses: subcollection documents first, while
+    // membership still grants access to them, then code + household + pointer.
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    const anna = db(ANNA);
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const f = ctx.firestore();
+      await setDoc(doc(f, "households", "h1", "products", "p1"), { name: "Mleko" });
+      await setDoc(doc(f, "households", "h1", "items", "i1"), { productId: "p1" });
+      await setDoc(doc(f, "users", ANNA), { householdId: "h1" });
+    });
+
+    await assertSucceeds(deleteDoc(doc(anna, "households", "h1", "products", "p1")));
+    await assertSucceeds(deleteDoc(doc(anna, "households", "h1", "items", "i1")));
+
+    const batch = writeBatch(anna);
+    batch.delete(doc(anna, "inviteCodes", "CODE01"));
+    batch.delete(doc(anna, "households", "h1"));
+    batch.delete(doc(anna, "users", ANNA));
+    await assertSucceeds(batch.commit());
+  });
+
+  it("cleanup is refused to a member who is not alone", async () => {
+    await seedHousehold("h1", { [ANNA]: true, [BOB]: true }, "CODE01");
+    // Taking the shared data away is not one member's call, and the rules —
+    // not just the UI — are what enforce that.
+    await assertFails(deleteDoc(doc(db(ANNA), "households", "h1")));
+    // Its documents are fair game for either member, though: that is ordinary
+    // pantry editing, and this is why deletion must come with sole membership.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "households", "h1", "products", "p1"), { name: "Mleko" });
+    });
+    await assertSucceeds(deleteDoc(doc(db(BOB), "households", "h1", "products", "p1")));
+  });
+
   it("the last member's cleanup batch deletes household and code together", async () => {
     await seedHousehold("h1", { [ANNA]: true }, "CODE01");
     const anna = db(ANNA);

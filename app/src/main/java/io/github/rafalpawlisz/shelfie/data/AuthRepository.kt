@@ -20,4 +20,14 @@ interface AuthRepository {
      * repeatedly; only the first call for an install hits the network.
      */
     suspend fun ensureSignedIn(): String
+
+    /**
+     * Delete the identity itself. Called after leaving a household, where it
+     * has served its purpose: an anonymous account outside a household owns
+     * nothing, cannot be signed back into, and would otherwise sit in the
+     * project forever. A later household action creates a fresh one.
+     *
+     * Local data is untouched — this deletes the account, not the pantry.
+     */
+    suspend fun deleteAccount()
 }

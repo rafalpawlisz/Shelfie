@@ -24,4 +24,15 @@ class FakeAuthRepository(
         anonymousSignIns++
         return "anon-$anonymousSignIns".also { current.value = it }
     }
+
+    /** Raised by [deleteAccount] when set; the app treats that as survivable. */
+    var deleteFailure: Exception? = null
+
+    val deletedAccounts = mutableListOf<String>()
+
+    override suspend fun deleteAccount() {
+        deleteFailure?.let { throw it }
+        current.value?.let { deletedAccounts += it }
+        current.value = null
+    }
 }

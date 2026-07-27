@@ -23,4 +23,8 @@ class FirebaseAuthRepository(
         val user = auth.signInAnonymously().await().user
         return checkNotNull(user) { "Firebase reported a successful sign-in without a user" }.uid
     }
+
+    override suspend fun deleteAccount() {
+        auth.currentUser?.delete()?.await()
+    }
 }

@@ -64,6 +64,17 @@ class FakeHouseholdRepository : HouseholdRepository {
         pointers.update { it - uid }
     }
 
+    override suspend fun deleteHousehold(uid: String) {
+        val id = pointers.value[uid] ?: return
+        val target = households.value.firstOrNull { it.id == id } ?: return
+        // Mirrors the rules: only a sole member may delete a household.
+        check(target.memberIds - uid == emptySet<String>()) {
+            "a household with other members cannot be deleted"
+        }
+        households.update { list -> list.filterNot { it.id == id } }
+        pointers.update { it - uid }
+    }
+
     override suspend fun renameHousehold(householdId: String, name: String) {
         households.update { list ->
             list.map { if (it.id == householdId) it.copy(name = name) else it }
@@ -71,4 +82,8 @@ class FakeHouseholdRepository : HouseholdRepository {
     }
 
     override suspend fun markHouseholdActive(householdId: String, uid: String): Long? = null
+
+    fun findByName(name: String): Household? = households.value.firstOrNull { it.name == name }
+
+    fun membersOf(name: String): Set<String>? = findByName(name)?.memberIds
 }

@@ -111,18 +111,50 @@ class AuthViewModel(
         }
     }
 
-    /** The UI confirms leaving before calling this. */
-    fun leaveHousehold() {
+    /**
+     * The UI confirms leaving before calling this, and only offers
+     * [deleteHousehold] to a sole member — the rules refuse it for anyone else.
+     *
+     * Either way the identity goes with the household: an anonymous account
+     * outside one owns nothing and cannot be signed back into. Local data
+     * stays, so the device keeps its pantry and simply stops syncing.
+     */
+    fun leaveHousehold(deleteHousehold: Boolean = false) {
         clearError()
         viewModelScope.launch {
             try {
-                householdRepository.leaveHousehold(currentUid())
+                val uid = currentUid()
+                if (deleteHousehold) {
+                    householdRepository.deleteHousehold(uid)
+                    // The code now names nothing; offering it as the way back
+                    // would be a lie.
+                    syncState.lastHouseholdInviteCode = null
+                    _rememberedInviteCode.value = null
+                } else {
+                    householdRepository.leaveHousehold(uid)
+                }
+                forgetIdentity()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Leaving household failed", e)
                 _errorMessage.value = errorMessageFor(e)
             }
+        }
+    }
+
+    /**
+     * Failing to delete the account is not worth reporting: the household part
+     * already succeeded, the user is out, and all that survives is an unusable
+     * account in the project.
+     */
+    private suspend fun forgetIdentity() {
+        try {
+            authRepository.deleteAccount()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("AuthViewModel", "deleting the anonymous account failed", e)
         }
     }
 

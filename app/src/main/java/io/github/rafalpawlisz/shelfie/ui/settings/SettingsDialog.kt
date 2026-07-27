@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -64,7 +66,7 @@ fun SettingsDialog(
     onCreateHousehold: (name: String) -> Unit,
     onJoinHousehold: (code: String) -> Unit,
     onRenameHousehold: (name: String) -> Unit,
-    onLeaveHousehold: () -> Unit,
+    onLeaveHousehold: (alsoDelete: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     // Joining an existing household replaces this device's data with the
@@ -171,33 +173,63 @@ fun SettingsDialog(
 
     if (confirmLeave && household != null) {
         val lastMember = household.memberIds.size <= 1
+        // Only a sole member can delete the household — the rules refuse it
+        // for anyone else, and taking away data someone still uses is not a
+        // decision one member gets to make.
+        var alsoDelete by rememberSaveable { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { confirmLeave = false },
             title = { Text(stringResource(R.string.household_leave_title)) },
             text = {
-                Text(
-                    stringResource(
-                        // An emptied household is kept, so the last member is
-                        // told their data stays recoverable — and both cases
-                        // get the code, which is invisible after leaving.
-                        if (lastMember) {
-                            R.string.household_leave_message_last
-                        } else {
-                            R.string.household_leave_message
-                        },
-                        household.name,
-                        household.inviteCode,
-                    ),
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        stringResource(
+                            when {
+                                // Deleting is irreversible, so say what goes
+                                // and what stays instead of repeating the
+                                // recovery promise that no longer holds.
+                                lastMember && alsoDelete ->
+                                    R.string.household_leave_message_delete
+                                // An emptied household is kept, so the last
+                                // member is told their data stays recoverable
+                                // — and both cases get the code, which is
+                                // invisible after leaving.
+                                lastMember -> R.string.household_leave_message_last
+                                else -> R.string.household_leave_message
+                            },
+                            household.name,
+                            household.inviteCode,
+                        ),
+                    )
+                    if (lastMember) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { alsoDelete = !alsoDelete },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = alsoDelete, onCheckedChange = { alsoDelete = it })
+                            Text(stringResource(R.string.household_leave_delete_option))
+                        }
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onLeaveHousehold()
+                        onLeaveHousehold(lastMember && alsoDelete)
                         confirmLeave = false
                     },
                 ) {
-                    Text(stringResource(R.string.household_leave))
+                    Text(
+                        stringResource(
+                            if (lastMember && alsoDelete) {
+                                R.string.household_leave_and_delete
+                            } else {
+                                R.string.household_leave
+                            },
+                        ),
+                    )
                 }
             },
             dismissButton = {

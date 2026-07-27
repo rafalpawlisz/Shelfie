@@ -112,4 +112,55 @@ class AuthViewModelTest {
         assertEquals("ABC123", viewModel.rememberedInviteCode.value)
         assertEquals("ABC123", syncState.lastHouseholdInviteCode)
     }
+
+    @Test
+    fun `leaving discards the identity but keeps the household`() = runTest {
+        val auth = FakeAuthRepository(initialUid = "anon-1")
+        val households = FakeHouseholdRepository()
+        households.seed(name = "Dom", code = "ABC123", members = setOf("anon-1", "uid-other"))
+        val viewModel = makeViewModel(auth, households)
+        observe(viewModel)
+
+        viewModel.leaveHousehold()
+
+        assertEquals(listOf("anon-1"), auth.deletedAccounts)
+        // The household is the other member's now, and it keeps its data.
+        assertEquals(setOf("uid-other"), households.membersOf("Dom"))
+    }
+
+    @Test
+    fun `leaving and deleting takes the household and the code with it`() = runTest {
+        val auth = FakeAuthRepository(initialUid = "anon-1")
+        val households = FakeHouseholdRepository()
+        households.seed(name = "Dom", code = "ABC123", members = setOf("anon-1"))
+        val syncState = FakeSyncStateStore()
+        val viewModel = makeViewModel(auth, households, syncState)
+        observe(viewModel)
+
+        viewModel.leaveHousehold(deleteHousehold = true)
+
+        assertNull(viewModel.household.value)
+        assertNull(households.findByName("Dom"))
+        assertEquals(listOf("anon-1"), auth.deletedAccounts)
+        // Offering the code as the way back would be a lie now.
+        assertNull(viewModel.rememberedInviteCode.value)
+        assertNull(syncState.lastHouseholdInviteCode)
+    }
+
+    @Test
+    fun `a household that outlives its account deletion is still left`() = runTest {
+        val auth = FakeAuthRepository(initialUid = "anon-1")
+        auth.deleteFailure = FirebaseNetworkException("offline")
+        val households = FakeHouseholdRepository()
+        households.seed(name = "Dom", code = "ABC123", members = setOf("anon-1"))
+        val viewModel = makeViewModel(auth, households)
+        observe(viewModel)
+
+        viewModel.leaveHousehold()
+
+        // The leave succeeded; a leftover account is not worth an error the
+        // user can do nothing about.
+        assertNull(viewModel.household.value)
+        assertNull(viewModel.errorMessage.value)
+    }
 }
