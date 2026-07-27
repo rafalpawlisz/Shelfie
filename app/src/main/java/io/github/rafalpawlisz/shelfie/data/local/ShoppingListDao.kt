@@ -202,6 +202,12 @@ interface ShoppingListDao {
     )
     fun observePlannedEntries(): Flow<List<PlannedEntry>>
 
+    // Products referenced by ANY list, archived ones included — which is what
+    // decides whether an archived product may be deleted for good. Archived
+    // lists count because restoring one must not find its items missing.
+    @Query("SELECT DISTINCT productId FROM shopping_list_items")
+    fun observeReferencedProductIds(): Flow<List<String>>
+
     @Insert
     suspend fun insert(item: ShoppingListItemEntity)
 

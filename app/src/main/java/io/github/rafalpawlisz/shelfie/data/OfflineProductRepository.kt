@@ -2,6 +2,10 @@ package io.github.rafalpawlisz.shelfie.data
 
 import io.github.rafalpawlisz.shelfie.data.local.ProductDao
 import io.github.rafalpawlisz.shelfie.data.sync.SyncClock
+import io.github.rafalpawlisz.shelfie.data.sync.SyncCollection
+import io.github.rafalpawlisz.shelfie.data.sync.NoopSyncEngine
+import io.github.rafalpawlisz.shelfie.data.sync.SyncEngine
+import io.github.rafalpawlisz.shelfie.data.sync.listOrderDocId
 import io.github.rafalpawlisz.shelfie.data.local.ProductEntity
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
 import io.github.rafalpawlisz.shelfie.model.Product
@@ -11,6 +15,7 @@ import kotlinx.coroutines.flow.map
 
 class OfflineProductRepository(
     private val dao: ProductDao,
+    private val syncEngine: SyncEngine = NoopSyncEngine,
     // Server-corrected: a raw device clock splits a household under LWW.
     private val clock: SyncClock = SyncClock { System.currentTimeMillis() },
 ) : ProductRepository {
@@ -86,5 +91,25 @@ class OfflineProductRepository(
 
     override suspend fun restoreProduct(id: String) {
         dao.restore(id = id, timestamp = clock.now())
+    }
+
+    override suspend fun deleteArchivedProduct(id: String): Boolean {
+        val removed = dao.deleteArchivedIfUnused(id) ?: return false
+        // A real deletion, so the other device has to hear about it: absence
+        // alone is never read as a deletion past a session's first reconcile,
+        // and an unreported row comes back on the next pull. The children go
+        // with it — locally by cascade, remotely only because they are named
+        // here.
+        syncEngine.onDeleted(SyncCollection.PRODUCTS, listOf(id))
+        if (removed.barcodes.isNotEmpty()) {
+            syncEngine.onDeleted(SyncCollection.BARCODES, removed.barcodes)
+        }
+        if (removed.orderedListIds.isNotEmpty()) {
+            syncEngine.onDeleted(
+                SyncCollection.LIST_ORDER,
+                removed.orderedListIds.map { listOrderDocId(it, id) },
+            )
+        }
+        return true
     }
 }

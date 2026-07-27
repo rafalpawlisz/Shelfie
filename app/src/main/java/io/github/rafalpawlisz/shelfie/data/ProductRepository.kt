@@ -37,4 +37,12 @@ interface ProductRepository {
     suspend fun archiveProduct(id: String)
 
     suspend fun restoreProduct(id: String)
+
+    /**
+     * Delete an archived product for good, with its barcodes and list-order
+     * rows. Returns false and changes nothing when the product is still on a
+     * shopping list (archived lists count — they can be restored) or is not
+     * archived in the first place.
+     */
+    suspend fun deleteArchivedProduct(id: String): Boolean
 }

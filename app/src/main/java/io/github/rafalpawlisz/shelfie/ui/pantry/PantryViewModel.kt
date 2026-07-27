@@ -72,6 +72,9 @@ data class PantryUiState(
     val lowStockProducts: List<Product> = emptyList(),
     // productId -> ids of the active lists that already plan it; guards moves.
     val plannedByProduct: Map<String, Set<String>> = emptyMap(),
+    // Products referenced by any list, archived lists included. An archived
+    // product outside this set is the only kind that may be deleted for good.
+    val referencedProductIds: Set<String> = emptySet(),
     val lists: List<ShoppingList> = emptyList(),
     val archivedLists: List<ShoppingList> = emptyList(),
     val selectedListId: String? = null,
@@ -115,6 +118,7 @@ class PantryViewModel(
         val archived: List<Product>,
         val barcodes: List<io.github.rafalpawlisz.shelfie.model.ProductBarcode>,
         val planned: List<io.github.rafalpawlisz.shelfie.model.PlannedEntry>,
+        val referenced: List<String>,
     )
 
     val uiState: StateFlow<PantryUiState> =
@@ -124,14 +128,15 @@ class PantryViewModel(
                 repository.observeArchivedProducts(),
                 barcodeRepository.observeBarcodes(),
                 shoppingListRepository.observePlannedEntries(),
-            ) { active, archived, barcodes, planned ->
-                ProductsBundle(active, archived, barcodes, planned)
+                shoppingListRepository.observeReferencedProductIds(),
+            ) { active, archived, barcodes, planned, referenced ->
+                ProductsBundle(active, archived, barcodes, planned, referenced)
             },
             shoppingListRepository.observeLists(),
             shoppingListRepository.observeArchivedLists(),
             selectedListId,
             shoppingItems,
-        ) { (active, archived, barcodes, planned), lists, archivedLists, selected, items ->
+        ) { (active, archived, barcodes, planned, referenced), lists, archivedLists, selected, items ->
             val plannedByProduct = planned
                 .groupBy({ it.productId }, { it.listId })
                 .mapValues { (_, listIds) -> listIds.toSet() }
@@ -143,6 +148,7 @@ class PantryViewModel(
                     min != null && product.quantity < min && product.id !in plannedByProduct
                 },
                 plannedByProduct = plannedByProduct,
+                referencedProductIds = referenced.toSet(),
                 lists = lists,
                 archivedLists = archivedLists,
                 selectedListId = selected,
@@ -459,6 +465,20 @@ class PantryViewModel(
 
     fun restore(id: String) {
         viewModelScope.launch { repository.restoreProduct(id) }
+    }
+
+    /**
+     * Delete an archived product for good. The UI only offers this for a
+     * product no list refers to, but the repository checks again and can
+     * refuse: the other device may have put it on a list in the meantime, and
+     * deleting it would take that item down with it.
+     */
+    fun deleteArchived(id: String) {
+        viewModelScope.launch {
+            if (!repository.deleteArchivedProduct(id)) {
+                messageChannel.send(R.string.delete_product_in_use)
+            }
+        }
     }
 
     companion object {

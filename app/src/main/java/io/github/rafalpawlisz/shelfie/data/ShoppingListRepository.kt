@@ -32,6 +32,9 @@ interface ShoppingListRepository {
     // Reactive planning map (list × product) powering the derived "low stock"
     // list and the move-between-lists guard.
     fun observePlannedEntries(): Flow<List<PlannedEntry>>
+
+    /** Products on any list, archived lists included; gates permanent deletion. */
+    fun observeReferencedProductIds(): Flow<List<String>>
     suspend fun setChecked(id: String, checked: Boolean)
     suspend fun setItemAmount(id: String, amount: Int?)
     suspend fun setItemDetails(id: String, amount: Int?, note: String?)

@@ -105,6 +105,10 @@
     <string name="household_invite_share_text">Join my Shelfie household with this code: %1$s</string>
     <string name="action_archive">Archive</string>
     <string name="action_restore">Restore</string>
+    <string name="action_delete_forever">Delete for good</string>
+    <string name="delete_product_title">Delete for good?</string>
+    <string name="delete_product_message">“%1$s” and its barcodes will be gone from this device and from the household. Nothing brings it back.</string>
+    <string name="delete_product_in_use">That product is on a shopping list now — it stays in the archive</string>
     <string name="action_cancel">Cancel</string>
     <string name="archived_section">Archived (%1$d)</string>
     <string name="cd_increase_quantity">Increase quantity of %1$s</string>

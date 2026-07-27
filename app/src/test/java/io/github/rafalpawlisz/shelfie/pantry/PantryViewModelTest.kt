@@ -1,6 +1,7 @@
 ﻿package io.github.rafalpawlisz.shelfie.pantry
 
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
+import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -101,6 +102,74 @@ class PantryViewModelTest {
 
         assertTrue(viewModel.uiState.value.products.isEmpty())
         assertEquals("Flour", viewModel.uiState.value.archivedProducts.single().name)
+    }
+
+    @Test
+    fun `deleting an archived product removes it from the archive`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Kasza", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.archive(id)
+
+        viewModel.deleteArchived(id)
+
+        assertTrue(viewModel.uiState.value.archivedProducts.isEmpty())
+        assertTrue(viewModel.uiState.value.products.isEmpty())
+    }
+
+    @Test
+    fun `a product a list still refers to survives and says why`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Kasza", quantity = 0, unit = null)
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.archive(id)
+        // The refusal comes from the data layer, not the UI: between the button
+        // appearing and the tap, the other device can put it on a list.
+        repository.referencedProductIds = setOf(id)
+
+        val messages = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.messages.collect { messages += it }
+        }
+        viewModel.deleteArchived(id)
+
+        assertEquals("Kasza", viewModel.uiState.value.archivedProducts.single().name)
+        assertEquals(listOf(R.string.delete_product_in_use), messages)
+    }
+
+    @Test
+    fun `an active product is never deleted by the archive action`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Kasza", quantity = 1, unit = null)
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val id = viewModel.uiState.value.products.single().id
+
+        viewModel.deleteArchived(id)
+
+        assertEquals("Kasza", viewModel.uiState.value.products.single().name)
+    }
+
+    @Test
+    fun `an item on any list marks its product as referenced`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Kasza", quantity = 0, unit = null)
+        val lists = FakeShoppingListRepository(repository)
+        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val id = viewModel.uiState.value.products.single().id
+        val listId = lists.createList("Sklep")
+        lists.addItem(listId, id, amount = null, note = null)
+
+        // Archiving the list must not make the product deletable: restoring it
+        // would find the item gone.
+        lists.archiveList(listId)
+
+        assertEquals(setOf(id), viewModel.uiState.value.referencedProductIds)
     }
 
     @Test

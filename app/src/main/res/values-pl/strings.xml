@@ -105,6 +105,10 @@
     <string name="household_invite_share_text">Dołącz do mojego gospodarstwa w Shelfie tym kodem: %1$s</string>
     <string name="action_archive">Archiwizuj</string>
     <string name="action_restore">Przywróć</string>
+    <string name="action_delete_forever">Usuń trwale</string>
+    <string name="delete_product_title">Usunąć trwale?</string>
+    <string name="delete_product_message">„%1$s” wraz z kodami kreskowymi zniknie z tego urządzenia i z gospodarstwa. Nic tego nie przywróci.</string>
+    <string name="delete_product_in_use">Ten produkt jest teraz na liście zakupów — zostaje w archiwum</string>
     <string name="action_cancel">Anuluj</string>
     <string name="archived_section">Zarchiwizowane (%1$d)</string>
     <string name="cd_increase_quantity">Zwiększ ilość produktu %1$s</string>

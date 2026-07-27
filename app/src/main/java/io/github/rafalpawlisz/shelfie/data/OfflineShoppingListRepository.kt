@@ -154,4 +154,7 @@ class OfflineShoppingListRepository(
     override suspend fun isOnAnyList(productId: String): Boolean = dao.isOnActiveList(productId)
 
     override fun observePlannedEntries(): Flow<List<PlannedEntry>> = dao.observePlannedEntries()
+
+    override fun observeReferencedProductIds(): Flow<List<String>> =
+        dao.observeReferencedProductIds()
 }

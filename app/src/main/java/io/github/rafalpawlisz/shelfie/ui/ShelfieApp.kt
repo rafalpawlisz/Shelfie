@@ -373,6 +373,20 @@ fun ShelfieApp(
             } else {
                 null
             },
+            // Only an archived product no list refers to can go for good; an
+            // item anywhere (even on an archived list) would be deleted with
+            // it. The repository checks again — this only decides what to show.
+            onDelete = if (
+                editedArchived != null &&
+                editedProduct.id !in state.referencedProductIds
+            ) {
+                {
+                    viewModel.deleteArchived(editedProduct.id)
+                    editedProductId = null
+                }
+            } else {
+                null
+            },
         )
     }
 }

@@ -2,6 +2,7 @@ package io.github.rafalpawlisz.shelfie.data.local
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -33,6 +34,51 @@ interface ProductDao {
 
     @Query("DELETE FROM products WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    // --- Deleting an archived product for good ---
+
+    /**
+     * Every shopping-list item pointing at this product, archived lists
+     * included. An archived list can be restored, so a reference from one is
+     * still a reference: deleting the product would quietly remove the item
+     * (the FK cascades) and change a list nobody touched.
+     */
+    @Query("SELECT COUNT(*) FROM shopping_list_items WHERE productId = :id")
+    suspend fun listItemCount(id: String): Int
+
+    @Query("SELECT barcode FROM product_barcodes WHERE productId = :id")
+    suspend fun barcodesOf(id: String): List<String>
+
+    @Query("SELECT listId FROM product_list_order WHERE productId = :id")
+    suspend fun orderedListIdsOf(id: String): List<String>
+
+    @Query("SELECT id FROM products WHERE id = :id AND archivedAt IS NOT NULL")
+    suspend fun archivedIdOf(id: String): String?
+
+    /**
+     * Delete an archived, unused product together with what belongs to it,
+     * and report the child rows so the same deletions can be mirrored.
+     *
+     * Returns null when the product must not go: not archived (deleting
+     * something still in the pantry is not what any caller means) or still
+     * referenced by a list. The check lives here rather than only in the UI
+     * because the UI reads a snapshot — the other device can add the product
+     * to a list between the button appearing and the tap.
+     *
+     * Barcodes and order rows are read BEFORE the delete, since the cascade
+     * removes them and their ids would be gone with them.
+     */
+    @Transaction
+    suspend fun deleteArchivedIfUnused(id: String): DeletedProductRows? {
+        if (archivedIdOf(id) == null) return null
+        if (listItemCount(id) > 0) return null
+        val rows = DeletedProductRows(
+            barcodes = barcodesOf(id),
+            orderedListIds = orderedListIdsOf(id),
+        )
+        deleteById(id)
+        return rows
+    }
 
     @Query("SELECT * FROM products WHERE id = :id AND archivedAt IS NULL")
     suspend fun getActive(id: String): ProductEntity?
@@ -70,3 +116,9 @@ interface ProductDao {
     @Query("UPDATE products SET archivedAt = NULL, updatedAt = :timestamp WHERE id = :id")
     suspend fun restore(id: String, timestamp: Long)
 }
+
+/** What [ProductDao.deleteArchivedIfUnused] took with the product. */
+data class DeletedProductRows(
+    val barcodes: List<String>,
+    val orderedListIds: List<String>,
+)

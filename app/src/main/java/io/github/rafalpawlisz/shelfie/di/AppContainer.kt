@@ -111,7 +111,7 @@ class AppContainer(private val context: Context) {
     private val syncClock: SyncClock by lazy { OffsetSyncClock(syncStateStore) }
 
     val productRepository: ProductRepository by lazy {
-        OfflineProductRepository(database.productDao(), syncClock)
+        OfflineProductRepository(database.productDao(), syncEngine, syncClock)
     }
 
     val shoppingListRepository: ShoppingListRepository by lazy {

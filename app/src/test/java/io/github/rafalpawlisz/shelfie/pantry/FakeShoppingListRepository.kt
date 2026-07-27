@@ -218,6 +218,10 @@ class FakeShoppingListRepository(
         return items.value.any { it.productId == productId && it.listId in activeListIds }
     }
 
+    // Every list, archived included — the real query does not filter.
+    override fun observeReferencedProductIds(): Flow<List<String>> =
+        items.map { all -> all.map { it.productId }.distinct() }
+
     override fun observePlannedEntries(): Flow<List<PlannedEntry>> =
         combine(items, lists) { allItems, allLists ->
             val activeListIds = allLists.filter { it.archivedAt == null }.map { it.id }.toSet()

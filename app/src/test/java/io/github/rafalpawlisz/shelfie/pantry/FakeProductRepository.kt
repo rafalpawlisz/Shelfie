@@ -87,6 +87,21 @@ class FakeProductRepository : ProductRepository {
         setArchived(id, archived = false)
     }
 
+    /**
+     * Products the "lists" refer to. The real check is a SQL count over
+     * shopping_list_items; a test sets this to say what that count would find.
+     */
+    var referencedProductIds: Set<String> = emptySet()
+
+    override suspend fun deleteArchivedProduct(id: String): Boolean {
+        // Mirrors the DAO's transaction: archived and unreferenced, or nothing
+        // happens at all.
+        val entry = entries.value.firstOrNull { it.product.id == id } ?: return false
+        if (!entry.archived || id in referencedProductIds) return false
+        entries.update { list -> list.filterNot { it.product.id == id } }
+        return true
+    }
+
     private fun mapProduct(id: String, transform: (Product) -> Product) {
         entries.update { list ->
             list.map { entry ->

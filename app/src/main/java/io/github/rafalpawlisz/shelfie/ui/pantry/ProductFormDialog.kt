@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -88,7 +89,11 @@ fun ProductFormDialog(
     autoFocusName: Boolean = false,
     onArchive: (() -> Unit)? = null,
     onRestore: (() -> Unit)? = null,
+    // Permanent deletion; the caller passes it only when the product is
+    // archived and no list refers to it.
+    onDelete: (() -> Unit)? = null,
 ) {
+    var confirmDelete by rememberSaveable(stateKey) { mutableStateOf(false) }
     var name by rememberSaveable(stateKey) { mutableStateOf(initialName) }
     var quantityText by rememberSaveable(stateKey) { mutableStateOf(initialQuantity.toString()) }
     var unit by rememberSaveable(stateKey) { mutableStateOf(initialUnit.orEmpty()) }
@@ -295,8 +300,48 @@ fun ProductFormDialog(
                             Text(stringResource(R.string.action_restore))
                         }
                     }
+                    // Offered only for an archived product no list refers to —
+                    // the caller decides that; here it only asks first, because
+                    // nothing brings this back.
+                    if (onDelete != null) {
+                        TextButton(
+                            onClick = { confirmDelete = true },
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error,
+                            ),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        ) {
+                            Text(stringResource(R.string.action_delete_forever))
+                        }
+                    }
                 }
             }
         }
+    }
+
+    if (confirmDelete && onDelete != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.delete_product_title)) },
+            text = { Text(stringResource(R.string.delete_product_message, initialName)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmDelete = false
+                        onDelete()
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) {
+                    Text(stringResource(R.string.action_delete_forever))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
     }
 }
