@@ -36,11 +36,16 @@ interface HouseholdRepository {
      *
      * Local data is not touched — this deletes the household, not the pantry.
      *
-     * Order is forced by the rules and by Firestore having no cascade: the
-     * subcollections have to go while membership still grants access to them,
-     * and membership therefore goes last. An interrupted run leaves the caller
-     * a member of a partly emptied household, which is retryable; the reverse
-     * order would leave documents nobody can read or delete.
+     * Order is forced by three things. The pointer goes first, because it is
+     * what drives the sync session and deleting documents underneath a live
+     * session makes the pull side mirror those deletions into Room — the local
+     * pantry, which is exactly what this promises to keep. The subcollections
+     * go next, one document at a time (Firestore has no cascade) and while
+     * membership in the household document still grants access to them. The
+     * household and its code go last.
+     *
+     * An interrupted run leaves the caller outside a household that still
+     * exists, with its code still valid — rejoinable, and retryable.
      */
     suspend fun deleteHousehold(uid: String)
 

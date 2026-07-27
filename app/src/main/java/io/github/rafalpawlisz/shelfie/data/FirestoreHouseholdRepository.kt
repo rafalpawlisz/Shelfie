@@ -13,6 +13,7 @@ import java.security.SecureRandom
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 
 class FirestoreHouseholdRepository(
@@ -136,6 +137,18 @@ class FirestoreHouseholdRepository(
         val household = db.collection(HOUSEHOLDS).document(currentId)
         val snapshot = household.get().await()
 
+        // 0) Detach this device before deleting anything, by dropping the
+        // pointer and waiting for it to take effect.
+        //
+        // The pointer is what drives the sync session; membership, still intact
+        // in the household document, is what the rules check. Deleting the
+        // documents with the session live makes the pull side see them as
+        // someone else's deletions and mirror them into Room — which wiped the
+        // local pantry on a device before this step existed, in flat
+        // contradiction of what the dialog promises.
+        db.collection(USERS).document(uid).delete().await()
+        observeHousehold(uid).first { it == null }
+
         // 1) Everything under the household, while membership still grants
         // access. Firestore has no cascade, so this is document by document;
         // batches cap at 500 writes.
@@ -146,15 +159,14 @@ class FirestoreHouseholdRepository(
             }
         }
 
-        // 2) The code, the household and the pointer. The code first: its rule
-        // needs either a live membership or a household that no longer exists,
-        // and one batch satisfies the first.
+        // 2) The code and the household itself. The code goes in the same batch
+        // so its rule can still see a live membership; afterwards it would only
+        // be deletable through the "household is gone" clause.
         db.runBatch { batch ->
             snapshot.getString("inviteCode")?.let { code ->
                 batch.delete(db.collection(INVITE_CODES).document(code))
             }
             if (snapshot.exists()) batch.delete(household)
-            batch.delete(db.collection(USERS).document(uid))
         }.await()
     }
 
