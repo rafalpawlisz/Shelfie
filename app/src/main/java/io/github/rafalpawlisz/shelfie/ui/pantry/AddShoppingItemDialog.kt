@@ -76,8 +76,16 @@ fun AddShoppingItemDialog(
     }
     val selectedProduct = products.firstOrNull { it.id == selectedProductId }
 
+    // One meaning of "back" for every way of asking: the arrow in the bar, the
+    // system gesture, the hardware button. From the amount step it returns to
+    // the list; only the list itself closes the picker. Without this the
+    // system back skipped the first step and threw away a chosen product.
+    val goBack = {
+        if (selectedProduct == null) onDismiss() else selectedProductId = null
+    }
+
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = goBack,
         // Edge-to-edge so the window reports IME insets; imePadding() below then
         // keeps the content above the keyboard.
         properties = DialogProperties(
@@ -116,14 +124,7 @@ fun AddShoppingItemDialog(
                 topBar = {
                     TopAppBar(
                         navigationIcon = {
-                            IconButton(
-                                onClick = {
-                                    // Back steps out of the amount phase; from
-                                    // the list it closes.
-                                    if (selectedProduct == null) onDismiss()
-                                    else selectedProductId = null
-                                },
-                            ) {
+                            IconButton(onClick = goBack) {
                                 Icon(
                                     imageVector = if (selectedProduct == null) {
                                         Icons.Default.Clear
