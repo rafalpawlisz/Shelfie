@@ -51,7 +51,7 @@ function anonDb() {
 }
 
 // Seed data bypassing the rules.
-async function seedHousehold(hid, members, code) {
+async function seedHousehold(hid, members, code, extra = {}) {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const f = ctx.firestore();
     await setDoc(doc(f, "households", hid), {
@@ -60,6 +60,7 @@ async function seedHousehold(hid, members, code) {
       inviteCode: code,
       // Seeds may be memberless (an emptied household kept for recovery).
       createdBy: Object.keys(members)[0] ?? ANNA,
+      ...extra,
     });
     await setDoc(doc(f, "inviteCodes", code), { householdId: hid });
   });
@@ -210,6 +211,60 @@ describe("households: rename and delete", () => {
     );
     await assertFails(
       updateDoc(doc(db(EVE), "households", "h1"), { lastActiveAt: serverTimestamp() }),
+    );
+  });
+
+  it("a member stamps their own memberActivity entry, alone or with lastActiveAt", async () => {
+    await seedHousehold("h1", { [ANNA]: true, [BOB]: true }, "CODE01");
+    await assertSucceeds(
+      updateDoc(doc(db(ANNA), "households", "h1"), {
+        [`memberActivity.${ANNA}`]: serverTimestamp(),
+      }),
+    );
+    // What the app actually writes: both stamps in one update.
+    await assertSucceeds(
+      updateDoc(doc(db(BOB), "households", "h1"), {
+        lastActiveAt: serverTimestamp(),
+        [`memberActivity.${BOB}`]: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("nobody stamps or clears activity for someone else", async () => {
+    await seedHousehold("h1", { [ANNA]: true, [BOB]: true }, "CODE01", {
+      memberActivity: { [BOB]: new Date("2026-01-01") },
+    });
+    // Forging a fellow member's activity would hide a dead membership entry;
+    // clearing it does the opposite and makes a live member look prunable.
+    await assertFails(
+      updateDoc(doc(db(ANNA), "households", "h1"), {
+        [`memberActivity.${BOB}`]: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(db(ANNA), "households", "h1"), {
+        [`memberActivity.${BOB}`]: deleteField(),
+      }),
+    );
+    await assertFails(updateDoc(doc(db(ANNA), "households", "h1"), { memberActivity: {} }));
+    await assertFails(
+      updateDoc(doc(db(EVE), "households", "h1"), {
+        [`memberActivity.${EVE}`]: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("activity must be the server's clock, not a chosen value", async () => {
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    const household = doc(db(ANNA), "households", "h1");
+    // Backdating your own entry is how you would fake being inactive; the
+    // value has to be the time the write is served.
+    await assertFails(
+      updateDoc(household, { [`memberActivity.${ANNA}`]: new Date("2020-01-01") }),
+    );
+    await assertFails(updateDoc(household, { [`memberActivity.${ANNA}`]: "recently" }));
+    await assertSucceeds(
+      updateDoc(household, { [`memberActivity.${ANNA}`]: serverTimestamp() }),
     );
   });
 

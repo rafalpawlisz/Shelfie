@@ -136,13 +136,24 @@ class FirestoreHouseholdRepository(
             .await()
     }
 
-    override suspend fun markHouseholdActive(householdId: String): Long? {
+    override suspend fun markHouseholdActive(householdId: String, uid: String): Long? {
         // Server time on purpose: device clocks drift (a cloned emulator was
         // half an hour off), and this value exists to be compared across
         // households and read by a human much later.
+        //
+        // The per-member stamp is what makes members prunable. Membership
+        // entries outlive their owners — an anonymous identity dies with its
+        // install, and taking over an existing account abandons the uid it
+        // replaces — and a bare map of uids gives nothing to tell a live
+        // member from a dead one.
         val document = db.collection(HOUSEHOLDS).document(householdId)
         val before = System.currentTimeMillis()
-        document.update(FIELD_LAST_ACTIVE_AT, FieldValue.serverTimestamp()).await()
+        document.update(
+            mapOf(
+                FIELD_LAST_ACTIVE_AT to FieldValue.serverTimestamp(),
+                "$FIELD_MEMBER_ACTIVITY.$uid" to FieldValue.serverTimestamp(),
+            ),
+        ).await()
         val after = System.currentTimeMillis()
 
         // Reading the stamp back turns it into a clock reference. The server
@@ -197,6 +208,7 @@ class FirestoreHouseholdRepository(
         const val INVITE_CODES = "inviteCodes"
         const val FIELD_HOUSEHOLD_ID = "householdId"
         const val FIELD_LAST_ACTIVE_AT = "lastActiveAt"
+        const val FIELD_MEMBER_ACTIVITY = "memberActivity"
 
         // No 0/O/1/I — codes get read out loud between household members.
         const val CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"

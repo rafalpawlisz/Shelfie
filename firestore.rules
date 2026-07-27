@@ -2,7 +2,8 @@ rules_version = '2';
 
 // Shelfie household model. Everything not explicitly allowed is denied.
 //
-// households/{hid}   { name, members: {uid: true}, inviteCode, createdAt, createdBy }
+// households/{hid}   { name, members: {uid: true}, inviteCode, createdAt,
+//                      createdBy, lastActiveAt, memberActivity: {uid: time} }
 // users/{uid}        { householdId }
 // inviteCodes/{code} { householdId }   — code → household index for joining
 service cloud.firestore {
@@ -32,6 +33,23 @@ service cloud.firestore {
       function membersDiffOnlySelf() {
         return request.resource.data.members.diff(resource.data.members)
           .affectedKeys().hasOnly([request.auth.uid]);
+      }
+
+      function touches(field) {
+        return request.resource.data.diff(resource.data).affectedKeys().hasAny([field]);
+      }
+
+      // The memberActivity map gained exactly one entry — the caller's own,
+      // set to the time this write is served. The presence check comes first
+      // on purpose: without it, an update that drops the whole map reads a
+      // missing property and fails as an evaluation error rather than a plain
+      // denial, which is noise in the logs for a case we can just answer.
+      function stampsOwnActivityOnly() {
+        return 'memberActivity' in request.resource.data
+          && request.resource.data.memberActivity
+               .diff(resource.data.get('memberActivity', {}))
+               .affectedKeys().hasOnly([request.auth.uid])
+          && request.resource.data.memberActivity[request.auth.uid] == request.time;
       }
 
       // Creating a household: the creator is its sole member.
@@ -65,9 +83,19 @@ service cloud.firestore {
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
         )
-        // Members stamp lastActiveAt once per sync session (housekeeping
-        // signal for the project owner; nothing in the app reads it).
-        || (isMember() && changesOnly(['lastActiveAt']))
+        // Members stamp lastActiveAt and their own memberActivity entry once
+        // per sync session (housekeeping signals for the project owner;
+        // nothing in the app reads them).
+        //
+        // Both halves are constrained: a member may only touch their own
+        // activity entry, and only to the server's clock. Otherwise the field
+        // meant to identify dead members would let a live one forge activity
+        // for them — or backdate someone else into looking prunable.
+        || (
+          isMember()
+          && changesOnly(['lastActiveAt', 'memberActivity'])
+          && (!touches('memberActivity') || stampsOwnActivityOnly())
+        )
       );
 
       // A sole member may delete their own household. The membership check is

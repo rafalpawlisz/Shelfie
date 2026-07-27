@@ -91,8 +91,10 @@ class AppContainer(private val context: Context) {
             onSessionStart = { householdId ->
                 // The stamp doubles as a clock reference; storing the measured
                 // offset is what keeps this device's timestamps comparable with
-                // the other one's.
-                householdRepository.markHouseholdActive(householdId)?.let { offset ->
+                // the other one's. ensureSignedIn is a local read here: a
+                // session only exists because a signed-in user has a household.
+                val uid = authRepository.ensureSignedIn().uid
+                householdRepository.markHouseholdActive(householdId, uid)?.let { offset ->
                     if (offset != syncStateStore.clockOffsetMillis) {
                         Log.i("SyncEngine", "clock offset vs server: ${offset}ms")
                     }

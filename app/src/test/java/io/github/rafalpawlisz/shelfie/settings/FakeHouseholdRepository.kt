@@ -70,5 +70,5 @@ class FakeHouseholdRepository : HouseholdRepository {
         }
     }
 
-    override suspend fun markHouseholdActive(householdId: String): Long? = null
+    override suspend fun markHouseholdActive(householdId: String, uid: String): Long? = null
 }
