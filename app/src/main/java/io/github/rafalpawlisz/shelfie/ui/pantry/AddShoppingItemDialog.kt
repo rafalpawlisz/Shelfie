@@ -25,12 +25,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -218,10 +222,18 @@ private fun SearchPhase(
     var query by rememberSaveable { mutableStateOf("") }
     val visibleProducts = products.filterByName(query)
 
+    // Focus and keyboard up front: this screen exists to be typed into, and
+    // coming back from the amount step lands here to search again. Scoped to
+    // this composable, so the Products tab's identical field stays quiet.
+    val searchFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { searchFocus.requestFocus() }
     ProductSearchField(
         query = query,
         onQueryChange = { query = it },
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .focusRequester(searchFocus),
     )
     if (query.isBlank() && products.isEmpty()) {
         Text(
