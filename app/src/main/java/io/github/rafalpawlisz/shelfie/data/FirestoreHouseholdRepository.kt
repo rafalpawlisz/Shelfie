@@ -8,6 +8,7 @@ import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.WriteBatch
 import io.github.rafalpawlisz.shelfie.data.sync.SyncCollection
+import io.github.rafalpawlisz.shelfie.data.sync.SyncStateStore
 import io.github.rafalpawlisz.shelfie.model.Household
 import java.security.SecureRandom
 import kotlinx.coroutines.channels.awaitClose
@@ -18,6 +19,9 @@ import kotlinx.coroutines.tasks.await
 
 class FirestoreHouseholdRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    // Written by createHousehold only, to mark a household as this device's own
+    // before anyone can observe it. See the note there.
+    private val syncState: SyncStateStore? = null,
 ) : HouseholdRepository {
 
     override fun observeHousehold(uid: String): Flow<Household?> = callbackFlow {
@@ -59,6 +63,20 @@ class FirestoreHouseholdRepository(
             val householdId = db.collection(HOUSEHOLDS).document().id
             val code = generateInviteCode()
             try {
+                // Claim the household as this device's own BEFORE the write can
+                // be observed. The engine treats a household it has never
+                // synced as a join, and a join replaces local content with the
+                // household's — right when joining someone else, wrong for one
+                // we are creating ourselves. It matters most offline: the batch
+                // sits in Firestore's queue, products get added meanwhile, and
+                // when it finally lands the session would delete everything the
+                // household does not have yet. That cost two products on a
+                // device. lastSyncedAt = 0 keeps the deletion arm empty without
+                // pretending anything has synced.
+                syncState?.let {
+                    it.lastSyncedHouseholdId = householdId
+                    it.lastSyncedAt = 0
+                }
                 db.runBatch { batch ->
                     batch.set(
                         db.collection(HOUSEHOLDS).document(householdId),

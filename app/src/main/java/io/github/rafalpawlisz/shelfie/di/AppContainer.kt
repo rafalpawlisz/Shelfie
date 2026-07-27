@@ -131,6 +131,6 @@ class AppContainer(private val context: Context) {
     }
 
     val householdRepository: HouseholdRepository by lazy {
-        FirestoreHouseholdRepository()
+        FirestoreHouseholdRepository(syncState = syncStateStore)
     }
 }

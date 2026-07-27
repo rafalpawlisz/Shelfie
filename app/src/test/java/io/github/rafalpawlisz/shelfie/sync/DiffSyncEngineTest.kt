@@ -160,6 +160,30 @@ class DiffSyncEngineTest {
     }
 
     @Test
+    fun `a household this device created never replaces local rows`() = runTest {
+        // createHousehold claims the household in sync state before anyone can
+        // observe it, with lastSyncedAt = 0. That is what separates "I made
+        // this" from "I am joining yours" — and it has to hold even when the
+        // remote side already has documents, which is what happens when the
+        // creating batch was queued offline and lands much later while the
+        // pantry has moved on.
+        val h = Harness(this)
+        h.syncState.lastSyncedHouseholdId = "h1"
+        h.syncState.lastSyncedAt = 0
+        h.store.upsert(SyncCollection.PRODUCTS, "added", remoteProduct("added", "Bread", 300).data)
+        h.products.value = listOf(product("added", "Bread", 300))
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(products = listOf(remoteProduct("seeded", "Milk", 100)))
+        runCurrent()
+
+        val ids = h.store.ids(SyncCollection.PRODUCTS)
+        assertTrue("a row added before the session was deleted", "added" in ids)
+        assertTrue("the household's own row was not pulled", "seeded" in ids)
+        assertTrue(h.writer.sets.any { it.docId == "added" })
+    }
+
+    @Test
     fun `the household becomes known even when its remote side is empty`() = runTest {
         // Creating a household seeds it from local data; the next session must
         // not treat that household as someone else's and wipe local content.
