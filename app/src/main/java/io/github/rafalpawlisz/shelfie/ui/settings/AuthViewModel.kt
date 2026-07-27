@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.firestore.FirebaseFirestoreException
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.ShelfieApplication
 import io.github.rafalpawlisz.shelfie.data.AuthRepository
@@ -79,6 +80,15 @@ class AuthViewModel(
     private val _rememberedInviteCode = MutableStateFlow(syncState.lastHouseholdInviteCode)
     val rememberedInviteCode: StateFlow<String?> = _rememberedInviteCode
 
+    /**
+     * A create/join/leave is in flight. Creating a household waits for the
+     * server to acknowledge the write, which offline means waiting as long as
+     * it takes — so without this the button looks dead and a second tap would
+     * queue a second household.
+     */
+    private val _pending = MutableStateFlow(false)
+    val pending: StateFlow<Boolean> = _pending
+
     init {
         // The invite code is only visible from inside the household, so it has
         // to be captured while we are there — after leaving there is nothing
@@ -99,6 +109,7 @@ class AuthViewModel(
     fun createHousehold(name: String) {
         clearError()
         viewModelScope.launch {
+            _pending.value = true
             try {
                 householdRepository.createHousehold(currentUid(), name.trim())
             } catch (e: CancellationException) {
@@ -106,6 +117,8 @@ class AuthViewModel(
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household creation failed", e)
                 _error.value = HouseholdError(errorMessageFor(e), ErrorSpot.CREATE)
+            } finally {
+                _pending.value = false
             }
         }
     }
@@ -138,6 +151,7 @@ class AuthViewModel(
     fun leaveHousehold(deleteHousehold: Boolean = false) {
         clearError()
         viewModelScope.launch {
+            _pending.value = true
             try {
                 val uid = currentUid()
                 if (deleteHousehold) {
@@ -155,6 +169,8 @@ class AuthViewModel(
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Leaving household failed", e)
                 _error.value = HouseholdError(errorMessageFor(e), ErrorSpot.SECTION)
+            } finally {
+                _pending.value = false
             }
         }
     }
@@ -178,6 +194,7 @@ class AuthViewModel(
     fun joinHousehold(code: String) {
         clearError()
         viewModelScope.launch {
+            _pending.value = true
             try {
                 householdRepository.joinHousehold(currentUid(), code)
             } catch (e: InvalidInviteCodeException) {
@@ -187,6 +204,8 @@ class AuthViewModel(
             } catch (e: Exception) {
                 Log.w("AuthViewModel", "Household join failed", e)
                 _error.value = HouseholdError(errorMessageFor(e), ErrorSpot.JOIN)
+            } finally {
+                _pending.value = false
             }
         }
     }
@@ -197,8 +216,14 @@ class AuthViewModel(
      * thing on a fresh install that ever touches the network, since that is
      * when the anonymous account gets created.
      */
-    private fun errorMessageFor(e: Exception): Int = when (e) {
-        is FirebaseNetworkException -> R.string.error_network
+    private fun errorMessageFor(e: Exception): Int = when {
+        e is FirebaseNetworkException -> R.string.error_network
+        // Firestore reports its own unreachability, and it is the one that
+        // fails when a server-only read (resolving an invite code) is asked
+        // for offline.
+        e is FirebaseFirestoreException &&
+            e.code == FirebaseFirestoreException.Code.UNAVAILABLE -> R.string.error_network
+
         else -> R.string.household_error
     }
 

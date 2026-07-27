@@ -260,6 +260,7 @@ fun ShelfieApp(
 
     if (showSettings) {
         val error by authViewModel.error.collectAsStateWithLifecycle()
+        val pending by authViewModel.pending.collectAsStateWithLifecycle()
         val rememberedInviteCode by
             authViewModel.rememberedInviteCode.collectAsStateWithLifecycle()
         val syncStatus by authViewModel.syncStatus.collectAsStateWithLifecycle()
@@ -272,6 +273,7 @@ fun ShelfieApp(
                 state.archivedLists.isNotEmpty(),
             rememberedInviteCode = rememberedInviteCode,
             error = error,
+            pending = pending,
             onCreateHousehold = authViewModel::createHousehold,
             onJoinHousehold = authViewModel::joinHousehold,
             onRenameHousehold = authViewModel::renameHousehold,

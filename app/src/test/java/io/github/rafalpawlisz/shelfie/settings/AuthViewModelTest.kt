@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.settings
 
 import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.firestore.FirebaseFirestoreException
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.data.sync.SyncStatus
@@ -83,6 +84,44 @@ class AuthViewModelTest {
         assertEquals("Dom", viewModel.household.value?.name)
         assertEquals(setOf("uid-other", "anon-1"), viewModel.household.value?.memberIds)
         assertNull(viewModel.error.value)
+    }
+
+    @Test
+    fun `a create in flight blocks the buttons until it finishes`() = runTest {
+        // Offline this wait is open-ended — Firestore holds the write until the
+        // connection returns — so the UI needs to know it is happening.
+        val auth = FakeAuthRepository(initialUid = "anon-1")
+        val households = FakeHouseholdRepository()
+        households.blockCreate()
+        val viewModel = makeViewModel(auth, households)
+        observe(viewModel)
+
+        viewModel.createHousehold("Dom")
+        assertEquals(true, viewModel.pending.value)
+
+        households.releaseCreate()
+        assertEquals(false, viewModel.pending.value)
+        assertEquals("Dom", viewModel.household.value?.name)
+    }
+
+    @Test
+    fun `an unreachable Firestore is a connection problem, not a bad code`() = runTest {
+        // Resolving a code is a server-only read, so offline it fails with
+        // UNAVAILABLE. Reporting that as "no household found for that code"
+        // would blame a code that may be perfectly good.
+        val auth = FakeAuthRepository(initialUid = "anon-1")
+        val households = FakeHouseholdRepository()
+        households.joinFailure = FirebaseFirestoreException(
+            "offline",
+            FirebaseFirestoreException.Code.UNAVAILABLE,
+        )
+        val viewModel = makeViewModel(auth, households)
+        observe(viewModel)
+
+        viewModel.joinHousehold("ABC123")
+
+        assertEquals(R.string.error_network, viewModel.error.value?.message)
+        assertEquals(ErrorSpot.JOIN, viewModel.error.value?.spot)
     }
 
     @Test

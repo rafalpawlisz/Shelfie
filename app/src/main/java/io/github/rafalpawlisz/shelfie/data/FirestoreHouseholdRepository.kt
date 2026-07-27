@@ -107,7 +107,14 @@ class FirestoreHouseholdRepository(
 
     override suspend fun joinHousehold(uid: String, code: String) {
         val normalized = code.trim().uppercase()
-        val codeSnap = db.collection(INVITE_CODES).document(normalized).get().await()
+        // Server-only on purpose. A code this device has never seen is absent
+        // from the cache, so a cached read answers "no such household" when the
+        // truth is "no connection" — telling the user their code is wrong when
+        // it may be perfectly good. Offline this throws UNAVAILABLE instead,
+        // which maps to the network message.
+        val codeSnap = db.collection(INVITE_CODES).document(normalized)
+            .get(Source.SERVER)
+            .await()
         val targetId = codeSnap.getString(FIELD_HOUSEHOLD_ID)
             ?: throw InvalidInviteCodeException()
 

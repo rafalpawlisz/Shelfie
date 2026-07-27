@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -11,6 +12,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -63,6 +65,8 @@ fun SettingsDialog(
     // Code of the household this device last belonged to, if any.
     rememberedInviteCode: String?,
     error: HouseholdError?,
+    // A create/join/leave is waiting on the server; offline that is a long wait.
+    pending: Boolean,
     onCreateHousehold: (name: String) -> Unit,
     onJoinHousehold: (code: String) -> Unit,
     onRenameHousehold: (name: String) -> Unit,
@@ -104,6 +108,7 @@ fun SettingsDialog(
                     household = household,
                     syncStatus = syncStatus,
                     error = error,
+                    pending = pending,
                     rememberedInviteCode = rememberedInviteCode,
                     onCreate = onCreateHousehold,
                     onRename = { renaming = true },
@@ -360,6 +365,27 @@ private fun SyncStatusRow(status: SyncStatus) {
     }
 }
 
+/**
+ * A button label that becomes a spinner while the action is in flight.
+ *
+ * Creating a household waits for the server to acknowledge the write, and
+ * offline that wait is open-ended: Firestore keeps the write queued and
+ * delivers it whenever the connection returns. Saying nothing made the button
+ * look broken, so it says "working on it" instead — and, being disabled,
+ * stops a second tap from queueing a second household.
+ */
+@Composable
+private fun PendingLabel(pending: Boolean, label: Int) {
+    if (pending) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(18.dp),
+            strokeWidth = 2.dp,
+        )
+    } else {
+        Text(stringResource(label))
+    }
+}
+
 /** Renders [error] only where it belongs, and nothing anywhere else. */
 @Composable
 private fun ErrorText(error: HouseholdError?, spot: ErrorSpot) {
@@ -376,6 +402,8 @@ private fun HouseholdSection(
     household: Household?,
     syncStatus: SyncStatus,
     error: HouseholdError?,
+    // A create/join/leave is waiting on the server; offline that is a long wait.
+    pending: Boolean,
     rememberedInviteCode: String?,
     onCreate: (name: String) -> Unit,
     onRename: () -> Unit,
@@ -404,10 +432,10 @@ private fun HouseholdSection(
         ErrorText(error, ErrorSpot.CREATE)
         Button(
             onClick = { onCreate(name) },
-            enabled = name.isNotBlank(),
+            enabled = name.isNotBlank() && !pending,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(stringResource(R.string.household_create))
+            PendingLabel(pending, R.string.household_create)
         }
     } else {
         // Name and its rename action on one line: no icon vocabulary to learn,
@@ -443,8 +471,12 @@ private fun HouseholdSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         SyncStatusRow(syncStatus)
-        OutlinedButton(onClick = onLeave, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.household_leave))
+        OutlinedButton(
+            onClick = onLeave,
+            enabled = !pending,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            PendingLabel(pending, R.string.household_leave)
         }
     }
     // Joining is always available: with no household it's the first join,
@@ -463,9 +495,9 @@ private fun HouseholdSection(
             onJoin(code)
             code = ""
         },
-        enabled = code.isNotBlank(),
+        enabled = code.isNotBlank() && !pending,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(stringResource(R.string.household_join))
+        PendingLabel(pending, R.string.household_join)
     }
 }
