@@ -2,11 +2,26 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+        No automatic backup, and no device-to-device transfer of app data. The
+        household is the backup: a new phone joins with the invite code and the
+        pantry arrives from the server.
+
+        Restoring the data directory would also restore the sync bookkeeping —
+        `sync_state`, Firestore's cache and mutation queue, the anonymous
+        identity — and those decide whether a session treats a household as new
+        (replace local content) or as known (delete what the household no longer
+        has). A restore is by definition stale, and restoring onto a second phone
+        while the first still runs would clone one identity into two devices.
+        Neither is something to discover on somebody else's phone.
+
+        allowBackup governs cloud backup; the extraction rules are what turn off
+        device transfer on Android 12+, so both have to say it.
+    -->
     <application
         android:name=".ShelfieApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
