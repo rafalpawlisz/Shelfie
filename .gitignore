@@ -7,13 +7,31 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+# Per-user IDE preference, written the first time a Markdown file is opened.
+/.idea/markdown.xml
 .DS_Store
+Thumbs.db
 /build
 /captures
 .externalNativeBuild
 .cxx
-# Firebase project config — per-developer, not for a public repo.
+# Kotlin's project-local compiler session data.
+.kotlin
+
+# Firebase project config — per-developer, not for a public repo. CI rebuilds
+# it from a secret, or falls back to .github/ci/google-services.json.
 app/google-services.json
+
+# Signing material and build outputs: never in the repo, and the ignore is
+# cheap insurance for a public one.
+*.jks
+*.keystore
+*.apk
+*.aab
+*.hprof
+
+# The rules tests: npm dependencies and whatever the emulator logs beside them.
 firestore-tests/node_modules
-firebase-debug.log
-firestore-debug.log
+*-debug.log
+npm-debug.log*
+/.firebase
