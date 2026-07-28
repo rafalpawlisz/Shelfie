@@ -1,0 +1,149 @@
+package io.github.rafalpawlisz.shelfie.ui.pantry
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.model.ShoppingList
+
+@Composable
+internal fun ItemEditDialog(
+    lists: List<ShoppingList>,
+    currentListId: String?,
+    unavailableListIds: Set<String>,
+    initialAmount: Int?,
+    initialNote: String?,
+    onConfirm: (amount: Int?, note: String?, targetListId: String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var amountText by rememberSaveable { mutableStateOf(initialAmount?.toString().orEmpty()) }
+    var noteText by rememberSaveable { mutableStateOf(initialNote.orEmpty()) }
+    var targetListId by rememberSaveable { mutableStateOf(currentListId) }
+    val amount = amountText.trim().toIntOrNull()
+    val isValid = amountText.isBlank() || (amount != null && amount > 0)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.edit_item)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (lists.size > 1) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        lists.forEach { list ->
+                            FilterChip(
+                                selected = list.id == targetListId,
+                                // A list that already plans this product is not a
+                                // valid move target.
+                                enabled = list.id !in unavailableListIds,
+                                onClick = { targetListId = list.id },
+                                label = { Text(list.name) },
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text(stringResource(R.string.shopping_amount_label)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    label = { Text(stringResource(R.string.product_notes_label)) },
+                    maxLines = 3,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = isValid,
+                onClick = {
+                    onConfirm(
+                        if (amountText.isBlank()) null else amount,
+                        noteText.trim().ifBlank { null },
+                        targetListId?.takeIf { it != currentListId },
+                    )
+                },
+            ) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}
+
+// [allowEmpty]: a blank field is valid and confirms null ("just buy it") when
+// editing; the check-off variant requires a number (stock math needs it).
+@Composable
+internal fun AmountDialog(
+    title: String,
+    initialAmount: Int?,
+    allowEmpty: Boolean,
+    onConfirm: (Int?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // TextFieldValue instead of a plain String so the cursor can start after
+    // the prefilled amount — one backspace clears it.
+    var amountField by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        val text = initialAmount?.toString().orEmpty()
+        mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
+    }
+    val amountText = amountField.text
+    val amount = amountText.trim().toIntOrNull()
+    val isValid = if (amountText.isBlank()) allowEmpty else amount != null && amount > 0
+    val amountFocus = remember { FocusRequester() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = amountField,
+                onValueChange = { amountField = it },
+                label = { Text(stringResource(R.string.shopping_amount_label)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.focusRequester(amountFocus),
+            )
+            // The amount is the dialog's only input — focus it right away.
+            LaunchedEffect(Unit) { amountFocus.requestFocus() }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = isValid,
+                onClick = { onConfirm(if (amountText.isBlank()) null else amount) },
+            ) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}
+
