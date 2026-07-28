@@ -83,12 +83,18 @@ fun AddShoppingItemDialog(
         ?: archivedProducts.firstOrNull { it.id == selectedProductId }
     val selectedIsArchived = archivedProducts.any { it.id == selectedProductId }
 
+    // A product picked (or just created) but not yet in the lists Room hands
+    // us. Treated as the amount step, not as "nothing picked": falling back to
+    // the search meant a flash of it — keyboard, stolen focus and all — every
+    // time the picker reopened around a freshly created product.
+    val awaitingProduct = selectedProductId != null && selectedProduct == null
+
     // One meaning of "back" for every way of asking: the arrow in the bar, the
     // system gesture, the hardware button. From the amount step it returns to
     // the list; only the list itself closes the picker. Without this the
     // system back skipped the first step and threw away a chosen product.
     val goBack = {
-        if (selectedProduct == null) onDismiss() else selectedProductId = null
+        if (selectedProductId == null) onDismiss() else selectedProductId = null
     }
 
     Dialog(
@@ -133,13 +139,13 @@ fun AddShoppingItemDialog(
                         navigationIcon = {
                             IconButton(onClick = goBack) {
                                 Icon(
-                                    imageVector = if (selectedProduct == null) {
+                                    imageVector = if (selectedProductId == null) {
                                         Icons.Default.Clear
                                     } else {
                                         Icons.AutoMirrored.Filled.ArrowBack
                                     },
                                     contentDescription = stringResource(
-                                        if (selectedProduct == null) {
+                                        if (selectedProductId == null) {
                                             R.string.action_close
                                         } else {
                                             R.string.action_back
@@ -184,12 +190,16 @@ fun AddShoppingItemDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (selectedProduct == null) {
-                        SearchPhase(
-                            products = products,
-                            archivedProducts = archivedProducts,
-                            onSelect = { selectedProductId = it },
-                            onCreateProduct = onCreateProduct,
-                        )
+                        // Nothing but the bar while the picked product is still
+                        // on its way; back leaves for the search as usual.
+                        if (!awaitingProduct) {
+                            SearchPhase(
+                                products = products,
+                                archivedProducts = archivedProducts,
+                                onSelect = { selectedProductId = it },
+                                onCreateProduct = onCreateProduct,
+                            )
+                        }
                     } else {
                         Text(
                             text = listOfNotNull(selectedProduct.emoji, selectedProduct.name)

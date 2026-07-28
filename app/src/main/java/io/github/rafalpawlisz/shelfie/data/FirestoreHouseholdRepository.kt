@@ -11,6 +11,7 @@ import io.github.rafalpawlisz.shelfie.data.sync.SyncCollection
 import io.github.rafalpawlisz.shelfie.data.sync.SyncStateStore
 import io.github.rafalpawlisz.shelfie.model.Household
 import java.security.SecureRandom
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -59,6 +60,8 @@ class FirestoreHouseholdRepository(
     override suspend fun createHousehold(uid: String, name: String) {
         // The code doc is create-only under the rules, so a collision makes
         // the whole batch fail — retry with a fresh code.
+        val claimBefore = syncState?.lastSyncedHouseholdId
+        val syncedAtBefore = syncState?.lastSyncedAt ?: 0L
         repeat(CODE_ATTEMPTS) { attempt ->
             val householdId = db.collection(HOUSEHOLDS).document().id
             val code = generateInviteCode()
@@ -99,8 +102,24 @@ class FirestoreHouseholdRepository(
                     )
                 }.await()
                 return
+            } catch (e: CancellationException) {
+                // The batch stays in Firestore's queue and may still land, so
+                // the claim has to stand: it is what stops the session that
+                // greets it from mistaking it for someone else's household.
+                throw e
             } catch (e: Exception) {
-                if (attempt == CODE_ATTEMPTS - 1) throw e
+                if (attempt == CODE_ATTEMPTS - 1) {
+                    // Nothing was created, so put the claim back the way it was
+                    // rather than leaving this device pointed at a household id
+                    // that does not exist. Harmless in itself — no session ever
+                    // runs for it — but it makes the stored state a lie, and the
+                    // next create or join is the only thing that overwrites it.
+                    syncState?.let {
+                        it.lastSyncedHouseholdId = claimBefore
+                        it.lastSyncedAt = syncedAtBefore
+                    }
+                    throw e
+                }
             }
         }
     }

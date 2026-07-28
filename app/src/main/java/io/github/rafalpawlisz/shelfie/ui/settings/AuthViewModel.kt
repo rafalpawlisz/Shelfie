@@ -21,8 +21,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -94,11 +97,18 @@ class AuthViewModel(
         // to be captured while we are there — after leaving there is nothing
         // left to read it from.
         viewModelScope.launch {
-            household.collect { current ->
-                val code = current?.inviteCode ?: return@collect
-                syncState.lastHouseholdInviteCode = code
-                _rememberedInviteCode.value = code
-            }
+            household
+                // The household emits on every change to it — a rename, the
+                // other person joining — while the code itself never changes.
+                // Without this the same string is written to disk again on each
+                // of them.
+                .map { it?.inviteCode }
+                .filterNotNull()
+                .distinctUntilChanged()
+                .collect { code ->
+                    syncState.lastHouseholdInviteCode = code
+                    _rememberedInviteCode.value = code
+                }
         }
     }
 

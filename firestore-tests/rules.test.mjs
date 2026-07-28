@@ -269,6 +269,19 @@ describe("households: rename and delete", () => {
     );
   });
 
+  it("lastActiveAt must be the server's clock too", async () => {
+    // Same reasoning as the per-member stamp: a value a member picks makes a
+    // live household look abandoned, and this one speaks for all of them.
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01", {
+      lastActiveAt: new Date("2026-01-01"),
+    });
+    const household = doc(db(ANNA), "households", "h1");
+    await assertFails(updateDoc(household, { lastActiveAt: new Date("2020-01-01") }));
+    await assertFails(updateDoc(household, { lastActiveAt: "recently" }));
+    await assertFails(updateDoc(household, { lastActiveAt: deleteField() }));
+    await assertSucceeds(updateDoc(household, { lastActiveAt: serverTimestamp() }));
+  });
+
   it("a member stamps their own memberActivity entry, alone or with lastActiveAt", async () => {
     await seedHousehold("h1", { [ANNA]: true, [BOB]: true }, "CODE01");
     await assertSucceeds(

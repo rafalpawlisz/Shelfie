@@ -39,6 +39,16 @@ service cloud.firestore {
         return request.resource.data.diff(resource.data).affectedKeys().hasAny([field]);
       }
 
+      // The field carries the time this write is served, and nothing else. Both
+      // activity stamps are housekeeping signals read by a human much later, so
+      // a backdated or misspelled value is worse than no value: it makes a live
+      // household look abandoned. The presence check guards the read, like in
+      // stampsOwnActivityOnly() below.
+      function stampsNow(field) {
+        return field in request.resource.data
+          && request.resource.data[field] == request.time;
+      }
+
       // The memberActivity map gained exactly one entry — the caller's own,
       // set to the time this write is served. The presence check comes first
       // on purpose: without it, an update that drops the whole map reads a
@@ -108,6 +118,7 @@ service cloud.firestore {
         || (
           isMember()
           && changesOnly(['lastActiveAt', 'memberActivity'])
+          && (!touches('lastActiveAt') || stampsNow('lastActiveAt'))
           && (!touches('memberActivity') || stampsOwnActivityOnly())
         )
       );
