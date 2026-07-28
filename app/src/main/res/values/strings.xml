@@ -95,6 +95,8 @@
     <string name="picker_archived_returns">Adding this brings it back from the archive</string>
     <string name="product_back_from_archive">That name was in the archive — the product came back with its old details</string>
     <string name="product_name_label">Name</string>
+    <string name="product_name_taken">You already have a product with this name</string>
+    <string name="product_name_in_archive">This name is in the archive — restore that product instead</string>
     <string name="product_quantity_label">Quantity</string>
     <string name="product_unit_label">Unit</string>
     <string name="product_min_quantity_label">Minimum quantity (optional)</string>

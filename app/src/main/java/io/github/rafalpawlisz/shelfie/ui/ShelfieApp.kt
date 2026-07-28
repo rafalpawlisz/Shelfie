@@ -43,6 +43,7 @@ import io.github.rafalpawlisz.shelfie.ui.pantry.LowStockSuggestion
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
 import io.github.rafalpawlisz.shelfie.ui.pantry.ProductFormDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.ProductsScreen
+import io.github.rafalpawlisz.shelfie.ui.pantry.productNameConflict
 import io.github.rafalpawlisz.shelfie.ui.pantry.RestockDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.ShoppingScreen
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScanResult
@@ -294,6 +295,9 @@ fun ShelfieApp(
             title = stringResource(R.string.add_product),
             confirmLabel = stringResource(R.string.action_add),
             autoFocusName = true,
+            nameConflictOf = { typed ->
+                productNameConflict(state.products, state.archivedProducts, typed)
+            },
             // A new product has nothing to remove from.
             onConfirm = { name, quantity, unit, minQuantity, notes, emoji, added, _ ->
                 viewModel.addProduct(name, quantity, unit, minQuantity, notes, emoji, added)
@@ -403,6 +407,16 @@ fun ShelfieApp(
             initialEmoji = editedProduct.emoji,
             initialBarcodes = state.barcodesByProduct[editedProduct.id].orEmpty(),
             stateKey = editedProduct.id,
+            // Renaming into another product's name would make the same pair of
+            // duplicates that creating one does; the product keeps its own name.
+            nameConflictOf = { typed ->
+                productNameConflict(
+                    state.products,
+                    state.archivedProducts,
+                    typed,
+                    selfId = editedProduct.id,
+                )
+            },
             onConfirm = { name, quantity, unit, minQuantity, notes, emoji, added, removed ->
                 viewModel.updateProduct(
                     editedProduct.id, name, quantity, unit, minQuantity, notes, emoji,

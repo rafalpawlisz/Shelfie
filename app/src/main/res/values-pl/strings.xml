@@ -95,6 +95,8 @@
     <string name="picker_archived_returns">Dodanie przywróci go z archiwum</string>
     <string name="product_back_from_archive">Ta nazwa była w archiwum — produkt wrócił z zachowanymi danymi</string>
     <string name="product_name_label">Nazwa</string>
+    <string name="product_name_taken">Masz już produkt o tej nazwie</string>
+    <string name="product_name_in_archive">Ta nazwa jest w archiwum — przywróć ten produkt zamiast tworzyć nowy</string>
     <string name="product_quantity_label">Ilość</string>
     <string name="product_unit_label">Jednostka</string>
     <string name="product_min_quantity_label">Ilość minimalna (opcjonalnie)</string>

@@ -61,6 +61,57 @@ class PantryViewModelTest {
     }
 
     @Test
+    fun `addProduct reaches a name the pantry already has instead of doubling it`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(
+            name = "Mleko",
+            quantity = 2,
+            unit = "l",
+            minQuantity = 4,
+            notes = "UHT",
+            emoji = "🥛",
+        )
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val id = viewModel.uiState.value.products.single().id
+
+        // The form warns while the name is typed, so this is the race: the other
+        // phone created "Mleko" while the form was open. One product wins, with
+        // its own details — a second one would split its barcodes and low stock.
+        viewModel.addProduct(name = " mleko ", quantity = 0, unit = null)
+
+        val product = viewModel.uiState.value.products.single()
+        assertEquals(id, product.id)
+        assertEquals(2, product.quantity)
+        assertEquals("l", product.unit)
+        assertEquals(4, product.minQuantity)
+        assertEquals("UHT", product.notes)
+    }
+
+    @Test
+    fun `addProduct restores that name from the archive and says so`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Kasza", quantity = 0, unit = "kg", minQuantity = 2)
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.archive(id)
+        val messages = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.messages.collect { messages += it }
+        }
+
+        viewModel.addProduct(name = "kasza", quantity = 0, unit = null)
+
+        val product = viewModel.uiState.value.products.single()
+        assertEquals(id, product.id)
+        assertEquals("kg", product.unit)
+        assertEquals(2, product.minQuantity)
+        assertTrue(viewModel.uiState.value.archivedProducts.isEmpty())
+        assertEquals(listOf(R.string.product_back_from_archive), messages)
+    }
+
+    @Test
     fun `decrement clamps quantity at zero`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Butter", quantity = 1, unit = null)

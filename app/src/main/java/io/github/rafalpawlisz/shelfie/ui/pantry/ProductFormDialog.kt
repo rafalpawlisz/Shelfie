@@ -88,6 +88,10 @@ fun ProductFormDialog(
     stateKey: Any? = null,
     // Add mode: focus the (required) name field right away so typing can start.
     autoFocusName: Boolean = false,
+    // Asked on every keystroke whether the name is already taken; a conflict is
+    // shown under the field and blocks the save. Default: nothing to collide
+    // with (the picker's path deliberately reuses the product it finds).
+    nameConflictOf: (String) -> ProductNameConflict? = { null },
     onArchive: (() -> Unit)? = null,
     onRestore: (() -> Unit)? = null,
     // Permanent deletion; the caller passes it only when the product is
@@ -121,7 +125,9 @@ fun ProductFormDialog(
     val quantity = quantityText.toIntOrNull()
     val minQuantity = minQuantityText.trim().ifBlank { null }?.toIntOrNull()
     val minQuantityValid = minQuantityText.isBlank() || (minQuantity != null && minQuantity >= 0)
-    val isValid = name.isNotBlank() && quantity != null && quantity >= 0 && minQuantityValid
+    val nameConflict = nameConflictOf(name)
+    val isValid = name.isNotBlank() && quantity != null && quantity >= 0 &&
+        minQuantityValid && nameConflict == null
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -211,6 +217,21 @@ fun ProductFormDialog(
                             onValueChange = { name = it },
                             label = { Text(stringResource(R.string.product_name_label)) },
                             singleLine = true,
+                            isError = nameConflict != null,
+                            supportingText = nameConflict?.let { conflict ->
+                                {
+                                    Text(
+                                        stringResource(
+                                            when (conflict) {
+                                                ProductNameConflict.ACTIVE ->
+                                                    R.string.product_name_taken
+                                                ProductNameConflict.ARCHIVED ->
+                                                    R.string.product_name_in_archive
+                                            },
+                                        ),
+                                    )
+                                }
+                            },
                             modifier = Modifier.weight(0.7f).focusRequester(nameFocus),
                         )
                         if (autoFocusName) {

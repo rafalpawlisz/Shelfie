@@ -186,9 +186,10 @@ class PantryViewModel(
         emoji: String? = null,
         barcodes: List<String> = emptyList(),
     ) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            val id = repository.addProduct(name, quantity, unit, minQuantity, notes, emoji)
-            barcodes.forEach { barcodeRepository.addBarcode(id, it) }
+            resolveProduct(trimmed, quantity, unit, minQuantity, notes, emoji, barcodes)
         }
     }
 
@@ -364,18 +365,6 @@ class PantryViewModel(
      * the Products tab uses — one meaning for "add a product", not two.
      * Publishes the id through [productForList] so the picker can continue to
      * the amount step with it.
-     *
-     * A name the pantry already knows reaches that product instead of making a
-     * second one, and its stored details are LEFT ALONE. The picker now finds
-     * archived products by search, so this branch is a race guard — the other
-     * device created or archived that name while the form was open — and in a
-     * race the established product is worth more than a form the user filled
-     * believing it was blank. Overwriting here once emptied an archived
-     * product's unit, minimum and notes, because that form is blank by design.
-     * The message says what happened rather than leaving it to be discovered.
-     *
-     * Barcodes are the exception, being additive: a code scanned into the form
-     * is new information about the product, not a replacement for it.
      */
     fun addProductForList(
         name: String,
@@ -389,21 +378,51 @@ class PantryViewModel(
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            val existing = repository.findByName(trimmed)
-            val id = if (existing == null) {
-                repository.addProduct(trimmed, quantity, unit, minQuantity, notes, emoji)
-            } else {
-                // Restoring is asked of the database rather than of uiState,
-                // which reports nothing when the screen is not collecting.
-                if (repository.getActiveProduct(existing.id) == null) {
-                    repository.restoreProduct(existing.id)
-                }
-                messageChannel.send(R.string.product_back_from_archive)
-                existing.id
-            }
-            barcodes.forEach { barcodeRepository.addBarcode(id, it) }
-            _productForList.value = id
+            _productForList.value =
+                resolveProduct(trimmed, quantity, unit, minQuantity, notes, emoji, barcodes)
         }
+    }
+
+    /**
+     * Reach the product of that name, creating one only when the pantry has
+     * none: two "Mleko" split the barcode a scan finds, the low-stock list and
+     * what the other phone sees. Both forms come through here.
+     *
+     * An existing product's stored details are LEFT ALONE. The forms warn about
+     * a taken name while it is typed, so this is the race guard — the other
+     * device created or archived that name while the form was open — and in a
+     * race the established product is worth more than a form the user filled
+     * believing it was blank. Overwriting here once emptied an archived
+     * product's unit, minimum and notes, because that form is blank by design.
+     * A product coming back from the archive says so, rather than leaving the
+     * restore to be discovered.
+     *
+     * Barcodes are the exception, being additive: a code scanned into the form
+     * is new information about the product, not a replacement for it.
+     */
+    private suspend fun resolveProduct(
+        name: String,
+        quantity: Int,
+        unit: String?,
+        minQuantity: Int?,
+        notes: String?,
+        emoji: String?,
+        barcodes: List<String>,
+    ): String {
+        val existing = repository.findByName(name)
+        val id = if (existing == null) {
+            repository.addProduct(name, quantity, unit, minQuantity, notes, emoji)
+        } else {
+            // Whether it is archived is asked of the database rather than of
+            // uiState, which reports nothing when the screen is not collecting.
+            if (repository.getActiveProduct(existing.id) == null) {
+                repository.restoreProduct(existing.id)
+                messageChannel.send(R.string.product_back_from_archive)
+            }
+            existing.id
+        }
+        barcodes.forEach { barcodeRepository.addBarcode(id, it) }
+        return id
     }
 
     /**
