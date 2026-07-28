@@ -231,8 +231,12 @@ class FirestoreHouseholdRepository(
     }
 
     /**
-     * Removes [uid] from [household]'s members — the only mutation the rules
-     * let a member make to themselves.
+     * Removes [uid] from [household]'s members, together with their own
+     * memberActivity stamp — the only mutations the rules let a member make to
+     * themselves. The stamp has to go in the same write: afterwards there is no
+     * membership left to authorise touching the map, so an entry left behind
+     * would be permanent litter in the map that exists to spot dead
+     * memberships. Dropping a stamp that was never written is a harmless no-op.
      *
      * A household emptied this way is deliberately NOT deleted: it keeps its
      * invite code, and joining is allowed for non-members, so anyone holding
@@ -244,8 +248,10 @@ class FirestoreHouseholdRepository(
     private fun WriteBatch.leave(household: DocumentSnapshot, uid: String) {
         update(
             db.collection(HOUSEHOLDS).document(household.id),
-            "members.$uid",
-            FieldValue.delete(),
+            mapOf(
+                "members.$uid" to FieldValue.delete(),
+                "$FIELD_MEMBER_ACTIVITY.$uid" to FieldValue.delete(),
+            ),
         )
     }
 

@@ -52,6 +52,18 @@ service cloud.firestore {
           && request.resource.data.memberActivity[request.auth.uid] == request.time;
       }
 
+      // The memberActivity map lost exactly the caller's own entry and kept
+      // everyone else's. Leaving takes the stamp along: a former member may not
+      // touch the map at all (both activity clauses require membership), so
+      // whatever is left behind stays there forever — dead weight in the very
+      // map that exists to point out dead memberships.
+      function dropsOwnActivityOnly() {
+        return request.resource.data.get('memberActivity', {})
+               .diff(resource.data.get('memberActivity', {}))
+               .affectedKeys().hasOnly([request.auth.uid])
+          && !(request.auth.uid in request.resource.data.get('memberActivity', {}));
+      }
+
       // Creating a household: the creator is its sole member.
       allow create: if signedIn()
         && request.resource.data.members.keys().hasOnly([request.auth.uid])
@@ -67,12 +79,14 @@ service cloud.firestore {
           && membersDiffOnlySelf()
           && request.resource.data.members[request.auth.uid] == true
         )
-        // Leaving: a member may remove exactly their own uid, nothing else.
+        // Leaving: a member may remove exactly their own uid, and with it their
+        // own activity stamp — nothing else, and nobody else's.
         || (
           isMember()
-          && changesOnly(['members'])
+          && changesOnly(['members', 'memberActivity'])
           && membersDiffOnlySelf()
           && !(request.auth.uid in request.resource.data.members)
+          && (!touches('memberActivity') || dropsOwnActivityOnly())
         )
         // Members may rename the household — to an actual name. changesOnly()
         // counts a removed key as affected, so without the type and length

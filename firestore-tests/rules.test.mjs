@@ -168,6 +168,61 @@ describe("households: leaving", () => {
       }),
     );
   });
+
+  it("leaving takes the leaver's own activity stamp with it", async () => {
+    // It has to happen in this write: a former member may not touch the
+    // activity map at all, so an entry left behind is there for good.
+    await seedHousehold("h1", { [ANNA]: true, [BOB]: true }, "CODE01", {
+      memberActivity: { [ANNA]: new Date("2026-01-01"), [BOB]: new Date("2026-01-02") },
+    });
+    const household = doc(db(BOB), "households", "h1");
+    await assertSucceeds(
+      updateDoc(household, {
+        [`members.${BOB}`]: deleteField(),
+        [`memberActivity.${BOB}`]: deleteField(),
+      }),
+    );
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const snap = await getDoc(doc(ctx.firestore(), "households", "h1"));
+      // Anna's stamp is untouched; only the leaver's is gone.
+      if (Object.keys(snap.data().memberActivity).join() !== ANNA) {
+        throw new Error(`unexpected memberActivity: ${JSON.stringify(snap.data().memberActivity)}`);
+      }
+    });
+  });
+
+  it("leaving with a stamp that was never written is fine", async () => {
+    await seedHousehold("h1", { [ANNA]: true, [BOB]: true }, "CODE01");
+    await assertSucceeds(
+      updateDoc(doc(db(BOB), "households", "h1"), {
+        [`members.${BOB}`]: deleteField(),
+        [`memberActivity.${BOB}`]: deleteField(),
+      }),
+    );
+  });
+
+  it("leaving may not clear anyone else's activity", async () => {
+    await seedHousehold("h1", { [ANNA]: true, [BOB]: true }, "CODE01", {
+      memberActivity: { [ANNA]: new Date("2026-01-01"), [BOB]: new Date("2026-01-02") },
+    });
+    const household = doc(db(BOB), "households", "h1");
+    await assertFails(
+      updateDoc(household, {
+        [`members.${BOB}`]: deleteField(),
+        [`memberActivity.${ANNA}`]: deleteField(),
+      }),
+    );
+    await assertFails(
+      updateDoc(household, { [`members.${BOB}`]: deleteField(), memberActivity: {} }),
+    );
+    // Leaving is not an occasion to stamp yourself as active either.
+    await assertFails(
+      updateDoc(household, {
+        [`members.${BOB}`]: deleteField(),
+        [`memberActivity.${BOB}`]: serverTimestamp(),
+      }),
+    );
+  });
 });
 
 describe("households: emptied but kept (recovery by invite code)", () => {
