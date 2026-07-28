@@ -73,7 +73,10 @@ jobs:
         env:
           SHELFIE_KEYSTORE_FILE: ${{ runner.temp }}/release.jks
           SHELFIE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          SHELFIE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          # The alias names an entry in a file nobody else has, so hiding it
+          # protects nothing — and as a secret it was unreadable in the logs,
+          # which is how a stray space in it cost a build.
+          SHELFIE_KEY_ALIAS: shelfie
           SHELFIE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease
 
