@@ -90,6 +90,17 @@ jobs:
           apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
           "$apksigner" verify --print-certs "$apk"
 
+      # A dry run keeps its APK: the point of building without distributing is
+      # to put that exact file on a device and walk through it, and R8 runs in
+      # this variant only.
+      - name: Keep the APK for a manual check
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: shelfie-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
       - name: Distribute to testers
         if: github.ref_type == 'tag' || inputs.distribute
         uses: wzieba/Firebase-Distribution-Github-Action@v1
