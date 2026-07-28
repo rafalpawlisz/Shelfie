@@ -29,12 +29,24 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      # google-services.json is gitignored (per-developer Firebase config);
-      # CI reconstructs it from a repository secret (base64 of the file).
+      # google-services.json is gitignored (per-developer Firebase config), so
+      # CI rebuilds it from a repository secret (base64 of the file).
+      #
+      # A pull request from a fork gets no secrets — by design, and not
+      # something to work around. It falls back to the checked-in placeholder,
+      # which is enough for everything CI actually does: the Gradle plugin only
+      # needs a well-formed config, unit tests run against fakes, and the
+      # instrumented ones are Room-level and never reach the network.
       - name: Write google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
+          else
+            echo "No GOOGLE_SERVICES_JSON secret (fork pull request) — using the placeholder config."
+            cp .github/ci/google-services.json app/google-services.json
+          fi
 
       - name: Build and run unit tests
         run: ./gradlew :app:assembleDebug :app:testDebugUnitTest
