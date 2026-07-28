@@ -26,6 +26,8 @@ app/google-services.json
 # cheap insurance for a public one.
 *.jks
 *.keystore
+# Keystore path and passwords for local release builds; CI passes them as env.
+keystore.properties
 *.apk
 *.aab
 *.hprof

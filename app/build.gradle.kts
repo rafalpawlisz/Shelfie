@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -10,6 +12,23 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+// Release signing, from a gitignored keystore.properties locally or from the
+// environment in CI. Absent on a fresh clone and in the ordinary CI jobs, and
+// that has to stay harmless: the release variant then builds unsigned, exactly
+// as it did before this existed, and only the release workflow needs the real
+// thing. Nothing about the keystore — path, passwords, alias — belongs in the
+// repo, so this file reads and never stores.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun signingValue(key: String, env: String): String? =
+    keystoreProperties.getProperty(key) ?: System.getenv(env)
+
+val keystorePath = signingValue("storeFile", "SHELFIE_KEYSTORE_FILE")
+val keystoreReady = keystorePath != null && file(keystorePath).exists()
+
 android {
     namespace = "io.github.rafalpawlisz.shelfie"
     compileSdk {
@@ -20,10 +39,23 @@ android {
         applicationId = "io.github.rafalpawlisz.shelfie"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // Overridden by the release workflow from the tag being built, so a
+        // version is never bumped by hand and never disagrees with its tag.
+        versionCode = System.getenv("SHELFIE_VERSION_CODE")?.toIntOrNull() ?: 1
+        versionName = System.getenv("SHELFIE_VERSION_NAME") ?: "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (keystoreReady) {
+            create("release") {
+                storeFile = file(keystorePath!!)
+                storePassword = signingValue("storePassword", "SHELFIE_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "SHELFIE_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "SHELFIE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -31,6 +63,9 @@ android {
             optimization {
                 enable = true
             }
+            // Unsigned when there is no keystore — a state the ordinary CI jobs
+            // and any clone live in.
+            if (keystoreReady) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
