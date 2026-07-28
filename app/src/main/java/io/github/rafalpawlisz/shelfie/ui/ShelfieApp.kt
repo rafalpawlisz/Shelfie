@@ -334,6 +334,7 @@ fun ShelfieApp(
     if (showAddToListDialog) {
         AddShoppingItemDialog(
             products = state.products,
+            archivedProducts = state.archivedProducts,
             items = state.shoppingList,
             preselectProductId = newProductForListId,
             onConfirm = { productId, amount, note ->

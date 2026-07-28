@@ -133,24 +133,77 @@ class PantryViewModelTest {
     }
 
     @Test
-    fun `an archived product of that name is restored instead of duplicated`() = runTest {
+    fun `planning an archived product brings it back so the item is visible`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Groszek", quantity = 0, unit = "puszka")
+        val lists = FakeShoppingListRepository(repository)
+        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        lists.createList("Sklep")
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.archive(id)
+
+        viewModel.addToShoppingList(id, amount = 2)
+
+        // Restoring is what makes the row appear at all: items of archived
+        // products are filtered out, so without it this would be invisible.
+        assertTrue(viewModel.uiState.value.archivedProducts.isEmpty())
+        assertEquals(id, viewModel.uiState.value.shoppingList.single().productId)
+        // And it keeps what it had — planning is not editing.
+        assertEquals("puszka", viewModel.uiState.value.products.single().unit)
+    }
+
+    @Test
+    fun `the restock dialog also brings an archived product back`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Groszek", quantity = 0, unit = null)
+        val lists = FakeShoppingListRepository(repository)
+        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val listId = lists.createList("Sklep")
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.archive(id)
+
+        viewModel.addToList(listId, id, amount = 1)
+
+        assertTrue(viewModel.uiState.value.archivedProducts.isEmpty())
+        assertEquals(id, viewModel.uiState.value.shoppingList.single().productId)
+    }
+
+    @Test
+    fun `an archived product of that name is restored instead of duplicated`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(
+            name = "Groszek",
+            quantity = 0,
+            unit = "puszka",
+            minQuantity = 3,
+            notes = null,
+            emoji = null,
+        )
         val viewModel = makeViewModel(repository)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         val id = viewModel.uiState.value.products.single().id
         viewModel.archive(id)
 
-        // Typed with different case and spacing — still the same product, now
-        // carrying what was entered in the form.
-        viewModel.addProductForList(name = "  groszek ", quantity = 1, unit = "puszka")
+        // Typed with different case and spacing — still the same product, and
+        // its stored details survive: the form behind this path is blank by
+        // design, so writing it through emptied unit, minimum and notes.
+        val messages = mutableListOf<Int>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.messages.collect { messages += it }
+        }
+        viewModel.addProductForList(name = "  groszek ", quantity = 0, unit = null)
 
         assertTrue(viewModel.uiState.value.archivedProducts.isEmpty())
         val product = viewModel.uiState.value.products.single()
         assertEquals(id, product.id)
-        assertEquals("groszek", product.name)
+        assertEquals("Groszek", product.name)
         assertEquals("puszka", product.unit)
+        assertEquals(3, product.minQuantity)
         assertEquals(id, viewModel.productForList.value)
+        // Silence here would leave the user to discover the restore later.
+        assertEquals(listOf(R.string.product_back_from_archive), messages)
     }
 
     @Test

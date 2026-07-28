@@ -320,13 +320,30 @@ class PantryViewModel(
 
     fun addToShoppingList(productId: String, amount: Int?, note: String? = null) {
         val listId = selectedListId.value ?: return
-        viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount, note) }
+        viewModelScope.launch { planOnList(listId, productId, amount, note) }
     }
 
     /** Add to an explicitly chosen list (restock dialog) and remember the choice. */
     fun addToList(listId: String, productId: String, amount: Int?) {
         uiPreferences.lastRestockListId = listId
-        viewModelScope.launch { shoppingListRepository.addItem(listId, productId, amount) }
+        viewModelScope.launch { planOnList(listId, productId, amount, note = null) }
+    }
+
+    /**
+     * Put a product on a list, bringing it back from the archive if that is
+     * where it was.
+     *
+     * The restore is not a courtesy: observeItems joins products with
+     * `archivedAt IS NULL`, so an item pointing at an archived product is
+     * invisible — planning one would add a row nobody can see. Wanting to buy
+     * something is also the plainest possible statement that it belongs in the
+     * pantry again.
+     */
+    private suspend fun planOnList(listId: String, productId: String, amount: Int?, note: String?) {
+        if (repository.getActiveProduct(productId) == null) {
+            repository.restoreProduct(productId)
+        }
+        shoppingListRepository.addItem(listId, productId, amount, note)
     }
 
     /**
@@ -349,8 +366,16 @@ class PantryViewModel(
      * the amount step with it.
      *
      * A name the pantry already knows reaches that product instead of making a
-     * second one: an archived match is restored and updated with what was
-     * entered, because "groszek" typed here means the groszek that exists.
+     * second one, and its stored details are LEFT ALONE. The picker now finds
+     * archived products by search, so this branch is a race guard — the other
+     * device created or archived that name while the form was open — and in a
+     * race the established product is worth more than a form the user filled
+     * believing it was blank. Overwriting here once emptied an archived
+     * product's unit, minimum and notes, because that form is blank by design.
+     * The message says what happened rather than leaving it to be discovered.
+     *
+     * Barcodes are the exception, being additive: a code scanned into the form
+     * is new information about the product, not a replacement for it.
      */
     fun addProductForList(
         name: String,
@@ -373,9 +398,7 @@ class PantryViewModel(
                 if (repository.getActiveProduct(existing.id) == null) {
                     repository.restoreProduct(existing.id)
                 }
-                repository.updateProduct(
-                    existing.id, trimmed, quantity, unit, minQuantity, notes, emoji,
-                )
+                messageChannel.send(R.string.product_back_from_archive)
                 existing.id
             }
             barcodes.forEach { barcodeRepository.addBarcode(id, it) }

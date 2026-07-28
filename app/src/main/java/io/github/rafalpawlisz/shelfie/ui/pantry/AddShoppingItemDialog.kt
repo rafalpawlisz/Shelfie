@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -62,6 +63,10 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 @Composable
 fun AddShoppingItemDialog(
     products: List<Product>,
+    // Searchable too, or the archive is a place things vanish into: a name that
+    // exists there looked like a name that did not exist at all, and the only
+    // way onwards was a form that offered to "create" it.
+    archivedProducts: List<Product>,
     items: List<ShoppingListItem>,
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
     // A name the pantry does not have yet: hands it to the product form, which
@@ -75,6 +80,8 @@ fun AddShoppingItemDialog(
         mutableStateOf(preselectProductId)
     }
     val selectedProduct = products.firstOrNull { it.id == selectedProductId }
+        ?: archivedProducts.firstOrNull { it.id == selectedProductId }
+    val selectedIsArchived = archivedProducts.any { it.id == selectedProductId }
 
     // One meaning of "back" for every way of asking: the arrow in the bar, the
     // system gesture, the hardware button. From the amount step it returns to
@@ -179,6 +186,7 @@ fun AddShoppingItemDialog(
                     if (selectedProduct == null) {
                         SearchPhase(
                             products = products,
+                            archivedProducts = archivedProducts,
                             onSelect = { selectedProductId = it },
                             onCreateProduct = onCreateProduct,
                         )
@@ -189,6 +197,15 @@ fun AddShoppingItemDialog(
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(top = 8.dp),
                         )
+                        // Adding it brings it back — said before confirming, not
+                        // discovered afterwards on the Products tab.
+                        if (selectedIsArchived) {
+                            Text(
+                                text = stringResource(R.string.picker_archived_returns),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         OutlinedTextField(
                             value = amountText,
                             onValueChange = { amountText = it },
@@ -214,6 +231,7 @@ fun AddShoppingItemDialog(
 @Composable
 private fun SearchPhase(
     products: List<Product>,
+    archivedProducts: List<Product>,
     onSelect: (productId: String) -> Unit,
     onCreateProduct: (name: String) -> Unit,
 ) {
@@ -222,6 +240,9 @@ private fun SearchPhase(
     // pointing at another tab.
     var query by rememberSaveable { mutableStateOf("") }
     val visibleProducts = products.filterByName(query)
+    // Archived matches only while searching: the archive is something to find
+    // by name here, not to browse through on the way to the shopping list.
+    val visibleArchived = if (query.isBlank()) emptyList() else archivedProducts.filterByName(query)
 
     // Focus and keyboard up front: this screen exists to be typed into, and
     // coming back from the amount step lands here to search again. Scoped to
@@ -242,7 +263,10 @@ private fun SearchPhase(
             style = MaterialTheme.typography.bodyMedium,
         )
     }
-    if (query.isNotBlank() && visibleProducts.isEmpty()) {
+    // Offering to create is only honest when the name is unknown everywhere —
+    // archive included, or the button proposes to make a second product with a
+    // name the pantry already has.
+    if (query.isNotBlank() && visibleProducts.isEmpty() && visibleArchived.isEmpty()) {
         Text(
             text = stringResource(R.string.search_no_results),
             style = MaterialTheme.typography.bodyMedium,
@@ -257,10 +281,29 @@ private fun SearchPhase(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
+        contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         items(visibleProducts, key = { it.id }) { product ->
             ProductListItem(product = product, onClick = { onSelect(product.id) })
+        }
+        if (visibleArchived.isNotEmpty()) {
+            item(key = "archived-header") {
+                Text(
+                    text = stringResource(R.string.picker_archived_section),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            items(visibleArchived, key = { it.id }) { product ->
+                // Dimmed like on the Products tab, so a row from the archive
+                // never passes for a product currently in the pantry.
+                ProductListItem(
+                    product = product,
+                    dimmed = true,
+                    onClick = { onSelect(product.id) },
+                )
+            }
         }
     }
 }
