@@ -105,6 +105,7 @@
     <string name="product_notes_label">Notes (optional)</string>
     <string name="product_category_label">Store section</string>
     <string name="category_none">No section</string>
+    <string name="category_from_name">From the name: %1$s</string>
     <string name="category_produce">Fruit &amp; vegetables</string>
     <string name="category_bread">Bread &amp; bakery</string>
     <string name="category_dairy">Dairy &amp; eggs</string>

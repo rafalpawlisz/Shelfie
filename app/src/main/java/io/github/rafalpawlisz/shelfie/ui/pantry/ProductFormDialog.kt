@@ -233,6 +233,11 @@ fun ProductFormDialog(
                     // same way. While untouched it follows the typed name.
                     CategoryPickerField(
                         selectedEmoji = shownEmoji,
+                        // What the name implies, so a pick that disagrees with
+                        // it says so under the field. Nothing acts on this — it
+                        // is the answer to "why is milk in the fish aisle?",
+                        // which the closed field otherwise hides.
+                        suggestion = CategorySuggester.suggest(name),
                         onPick = { category ->
                             emojiTouched = true
                             emoji = category?.emoji.orEmpty()
@@ -391,6 +396,7 @@ fun ProductFormDialog(
 @Composable
 private fun CategoryPickerField(
     selectedEmoji: String,
+    suggestion: ProductCategory?,
     onPick: (ProductCategory?) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -400,6 +406,9 @@ private fun CategoryPickerField(
         selectedEmoji.isNotBlank() -> selectedEmoji
         else -> stringResource(R.string.category_none)
     }
+    // Only when the two disagree: when the field already shows what the name
+    // implies, repeating it is noise.
+    val differingSuggestion = suggestion?.takeIf { it.emoji != selectedEmoji.trim() }
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it },
@@ -410,6 +419,16 @@ private fun CategoryPickerField(
             readOnly = true,
             label = { Text(stringResource(R.string.product_category_label)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            supportingText = differingSuggestion?.let { suggested ->
+                {
+                    Text(
+                        stringResource(
+                            R.string.category_from_name,
+                            "${suggested.emoji}  ${stringResource(suggested.nameRes)}",
+                        ),
+                    )
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
