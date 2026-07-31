@@ -83,12 +83,31 @@ fun ProductsScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(visibleProducts, key = { it.id }) { product ->
-                ProductListItem(
-                    product = product,
-                    modifier = Modifier.animateItem(),
-                    onClick = { onProductClick(product.id) },
-                )
+            // Grouped by store section while browsing, so the pantry reads in
+            // the same order as the shopping list. While searching it stays
+            // flat: the answer is one or two rows, and a header over each of
+            // them is noise, not structure.
+            if (query.isBlank()) {
+                visibleProducts.groupedBySection().forEach { (section, group) ->
+                    item(key = "section-${section?.name ?: "none"}") {
+                        SectionHeader(section, modifier = Modifier.animateItem())
+                    }
+                    items(group, key = { it.id }) { product ->
+                        ProductListItem(
+                            product = product,
+                            modifier = Modifier.animateItem(),
+                            onClick = { onProductClick(product.id) },
+                        )
+                    }
+                }
+            } else {
+                items(visibleProducts, key = { it.id }) { product ->
+                    ProductListItem(
+                        product = product,
+                        modifier = Modifier.animateItem(),
+                        onClick = { onProductClick(product.id) },
+                    )
+                }
             }
             if (visibleArchived.isNotEmpty()) {
                 item(key = "archived-header") {

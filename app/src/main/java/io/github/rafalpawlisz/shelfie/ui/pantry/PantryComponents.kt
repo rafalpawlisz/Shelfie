@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.Product
+import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.ui.theme.warning
 
 @Composable
@@ -123,4 +124,29 @@ internal fun EmptyState(
             textAlign = TextAlign.Center,
         )
     }
+}
+
+/** The store section a product belongs to; null for none and for pre-section emoji. */
+internal fun Product.section(): ProductCategory? = ProductCategory.fromEmoji(emoji)
+
+/**
+ * Products in aisle order, grouped by section, with the sectionless group last.
+ * Order within a group is left alone — the repository already sorted by name.
+ */
+internal fun List<Product>.groupedBySection(): List<Pair<ProductCategory?, List<Product>>> =
+    groupBy { it.section() }
+        .toList()
+        .sortedBy { (section, _) -> section?.ordinal ?: ProductCategory.entries.size }
+
+/** The header over a group of rows belonging to one store section. */
+@Composable
+internal fun SectionHeader(section: ProductCategory?, modifier: Modifier = Modifier) {
+    Text(
+        text = section
+            ?.let { "${it.emoji}  ${stringResource(it.nameRes)}" }
+            ?: stringResource(R.string.category_none),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(top = 8.dp),
+    )
 }

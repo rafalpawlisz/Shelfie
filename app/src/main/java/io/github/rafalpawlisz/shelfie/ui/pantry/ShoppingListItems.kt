@@ -158,14 +158,7 @@ internal fun ListItems(
                 },
             ) { entry ->
                 if (entry is HeaderOrItem.Header) {
-                    Text(
-                        text = entry.section
-                            ?.let { "${it.emoji}  ${stringResource(it.nameRes)}" }
-                            ?: stringResource(R.string.category_none),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+                    SectionHeader(entry.section)
                     return@items
                 }
                 val item = (entry as HeaderOrItem.Row).item
