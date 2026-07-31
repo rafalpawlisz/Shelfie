@@ -141,10 +141,23 @@ internal fun List<Product>.groupedBySection(): List<Pair<ProductCategory?, List<
 /** The header over a group of rows belonging to one store section. */
 @Composable
 internal fun SectionHeader(section: ProductCategory?, modifier: Modifier = Modifier) {
-    Text(
+    GroupHeader(
         text = section
             ?.let { "${it.emoji}  ${stringResource(it.nameRes)}" }
             ?: stringResource(R.string.category_none),
+        modifier = modifier,
+    )
+}
+
+/**
+ * A label over a group of rows. Separate from [SectionHeader] because the
+ * shopping list ends with a group that is not a store section — the cart — and
+ * it has to look like every other header, not merely similar.
+ */
+@Composable
+internal fun GroupHeader(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier.padding(top = 8.dp),

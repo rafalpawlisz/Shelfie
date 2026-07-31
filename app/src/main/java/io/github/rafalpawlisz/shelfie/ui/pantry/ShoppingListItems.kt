@@ -137,13 +137,23 @@ internal fun ListItems(
         ) {
             // The unchecked block walks the store section by section with a
             // small header over each group; sectionless rows (one-offs, old
-            // emoji, none) trail as their own group. The checked block at the
-            // bottom keeps no headers — the cart has no aisles.
+            // emoji, none) trail as their own group. The checked block keeps
+            // its own single header: the cart is not an aisle, but without a
+            // label of its own it butted straight against "No section" and
+            // read as more of it.
             val headed = buildList {
-                var previousKey: Any? = Unit // never equals a section or null
+                var previousKey: Any? = Unit // never equals a section, null or Cart
                 for (item in ordered) {
-                    val key = if (item.isChecked) Unit else sectionOf(item)
-                    if (key != Unit && key != previousKey) add(HeaderOrItem.Header(key as ProductCategory?))
+                    val key = if (item.isChecked) Cart else sectionOf(item)
+                    if (key != previousKey) {
+                        add(
+                            if (key == Cart) {
+                                HeaderOrItem.CartHeader
+                            } else {
+                                HeaderOrItem.Header(key as ProductCategory?)
+                            },
+                        )
+                    }
                     previousKey = key
                     add(HeaderOrItem.Row(item))
                 }
@@ -153,12 +163,17 @@ internal fun ListItems(
                 key = { entry ->
                     when (entry) {
                         is HeaderOrItem.Header -> "header-${entry.section?.name ?: "none"}"
+                        HeaderOrItem.CartHeader -> "header-cart"
                         is HeaderOrItem.Row -> entry.item.id
                     }
                 },
             ) { entry ->
                 if (entry is HeaderOrItem.Header) {
                     SectionHeader(entry.section)
+                    return@items
+                }
+                if (entry is HeaderOrItem.CartHeader) {
+                    GroupHeader(stringResource(R.string.cart_section))
                     return@items
                 }
                 val item = (entry as HeaderOrItem.Row).item
@@ -351,8 +366,14 @@ private fun ShoppingListRow(
 // sees stable keys; the section of a row is derived from its product's emoji.
 private sealed interface HeaderOrItem {
     data class Header(val section: ProductCategory?) : HeaderOrItem
+    data object CartHeader : HeaderOrItem
     data class Row(val item: ShoppingListItem) : HeaderOrItem
 }
+
+// The grouping key for checked rows. A object of its own rather than null or
+// Unit: null is a real answer here (the sectionless group) and Unit was the
+// "nothing yet" seed, so reusing either would silently merge two groups.
+private data object Cart
 
 // null covers one-offs, pre-section emoji and "no section" alike.
 private fun sectionOf(item: ShoppingListItem): ProductCategory? =

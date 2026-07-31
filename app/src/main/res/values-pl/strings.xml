@@ -105,6 +105,7 @@
     <string name="product_notes_label">Notatki (opcjonalnie)</string>
     <string name="product_category_label">Dział w sklepie</string>
     <string name="category_none">Bez działu</string>
+    <string name="cart_section">W koszyku</string>
     <string name="category_from_name">Z nazwy: %1$s</string>
     <string name="category_produce">Owoce i warzywa</string>
     <string name="category_bread">Pieczywo</string>
