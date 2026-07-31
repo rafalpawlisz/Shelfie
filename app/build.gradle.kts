@@ -75,6 +75,16 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        // Puts Shelfie in the system's per-app language list (Android 13+),
+        // which is built from the manifest's localeConfig and nothing else —
+        // having a values-pl is not something the system goes looking for. AGP
+        // generates that file from the values-* directories present, so adding
+        // a language stays a matter of adding its strings. The language of the
+        // unqualified values/ is declared in res/resources.properties, since a
+        // directory without a qualifier does not say what it is written in.
+        generateLocaleConfig = true
+    }
     testOptions {
         unitTests {
             // The android.jar on the unit-test classpath throws from every
