@@ -220,6 +220,12 @@ object CategorySuggester {
             // in as itself. The adjective is here for names that lead with it.
             "pasta do zebow", "szczoteczka", "nitka", "nic", "nici",
             "dentystyczna", "dentystyczne", "dentystyczny", "floss",
+            // Mouthwash has to be a phrase: word by word, the cleaning aisle's
+            // "płyn" comes first and takes it. The rinsing one is longer than
+            // the fabric softener's "płyn do płukania" that it contains, which
+            // is exactly how it outranks it.
+            "plyn dentystyczny", "plyn do plukania ust", "plyn do plukania jamy ustnej",
+            "plyn do ust", "listerine",
             "krem do rak", "dezodorant", "maszynka", "zyletki", "golenie",
             "podpaski", "tampony", "wkladki",
             "pieluchy", "pieluszki", "butelka dla dziecka",

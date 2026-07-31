@@ -125,6 +125,19 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `mouthwash outranks the cleaning aisle's plyn`() {
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("płyn dentystyczny"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("płyn do płukania ust"))
+        assertEquals(
+            ProductCategory.HYGIENE,
+            CategorySuggester.suggest("płyn do płukania jamy ustnej"),
+        )
+        // The fabric softener keeps the shorter phrase it is named by.
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("płyn do płukania"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("płyn do naczyń"))
+    }
+
+    @Test
     fun `an unknown name suggests nothing`() {
         assertNull(CategorySuggester.suggest("zgrzeblarka"))
         assertNull(CategorySuggester.suggest(""))
