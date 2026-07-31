@@ -24,6 +24,8 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
     ],
     indices = [
         // At most one entry per product within a list (adds merge instead).
+        // SQLite treats NULLs as distinct here, so any number of one-off
+        // items (productId = NULL) coexist on a list without merging.
         Index(value = ["listId", "productId"], unique = true),
         // Covers the productId FK now that it's no longer the unique index.
         Index(value = ["productId"]),
@@ -32,7 +34,14 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 data class ShoppingListItemEntity(
     @PrimaryKey val id: String,
     val listId: String,
-    val productId: String,
+    // null = a one-off item: something bought once without earning a place in
+    // the pantry. Such a row carries its own [name] instead, has no stock to
+    // bank at checkout, and no manual sort slot (product_list_order is keyed
+    // by product).
+    val productId: String?,
+    // The one-off item's display name; null whenever [productId] is set (the
+    // product's name is the name). Exactly one of the two is present.
+    val name: String?,
     // How many to buy; > 0 when set. null = "just buy it" — the amount is asked
     // for when the item is checked off, so checkout math still works.
     val amount: Int?,
@@ -48,9 +57,11 @@ data class ShoppingListItemEntity(
 )
 
 // Flat read model for the list screen: item columns + joined product info.
+// For a one-off item (productId = null) productName carries the item's own
+// name and the product columns are null.
 data class ShoppingListItemRow(
     val id: String,
-    val productId: String,
+    val productId: String?,
     val amount: Int?,
     val note: String?,
     val checkedAt: Long?,

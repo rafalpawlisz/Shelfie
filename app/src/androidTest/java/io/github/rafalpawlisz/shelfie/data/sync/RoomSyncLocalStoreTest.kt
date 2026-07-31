@@ -80,6 +80,7 @@ class RoomSyncLocalStoreTest {
                 id = id,
                 listId = "l1",
                 productId = "p1",
+                name = null,
                 amount = null,
                 note = null,
                 checkedAt = null,

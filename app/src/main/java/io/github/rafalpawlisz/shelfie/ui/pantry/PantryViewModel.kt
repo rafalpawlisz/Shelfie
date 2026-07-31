@@ -59,7 +59,8 @@ sealed interface UseUpScanResult {
  */
 data class RemovedShoppingItem(
     val listId: String,
-    val productId: String,
+    // null = a one-off item; undo re-adds it by its name.
+    val productId: String?,
     val productName: String,
     val amount: Int?,
     val note: String?,
@@ -512,12 +513,23 @@ class PantryViewModel(
                 messageChannel.send(R.string.undo_list_gone)
                 return@launch
             }
-            shoppingListRepository.addItem(
-                removed.listId,
-                removed.productId,
-                removed.amount,
-                removed.note,
-            )
+            if (removed.productId == null) {
+                // A one-off comes back as a fresh line under the same name —
+                // there is no product row for it to return to.
+                shoppingListRepository.addOneOffItem(
+                    removed.listId,
+                    removed.productName,
+                    removed.amount,
+                    removed.note,
+                )
+            } else {
+                shoppingListRepository.addItem(
+                    removed.listId,
+                    removed.productId,
+                    removed.amount,
+                    removed.note,
+                )
+            }
         }
     }
 
@@ -538,8 +550,10 @@ class PantryViewModel(
         if (fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) return
         val moved = items[fromIndex]
         // Only unchecked items carry a manual position; checked items are parked at
-        // the bottom by check time and aren't repositioned by dragging.
+        // the bottom by check time and aren't repositioned by dragging. One-off
+        // items have no product slot to remember a position for.
         if (moved.isChecked) return
+        val movedProductId = moved.productId ?: return
         val without = items.toMutableList().apply { removeAt(fromIndex) }
         // Neighbours must be unchecked — a checked item at the boundary keeps its
         // own retained position and must not pull the dropped item into its range.
@@ -552,7 +566,16 @@ class PantryViewModel(
             else -> (prev + next) / 2.0
         }
         viewModelScope.launch {
-            shoppingListRepository.setItemPosition(listId, moved.productId, newPosition)
+            shoppingListRepository.setItemPosition(listId, movedProductId, newPosition)
+        }
+    }
+
+    /** A one-off onto the currently selected list; see [ShoppingListRepository.addOneOffItem]. */
+    fun addOneOffToShoppingList(name: String, amount: Int?, note: String? = null) {
+        val listId = selectedListId.value ?: return
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            shoppingListRepository.addOneOffItem(listId, name, amount, note)
         }
     }
 

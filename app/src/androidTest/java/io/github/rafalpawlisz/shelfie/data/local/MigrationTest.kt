@@ -68,8 +68,63 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migrate2To3_rebuildsItemsKeepingRowsAndConstraints() {
+        helper.createDatabase(TEST_DB, 2).use { db ->
+            db.execSQL(
+                "INSERT INTO products " +
+                    "(id, name, quantity, unit, updatedAt, archivedAt, createdAt, " +
+                    "minQuantity, notes, emoji) " +
+                    "VALUES ('p1', 'Milk', 2, 'l', 111, NULL, 100, 4, NULL, NULL)"
+            )
+            db.execSQL(
+                "INSERT INTO shopping_lists (id, name, createdAt, updatedAt, position, archivedAt) " +
+                    "VALUES ('l1', 'Sklep', 100, 100, 1.0, NULL)"
+            )
+            db.execSQL(
+                "INSERT INTO shopping_list_items " +
+                    "(id, listId, productId, amount, note, checkedAt, createdAt, updatedAt) " +
+                    "VALUES ('i1', 'l1', 'p1', 2, 'the blue one', NULL, 100, 100)"
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 3, true, *ShelfieDatabase.MIGRATIONS).use { db ->
+            // The existing row survived the rebuild, name arriving as NULL.
+            db.query(
+                "SELECT productId, name, amount, note FROM shopping_list_items WHERE id = 'i1'"
+            ).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("p1", cursor.getString(0))
+                assertTrue(cursor.isNull(1))
+                assertEquals(2, cursor.getInt(2))
+                assertEquals("the blue one", cursor.getString(3))
+            }
+            // What the rebuild exists for: a one-off row with no product — and
+            // two of them, because the unique index keeps NULLs distinct.
+            db.execSQL(
+                "INSERT INTO shopping_list_items " +
+                    "(id, listId, productId, name, amount, note, checkedAt, createdAt, updatedAt) " +
+                    "VALUES ('i2', 'l1', NULL, 'żarówka', NULL, NULL, NULL, 200, 200)"
+            )
+            db.execSQL(
+                "INSERT INTO shopping_list_items " +
+                    "(id, listId, productId, name, amount, note, checkedAt, createdAt, updatedAt) " +
+                    "VALUES ('i3', 'l1', NULL, 'żarówka', NULL, NULL, NULL, 300, 300)"
+            )
+            // The FK cascade still works after the rebuild: dropping the
+            // product takes its item along and leaves the one-offs alone.
+            db.execSQL("PRAGMA foreign_keys = ON")
+            db.execSQL("DELETE FROM products WHERE id = 'p1'")
+            db.query("SELECT id FROM shopping_list_items ORDER BY id").use { cursor ->
+                assertEquals(2, cursor.count)
+                assertTrue(cursor.moveToFirst())
+                assertEquals("i2", cursor.getString(0))
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test.db"
-        const val CURRENT_VERSION = 2
+        const val CURRENT_VERSION = 3
     }
 }

@@ -122,7 +122,10 @@ class RoomSyncLocalStore(
      * the winner is later deleted.
      */
     private suspend fun resolveItemSlotClash(item: ShoppingListItemEntity): UpsertResult? {
-        val clash = shoppingListDao.findByProduct(item.listId, item.productId)
+        // One-off items occupy no product slot — NULLs are distinct under the
+        // unique index, so there is nothing to clash with.
+        val productId = item.productId ?: return null
+        val clash = shoppingListDao.findByProduct(item.listId, productId)
             ?: return null
         if (clash.id == item.id) return null
         val incomingWins = item.updatedAt > clash.updatedAt ||
@@ -183,10 +186,16 @@ class RoomSyncLocalStore(
     }
 
     private fun itemFrom(id: String, d: Map<String, Any?>): ShoppingListItemEntity? {
+        val productId = d.string("productId")
+        val name = d.string("name")
+        // A row must have something to show: a product to join or its own
+        // name (a one-off). A document with neither is malformed.
+        if (productId == null && name == null) return null
         return ShoppingListItemEntity(
             id = id,
             listId = d.string("listId") ?: return null,
-            productId = d.string("productId") ?: return null,
+            productId = productId,
+            name = name,
             amount = d.int("amount"),
             note = d.string("note"),
             checkedAt = d.long("checkedAt"),

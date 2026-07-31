@@ -7,6 +7,7 @@ import io.github.rafalpawlisz.shelfie.data.sync.SyncCollection
 import io.github.rafalpawlisz.shelfie.data.sync.SyncEngine
 import io.github.rafalpawlisz.shelfie.data.sync.listOrderDocId
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
+import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemRow
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
@@ -115,6 +116,28 @@ class OfflineShoppingListRepository(
             note = note?.trim()?.ifBlank { null },
             newId = UUID.randomUUID().toString(),
             timestamp = clock.now(),
+        )
+    }
+
+    override suspend fun addOneOffItem(listId: String, name: String, amount: Int?, note: String?) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        val now = clock.now()
+        // A plain insert, no merge: one-offs occupy no product slot (NULLs are
+        // distinct under the unique index), so two bulbs are two lines — which
+        // is what a hand-written list would say too.
+        dao.insert(
+            ShoppingListItemEntity(
+                id = UUID.randomUUID().toString(),
+                listId = listId,
+                productId = null,
+                name = trimmed,
+                amount = amount,
+                note = note?.trim()?.ifBlank { null },
+                checkedAt = null,
+                createdAt = now,
+                updatedAt = now,
+            ),
         )
     }
 

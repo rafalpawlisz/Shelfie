@@ -107,7 +107,8 @@ interface ShoppingListDao {
     // about exactly those rows and no others.
     @Query(
         "SELECT id FROM shopping_list_items WHERE listId = :listId AND checkedAt IS NOT NULL " +
-            "AND productId IN (SELECT id FROM products WHERE archivedAt IS NULL)"
+            "AND (productId IS NULL " +
+            "OR productId IN (SELECT id FROM products WHERE archivedAt IS NULL))"
     )
     suspend fun checkedItemIds(listId: String): List<String>
 
@@ -146,14 +147,21 @@ interface ShoppingListDao {
 
     // --- Items within a list ---
 
+    // One-off items (productId IS NULL) ride along: their own name stands in
+    // for the product's, and their "position" is their creation time — large
+    // against hand-assigned fractional indices, so they gather at the end of
+    // the unchecked block in the order they were added (they have no slot in
+    // product_list_order to drag around).
     @Query(
         "SELECT i.id AS id, i.productId AS productId, i.amount AS amount, i.note AS note, " +
-            "i.checkedAt AS checkedAt, p.name AS productName, p.emoji AS productEmoji, " +
-            "p.unit AS productUnit, COALESCE(o.position, 0.0) AS position " +
+            "i.checkedAt AS checkedAt, COALESCE(p.name, i.name, '') AS productName, " +
+            "p.emoji AS productEmoji, " +
+            "p.unit AS productUnit, COALESCE(o.position, " +
+            "CASE WHEN i.productId IS NULL THEN i.createdAt * 1.0 END, 0.0) AS position " +
             "FROM shopping_list_items i " +
-            "JOIN products p ON p.id = i.productId " +
+            "LEFT JOIN products p ON p.id = i.productId " +
             "LEFT JOIN product_list_order o ON o.listId = i.listId AND o.productId = i.productId " +
-            "WHERE i.listId = :listId AND p.archivedAt IS NULL"
+            "WHERE i.listId = :listId AND (i.productId IS NULL OR p.archivedAt IS NULL)"
     )
     // Ordering (manual position, then name) is applied in the repository with a
     // locale-aware Collator.
@@ -180,8 +188,12 @@ interface ShoppingListDao {
     suspend fun moveToList(id: String, targetListId: String, timestamp: Long) {
         val item = getById(id) ?: return
         if (item.listId == targetListId) return
-        if (findByProduct(targetListId, item.productId) != null) return
-        ensurePosition(targetListId, item.productId, timestamp)
+        // A one-off has no product slot to clash with and no order row to
+        // reserve — it just changes lists.
+        if (item.productId != null) {
+            if (findByProduct(targetListId, item.productId) != null) return
+            ensurePosition(targetListId, item.productId, timestamp)
+        }
         reassignList(item.id, targetListId, timestamp)
     }
 
@@ -195,17 +207,19 @@ interface ShoppingListDao {
     suspend fun isOnActiveList(productId: String): Boolean
 
     // Reactive planning map: which products sit on which active lists. Feeds the
-    // derived "low stock" list and the move-between-lists guard.
+    // derived "low stock" list and the move-between-lists guard. One-off items
+    // plan no product, so they are not in this map.
     @Query(
         "SELECT i.listId AS listId, i.productId AS productId FROM shopping_list_items i " +
-            "JOIN shopping_lists l ON l.id = i.listId WHERE l.archivedAt IS NULL"
+            "JOIN shopping_lists l ON l.id = i.listId " +
+            "WHERE l.archivedAt IS NULL AND i.productId IS NOT NULL"
     )
     fun observePlannedEntries(): Flow<List<PlannedEntry>>
 
     // Products referenced by ANY list, archived ones included — which is what
     // decides whether an archived product may be deleted for good. Archived
     // lists count because restoring one must not find its items missing.
-    @Query("SELECT DISTINCT productId FROM shopping_list_items")
+    @Query("SELECT DISTINCT productId FROM shopping_list_items WHERE productId IS NOT NULL")
     fun observeReferencedProductIds(): Flow<List<String>>
 
     @Insert
@@ -230,9 +244,12 @@ interface ShoppingListDao {
     // observeItems hides them, so checkout must not touch them either. Without
     // the filter, stock was banked into a product the user cannot see and the
     // invisible row was deleted — an action they could neither watch nor undo.
+    // A checked one-off (productId IS NULL) has no stock to bank and simply
+    // leaves with the shopping trip.
     @Query(
         "DELETE FROM shopping_list_items WHERE listId = :listId AND checkedAt IS NOT NULL " +
-            "AND productId IN (SELECT id FROM products WHERE archivedAt IS NULL)"
+            "AND (productId IS NULL " +
+            "OR productId IN (SELECT id FROM products WHERE archivedAt IS NULL))"
     )
     suspend fun deleteChecked(listId: String)
 
@@ -304,6 +321,7 @@ interface ShoppingListDao {
                     id = newId,
                     listId = listId,
                     productId = productId,
+                    name = null,
                     amount = amount,
                     note = note,
                     checkedAt = null,

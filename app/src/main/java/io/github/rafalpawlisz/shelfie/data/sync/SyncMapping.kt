@@ -32,6 +32,11 @@ fun ShoppingListEntity.toSyncDoc(): Map<String, Any?> = mapOf(
 fun ShoppingListItemEntity.toSyncDoc(): Map<String, Any?> = mapOf(
     "listId" to listId,
     "productId" to productId,
+    // The one-off item's own display name; null for product-backed items.
+    // Older app versions cannot store a null productId, so a one-off document
+    // fails to apply there — both phones must run a version that knows the
+    // field before one-offs land on a shared list.
+    "name" to name,
     "amount" to amount,
     "note" to note,
     "checkedAt" to checkedAt,

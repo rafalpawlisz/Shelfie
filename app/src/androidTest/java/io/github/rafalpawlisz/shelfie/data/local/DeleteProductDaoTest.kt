@@ -72,6 +72,7 @@ class DeleteProductDaoTest {
                 id = id,
                 listId = listId,
                 productId = productId,
+                name = null,
                 amount = null,
                 note = null,
                 checkedAt = null,

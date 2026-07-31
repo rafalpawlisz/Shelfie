@@ -25,6 +25,13 @@ interface ShoppingListRepository {
     // that dies with the item at checkout/removal.
     suspend fun addItem(listId: String, productId: String, amount: Int?, note: String? = null)
 
+    /**
+     * A one-off item: a line of text on the list, bought once, never part of
+     * the pantry. It has no stock to bank at checkout — "Finish shopping"
+     * simply removes it — and repeats of the same name are allowed.
+     */
+    suspend fun addOneOffItem(listId: String, name: String, amount: Int?, note: String? = null)
+
     // True when the product already sits on any active (non-archived) list —
     // used to keep the low-stock suggestion from nagging about planned items.
     suspend fun isOnAnyList(productId: String): Boolean

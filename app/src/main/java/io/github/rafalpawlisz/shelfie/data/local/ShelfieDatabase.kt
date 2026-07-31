@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     ],
     // Renumbered from 12 back to 1 before the first release — the development
     // history (schema wipes all along) doesn't need to live in the version.
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class ShelfieDatabase : RoomDatabase() {
@@ -43,6 +43,45 @@ abstract class ShelfieDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf<Migration>(MIGRATION_1_2)
+        // 2 → 3: one-off shopping items. shopping_list_items.productId becomes
+        // nullable and the row gains its own nullable name — a one-off is a
+        // line of text on the list, not a pantry product. SQLite cannot relax
+        // NOT NULL in place, so the table is rebuilt; both indices are
+        // recreated, and the unique (listId, productId) keeps NULLs distinct,
+        // which is what lets several one-offs share a list.
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `shopping_list_items_new` (" +
+                        "`id` TEXT NOT NULL, `listId` TEXT NOT NULL, `productId` TEXT, " +
+                        "`name` TEXT, `amount` INTEGER, `note` TEXT, `checkedAt` INTEGER, " +
+                        "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`id`), " +
+                        "FOREIGN KEY(`productId`) REFERENCES `products`(`id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE , " +
+                        "FOREIGN KEY(`listId`) REFERENCES `shopping_lists`(`id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE )"
+                )
+                db.execSQL(
+                    "INSERT INTO shopping_list_items_new " +
+                        "(id, listId, productId, amount, note, checkedAt, createdAt, updatedAt) " +
+                        "SELECT id, listId, productId, amount, note, checkedAt, createdAt, updatedAt " +
+                        "FROM shopping_list_items"
+                )
+                db.execSQL("DROP TABLE shopping_list_items")
+                db.execSQL("ALTER TABLE shopping_list_items_new RENAME TO shopping_list_items")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS " +
+                        "`index_shopping_list_items_listId_productId` " +
+                        "ON `shopping_list_items` (`listId`, `productId`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_shopping_list_items_productId` " +
+                        "ON `shopping_list_items` (`productId`)"
+                )
+            }
+        }
+
+        val MIGRATIONS = arrayOf<Migration>(MIGRATION_1_2, MIGRATION_2_3)
     }
 }

@@ -24,12 +24,17 @@ class FakeShoppingListRepository(
     private data class Item(
         val id: String,
         val listId: String,
-        val productId: String,
+        // null = one-off item; [name] carries its display name instead.
+        val productId: String?,
+        val name: String? = null,
         val amount: Int?,
         val note: String? = null,
         // null = to buy; increasing value = in cart. Monotonic stand-in for the
         // real checkedAt timestamp, so "most recently checked" sorts highest.
         val checkedAt: Long?,
+        // Stand-in for createdAt: one-offs sort at the end, in add order,
+        // mirroring the DAO's createdAt-as-position fallback.
+        val seq: Long = 0,
     )
 
     private val lists = MutableStateFlow<List<ListEntry>>(emptyList())
@@ -44,6 +49,7 @@ class FakeShoppingListRepository(
     private var nextId = 1
     private var checkSeq = 0L
     private var archiveSeq = 0L
+    private var oneOffSeq = 0L
 
     override fun observeLists(): Flow<List<ShoppingList>> =
         lists.map { entries -> entries.filter { it.archivedAt == null }.toSortedDomain() }
@@ -88,8 +94,14 @@ class FakeShoppingListRepository(
 
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
         combine(items, products.observeProducts(), positions) { list, active, pos ->
+            // Mirrors the DAO's position fallback: one-offs have no manual
+            // slot and sort at the end of the unchecked block, in add order.
+            fun positionOf(item: Item): Double =
+                if (item.productId == null) ONE_OFF_BASE + item.seq
+                else pos[listId to item.productId] ?: 0.0
             list.filter { it.listId == listId }
                 .mapNotNull { item ->
+                    if (item.productId == null) return@mapNotNull item to null
                     val product = active.firstOrNull { it.id == item.productId }
                         ?: return@mapNotNull null
                     item to product
@@ -103,11 +115,10 @@ class FakeShoppingListRepository(
                         aChecked != bChecked -> if (aChecked) 1 else -1
                         aChecked -> bItem.checkedAt!!.compareTo(aItem.checkedAt!!)
                         else -> {
-                            val pa = pos[listId to aItem.productId] ?: 0.0
-                            val pb = pos[listId to bItem.productId] ?: 0.0
-                            val byPos = pa.compareTo(pb)
+                            val byPos = positionOf(aItem).compareTo(positionOf(bItem))
                             if (byPos != 0) byPos
-                            else aProd.name.lowercase().compareTo(bProd.name.lowercase())
+                            else (aProd?.name ?: aItem.name).orEmpty().lowercase()
+                                .compareTo((bProd?.name ?: bItem.name).orEmpty().lowercase())
                         }
                     }
                 }
@@ -118,10 +129,10 @@ class FakeShoppingListRepository(
                         amount = item.amount,
                         note = item.note,
                         isChecked = item.checkedAt != null,
-                        productName = product.name,
-                        productEmoji = product.emoji,
-                        productUnit = product.unit,
-                        position = pos[listId to item.productId] ?: 0.0,
+                        productName = product?.name ?: item.name.orEmpty(),
+                        productEmoji = product?.emoji,
+                        productUnit = product?.unit,
+                        position = positionOf(item),
                     )
                 }
         }
@@ -154,6 +165,25 @@ class FakeShoppingListRepository(
         }
     }
 
+    override suspend fun addOneOffItem(listId: String, name: String, amount: Int?, note: String?) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        // Mirrors the DAO: a plain insert, never a merge — one-offs occupy no
+        // product slot, so repeats of the same name are separate lines.
+        items.update {
+            it + Item(
+                id = "item-${nextId++}",
+                listId = listId,
+                productId = null,
+                name = trimmed,
+                amount = amount,
+                note = note?.trim()?.ifBlank { null },
+                checkedAt = null,
+                seq = ++oneOffSeq,
+            )
+        }
+    }
+
     override suspend fun setChecked(id: String, checked: Boolean) {
         items.update { list ->
             list.map {
@@ -176,12 +206,15 @@ class FakeShoppingListRepository(
     override suspend fun moveItem(id: String, targetListId: String) {
         val item = items.value.firstOrNull { it.id == id } ?: return
         if (item.listId == targetListId) return
-        // Mirror the DAO: never clobber an existing entry on the target list.
-        val targetHasProduct = items.value.any {
-            it.listId == targetListId && it.productId == item.productId
+        // Mirror the DAO: never clobber an existing entry on the target list;
+        // one-offs occupy no slot and move freely.
+        if (item.productId != null) {
+            val targetHasProduct = items.value.any {
+                it.listId == targetListId && it.productId == item.productId
+            }
+            if (targetHasProduct) return
+            ensurePosition(targetListId, item.productId)
         }
-        if (targetHasProduct) return
-        ensurePosition(targetListId, item.productId)
         items.update { list ->
             list.map {
                 if (it.id == id) it.copy(listId = targetListId, checkedAt = null) else it
@@ -196,11 +229,16 @@ class FakeShoppingListRepository(
 
     override suspend fun finishShopping(listId: String) {
         // Items of archived products are dormant (observeItems hides them), so
-        // checkout skips them exactly as the DAO does.
+        // checkout skips them exactly as the DAO does. Checked one-offs have
+        // no stock to bank — they are simply removed.
         val processed = items.value
             .filter { it.listId == listId && it.checkedAt != null }
-            .filter { products.getActiveProduct(it.productId) != null }
-        processed.forEach { item -> item.amount?.let { products.adjustQuantity(item.productId, it) } }
+            .filter { it.productId == null || products.getActiveProduct(it.productId) != null }
+        processed.forEach { item ->
+            if (item.productId != null) {
+                item.amount?.let { products.adjustQuantity(item.productId, it) }
+            }
+        }
         // Checked items are removed but their order rows persist.
         val processedIds = processed.map { it.id }.toSet()
         items.update { list -> list.filterNot { it.id in processedIds } }
@@ -218,16 +256,22 @@ class FakeShoppingListRepository(
         return items.value.any { it.productId == productId && it.listId in activeListIds }
     }
 
-    // Every list, archived included — the real query does not filter.
+    // Every list, archived included — the real query only drops one-offs.
     override fun observeReferencedProductIds(): Flow<List<String>> =
-        items.map { all -> all.map { it.productId }.distinct() }
+        items.map { all -> all.mapNotNull { it.productId }.distinct() }
 
     override fun observePlannedEntries(): Flow<List<PlannedEntry>> =
         combine(items, lists) { allItems, allLists ->
             val activeListIds = allLists.filter { it.archivedAt == null }.map { it.id }.toSet()
-            allItems.filter { it.listId in activeListIds }
-                .map { PlannedEntry(listId = it.listId, productId = it.productId) }
+            allItems.filter { it.listId in activeListIds && it.productId != null }
+                .map { PlannedEntry(listId = it.listId, productId = it.productId!!) }
         }
+
+    private companion object {
+        // Far above any hand-assigned fractional index, like the DAO's
+        // createdAt-in-millis fallback.
+        const val ONE_OFF_BASE = 1_000_000.0
+    }
 
     // Append at the end the first time a product joins a list; keep an existing slot.
     private fun ensurePosition(listId: String, productId: String) {

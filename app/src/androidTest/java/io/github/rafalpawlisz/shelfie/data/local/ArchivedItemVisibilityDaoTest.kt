@@ -59,6 +59,7 @@ class ArchivedItemVisibilityDaoTest {
                 id = "i1",
                 listId = "l1",
                 productId = "p1",
+                name = null,
                 amount = 2,
                 note = null,
                 checkedAt = null,

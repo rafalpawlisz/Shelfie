@@ -1249,4 +1249,89 @@ class ShoppingListViewModelTest {
         assertEquals(3, auchanItem.amount)
         assertFalse(auchanItem.isChecked)
     }
+
+    // --- One-off items ---
+
+    @Test
+    fun `a one-off lands on the list under its own name, after the products`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        viewModel.addToShoppingList(viewModel.uiState.value.products.single().id, amount = 1)
+
+        viewModel.addOneOffToShoppingList("  żarówka ", amount = 2)
+
+        val items = viewModel.uiState.value.shoppingList
+        assertEquals(2, items.size)
+        val oneOff = items.last() // no manual slot — one-offs gather at the end
+        assertNull(oneOff.productId)
+        assertEquals("żarówka", oneOff.productName)
+        assertEquals(2, oneOff.amount)
+        assertNull(oneOff.productUnit)
+    }
+
+    @Test
+    fun `two one-offs of the same name are two lines, and checkout removes only checked ones`() = runTest {
+        val repository = FakeProductRepository()
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+
+        viewModel.addOneOffToShoppingList("żarówka", amount = null)
+        viewModel.addOneOffToShoppingList("żarówka", amount = null)
+        assertEquals(2, viewModel.uiState.value.shoppingList.size)
+
+        viewModel.setShoppingItemChecked(viewModel.uiState.value.shoppingList.first().id, checked = true)
+        viewModel.finishShopping()
+
+        // One bought and gone; the other still waiting. No product appeared
+        // anywhere out of this.
+        assertEquals(1, viewModel.uiState.value.shoppingList.size)
+        assertTrue(viewModel.uiState.value.products.isEmpty())
+    }
+
+    @Test
+    fun `undo of a removed one-off brings it back by name`() = runTest {
+        val repository = FakeProductRepository()
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        viewModel.addOneOffToShoppingList("znicz", amount = 3, note = "czerwony")
+        val item = viewModel.uiState.value.shoppingList.single()
+
+        viewModel.removeShoppingItem(item.id)
+        assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+        viewModel.undoRemoveItem(
+            RemovedShoppingItem(
+                listId = viewModel.uiState.value.selectedListId!!,
+                productId = null,
+                productName = "znicz",
+                amount = 3,
+                note = "czerwony",
+            ),
+        )
+
+        val restored = viewModel.uiState.value.shoppingList.single()
+        assertNull(restored.productId)
+        assertEquals("znicz", restored.productName)
+        assertEquals(3, restored.amount)
+        assertEquals("czerwony", restored.note)
+    }
+
+    @Test
+    fun `one-offs plan nothing - low stock ignores them and they block no deletion`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = null, minQuantity = 2)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+
+        // A one-off named like the product must not count as planning it.
+        viewModel.addOneOffToShoppingList("Milk", amount = 1)
+
+        assertEquals(1, viewModel.uiState.value.lowStockProducts.size)
+        assertTrue(viewModel.uiState.value.referencedProductIds.isEmpty())
+    }
 }

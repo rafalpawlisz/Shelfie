@@ -55,6 +55,7 @@ class CheckoutDaoTest {
                 id = id,
                 listId = "l1",
                 productId = productId,
+                name = null,
                 amount = amount,
                 note = null,
                 checkedAt = 5,
