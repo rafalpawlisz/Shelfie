@@ -206,6 +206,11 @@ object CategorySuggester {
             "odplamiacz", "wybielacz", "odswiezacz", "plyn do szyb", "mleczko",
             "miotla", "zmiotka", "szufelka", "gabka", "zmywak", "sciereczka", "scierka",
             "worki na smieci", "worki", "smieci", "pranie", "plyn do plukania",
+            // "rękawiczek" is not reachable from "rękawiczki" by stripping an
+            // ending, hence the extra form. "nitrylowe" carries the section on
+            // its own, so the adjective-first order works too.
+            "rekawiczki", "rekawiczka", "rekawiczek", "rekawice", "gloves",
+            "nitrylowe", "nitryl",
         ),
         ProductCategory.HYGIENE to listOf(
             "mydlo", "soap", "zel pod prysznic", "szampon", "odzywka", "balsam",

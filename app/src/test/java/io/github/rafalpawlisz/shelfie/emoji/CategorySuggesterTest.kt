@@ -104,6 +104,15 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `cleaning gloves reach the cleaning aisle in every form`() {
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("rękawiczki nitrylowe"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("nitrylowe rękawiczki"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("rękawiczki"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("rękawiczek"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("rękawice gumowe"))
+    }
+
+    @Test
     fun `an unknown name suggests nothing`() {
         assertNull(CategorySuggester.suggest("zgrzeblarka"))
         assertNull(CategorySuggester.suggest(""))
