@@ -2,6 +2,7 @@ package io.github.rafalpawlisz.shelfie.pantry
 
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
+import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import kotlinx.coroutines.flow.Flow
@@ -107,14 +108,18 @@ class FakeShoppingListRepository(
                     item to product
                 }
                 .sortedWith { (aItem, aProd), (bItem, bProd) ->
-                    // Unchecked first (manual position, then name); checked sink to
-                    // the bottom ordered by most-recently-checked.
+                    // Mirrors the real repository: unchecked walk the store
+                    // section by section (sectionless trailing), manual position
+                    // then name inside one; checked sink to the bottom ordered
+                    // by most-recently-checked, sections ignored.
                     val aChecked = aItem.checkedAt != null
                     val bChecked = bItem.checkedAt != null
                     when {
                         aChecked != bChecked -> if (aChecked) 1 else -1
                         aChecked -> bItem.checkedAt!!.compareTo(aItem.checkedAt!!)
                         else -> {
+                            val bySection = sectionRank(aProd).compareTo(sectionRank(bProd))
+                            if (bySection != 0) return@sortedWith bySection
                             val byPos = positionOf(aItem).compareTo(positionOf(bItem))
                             if (byPos != 0) byPos
                             else (aProd?.name ?: aItem.name).orEmpty().lowercase()
@@ -271,6 +276,10 @@ class FakeShoppingListRepository(
         // Far above any hand-assigned fractional index, like the DAO's
         // createdAt-in-millis fallback.
         const val ONE_OFF_BASE = 1_000_000.0
+
+        // Mirrors the real repository's aisle-walk rank.
+        fun sectionRank(product: io.github.rafalpawlisz.shelfie.model.Product?): Int =
+            ProductCategory.fromEmoji(product?.emoji)?.ordinal ?: ProductCategory.entries.size
     }
 
     // Append at the end the first time a product joins a list; keep an existing slot.

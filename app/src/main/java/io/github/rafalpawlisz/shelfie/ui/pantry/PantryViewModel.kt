@@ -12,6 +12,7 @@ import io.github.rafalpawlisz.shelfie.data.ProductRepository
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.data.UiPreferences
 import io.github.rafalpawlisz.shelfie.model.Product
+import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -553,11 +554,23 @@ class PantryViewModel(
         // items have no product slot to remember a position for.
         if (moved.isChecked) return
         val movedProductId = moved.productId ?: return
+        // A drag never crosses a section: the section is the product's, not the
+        // row's, so dropping into another aisle could not stick — the sort
+        // would put the row straight back. Landing there is a no-op instead.
+        val movedSection = sectionOf(moved)
         val without = items.toMutableList().apply { removeAt(fromIndex) }
-        // Neighbours must be unchecked — a checked item at the boundary keeps its
-        // own retained position and must not pull the dropped item into its range.
-        val prev = without.getOrNull(toIndex - 1)?.takeUnless { it.isChecked }?.position
-        val next = without.getOrNull(toIndex)?.takeUnless { it.isChecked }?.position
+        // Neighbours must be unchecked and of the same section — a row across
+        // either boundary keeps its own position range and must not pull the
+        // dropped item into it.
+        val prevItem = without.getOrNull(toIndex - 1)
+            ?.takeUnless { it.isChecked || sectionOf(it) != movedSection }
+        val nextItem = without.getOrNull(toIndex)
+            ?.takeUnless { it.isChecked || sectionOf(it) != movedSection }
+        // Nothing of the same section on either side of the drop — the drag
+        // left its aisle entirely; the resync snaps the row back.
+        if (prevItem == null && nextItem == null) return
+        val prev = prevItem?.position
+        val next = nextItem?.position
         val newPosition = when {
             prev == null && next == null -> moved.position
             prev == null -> next!! - 1.0
@@ -568,6 +581,11 @@ class PantryViewModel(
             shoppingListRepository.setItemPosition(listId, movedProductId, newPosition)
         }
     }
+
+    // null covers one-offs, pre-section emoji and "no section" alike — they all
+    // share the trailing sectionless group.
+    private fun sectionOf(item: ShoppingListItem): ProductCategory? =
+        ProductCategory.fromEmoji(item.productEmoji)
 
     /** A one-off onto the currently selected list; see [ShoppingListRepository.addOneOffItem]. */
     fun addOneOffToShoppingList(name: String, amount: Int?, note: String? = null) {

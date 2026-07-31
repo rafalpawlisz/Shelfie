@@ -11,6 +11,7 @@ import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemRow
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
+import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import java.util.UUID
@@ -88,9 +89,13 @@ class OfflineShoppingListRepository(
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
         dao.observeItems(listId).map { rows ->
             val collator = nameCollator()
-            // Unchecked (still to buy) first, in manual position order; checked
-            // items sink to the bottom ordered by most-recently-checked. Sorting
-            // on rows lets us read checkedAt (the domain model only keeps the flag).
+            // Unchecked (still to buy) first, walked store section by store
+            // section in the global aisle order; within a section the manual
+            // position, then name. Sectionless rows — one-offs, emoji from
+            // before sections, none — form the trailing group. Checked items
+            // sink to the bottom ordered by most-recently-checked, sections
+            // ignored: what is in the cart has no aisle anymore. Sorting on
+            // rows lets us read checkedAt (the domain model only keeps the flag).
             rows.sortedWith { a, b ->
                 val aChecked = a.checkedAt != null
                 val bChecked = b.checkedAt != null
@@ -101,12 +106,18 @@ class OfflineShoppingListRepository(
                         if (byTime != 0) byTime else collator.compare(a.productName, b.productName)
                     }
                     else -> {
+                        val bySection = a.sectionRank().compareTo(b.sectionRank())
+                        if (bySection != 0) return@sortedWith bySection
                         val byPosition = a.position.compareTo(b.position)
                         if (byPosition != 0) byPosition else collator.compare(a.productName, b.productName)
                     }
                 }
             }.map(ShoppingListItemRow::toDomain)
         }
+
+    // The aisle-walk rank; sectionless rows come after every real section.
+    private fun ShoppingListItemRow.sectionRank(): Int =
+        ProductCategory.fromEmoji(productEmoji)?.ordinal ?: ProductCategory.entries.size
 
     override suspend fun addItem(listId: String, productId: String, amount: Int?, note: String?) {
         dao.addOrMerge(

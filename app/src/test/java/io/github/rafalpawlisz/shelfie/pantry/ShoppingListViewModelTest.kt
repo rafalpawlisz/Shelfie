@@ -1250,6 +1250,82 @@ class ShoppingListViewModelTest {
         assertFalse(auchanItem.isChecked)
     }
 
+    // --- Store sections on the list ---
+
+    @Test
+    fun `unchecked items walk the store section by section, sectionless last`() = runTest {
+        val repository = FakeProductRepository()
+        // Added in the "wrong" order on purpose; 🧴 (cleaning) walks after
+        // 🥛 (dairy) after 🍎 (produce), and no emoji means no section.
+        repository.addProduct(name = "Plyn", quantity = 0, unit = null, emoji = "🧴")
+        repository.addProduct(name = "Mleko", quantity = 0, unit = null, emoji = "🥛")
+        repository.addProduct(name = "Jablka", quantity = 0, unit = null, emoji = "🍎")
+        repository.addProduct(name = "Tajemnica", quantity = 0, unit = null, emoji = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.uiState.value.products.forEach { viewModel.addToShoppingList(it.id, amount = null) }
+        viewModel.addOneOffToShoppingList("żarówka", amount = null)
+
+        val names = viewModel.uiState.value.shoppingList.map { it.productName }
+
+        assertEquals(listOf("Jablka", "Mleko", "Plyn", "Tajemnica", "żarówka"), names)
+    }
+
+    @Test
+    fun `checked items ignore sections and park at the bottom`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Jablka", quantity = 0, unit = null, emoji = "🍎")
+        repository.addProduct(name = "Plyn", quantity = 0, unit = null, emoji = "🧴")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.uiState.value.products.forEach { viewModel.addToShoppingList(it.id, amount = 1) }
+
+        // Checking the produce item — first section — must send it below the
+        // cleaning item, aisle notwithstanding: the cart has no aisles.
+        val apples = viewModel.uiState.value.shoppingList.first { it.productName == "Jablka" }
+        viewModel.setShoppingItemChecked(apples.id, checked = true)
+
+        assertEquals(
+            listOf("Plyn", "Jablka"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
+    @Test
+    fun `a drag across sections is a no-op, within a section it sticks`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Jablka", quantity = 0, unit = null, emoji = "🍎")
+        repository.addProduct(name = "Banany", quantity = 0, unit = null, emoji = "🍎")
+        repository.addProduct(name = "Mleko", quantity = 0, unit = null, emoji = "🥛")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        // Add in name order: Jablka, Banany, Mleko → sorted: Jablka, Banany, Mleko.
+        viewModel.uiState.value.products
+            .sortedBy { it.name }
+            .forEach { viewModel.addToShoppingList(it.id, amount = null) }
+        assertEquals(
+            listOf("Banany", "Jablka", "Mleko"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+
+        // Dragging Mleko (dairy) to the top would leave its aisle — nothing moves.
+        viewModel.moveShoppingItem(fromIndex = 2, toIndex = 0)
+        assertEquals(
+            listOf("Banany", "Jablka", "Mleko"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+
+        // Swapping the two produce items stays inside the aisle — it sticks.
+        viewModel.moveShoppingItem(fromIndex = 1, toIndex = 0)
+        assertEquals(
+            listOf("Jablka", "Banany", "Mleko"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
     // --- One-off items ---
 
     @Test

@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import io.github.rafalpawlisz.shelfie.ui.DragHandleIcon
@@ -92,12 +93,19 @@ internal fun ListItems(
         }
     }
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        // Only unchecked items are manually ordered; keep the drag within that
-        // block so the checked items parked at the bottom aren't displaced.
-        val uncheckedCount = ordered.count { !it.isChecked }
-        if (to.index < uncheckedCount) {
-            ordered.add(to.index, ordered.removeAt(from.index))
-        }
+        // Section headers sit between the rows now, so LazyColumn indices no
+        // longer line up with [ordered] — keys do. A drag applies only between
+        // two rows of the same section: the section is the product's, not the
+        // row's, so crossing a header could never stick (the sort would put
+        // the row straight back), and the checked block at the bottom is not
+        // draggable territory either.
+        val fromIndex = ordered.indexOfFirst { it.id == from.key }
+        val toIndex = ordered.indexOfFirst { it.id == to.key }
+        if (fromIndex == -1 || toIndex == -1) return@rememberReorderableLazyListState
+        val a = ordered[fromIndex]
+        val b = ordered[toIndex]
+        if (b.isChecked || sectionOf(a) != sectionOf(b)) return@rememberReorderableLazyListState
+        ordered.add(toIndex, ordered.removeAt(fromIndex))
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -127,7 +135,40 @@ internal fun ListItems(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(ordered, key = { it.id }) { item ->
+            // The unchecked block walks the store section by section with a
+            // small header over each group; sectionless rows (one-offs, old
+            // emoji, none) trail as their own group. The checked block at the
+            // bottom keeps no headers — the cart has no aisles.
+            val headed = buildList {
+                var previousKey: Any? = Unit // never equals a section or null
+                for (item in ordered) {
+                    val key = if (item.isChecked) Unit else sectionOf(item)
+                    if (key != Unit && key != previousKey) add(HeaderOrItem.Header(key as ProductCategory?))
+                    previousKey = key
+                    add(HeaderOrItem.Row(item))
+                }
+            }
+            items(
+                headed,
+                key = { entry ->
+                    when (entry) {
+                        is HeaderOrItem.Header -> "header-${entry.section?.name ?: "none"}"
+                        is HeaderOrItem.Row -> entry.item.id
+                    }
+                },
+            ) { entry ->
+                if (entry is HeaderOrItem.Header) {
+                    Text(
+                        text = entry.section
+                            ?.let { "${it.emoji}  ${stringResource(it.nameRes)}" }
+                            ?: stringResource(R.string.category_none),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    return@items
+                }
+                val item = (entry as HeaderOrItem.Row).item
                 ReorderableItem(reorderableState, key = item.id) { _ ->
                     // Built inside the reorderable scope so draggableHandle binds
                     // correctly, then handed to the row as a plain Modifier. On
@@ -312,3 +353,14 @@ private fun ShoppingListRow(
         }
     }
 }
+
+// One flat LazyColumn feeds both headers and rows, so the reorderable state
+// sees stable keys; the section of a row is derived from its product's emoji.
+private sealed interface HeaderOrItem {
+    data class Header(val section: ProductCategory?) : HeaderOrItem
+    data class Row(val item: ShoppingListItem) : HeaderOrItem
+}
+
+// null covers one-offs, pre-section emoji and "no section" alike.
+private fun sectionOf(item: ShoppingListItem): ProductCategory? =
+    ProductCategory.fromEmoji(item.productEmoji)
