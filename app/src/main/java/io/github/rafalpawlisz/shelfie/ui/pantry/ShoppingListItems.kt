@@ -75,13 +75,22 @@ internal fun ListItems(
     // mirror catches up the moment the gesture ends.
     var draggingRow by remember { mutableStateOf(false) }
     val ordered = remember { mutableStateListOf<ShoppingListItem>().apply { addAll(items) } }
+    val lazyListState = rememberLazyListState()
     LaunchedEffect(items, draggingRow) {
         if (!draggingRow && ordered != items) {
             ordered.clear()
             ordered.addAll(items)
+            // Keep the viewport where it is. A keyed LazyColumn anchors scroll
+            // to the first visible ITEM, so when checking off the top row sent
+            // it to the bottom (checked items park there), the list obediently
+            // followed it down. Re-request the same index/offset for the next
+            // layout: the position stays, whatever moved underneath.
+            lazyListState.requestScrollToItem(
+                lazyListState.firstVisibleItemIndex,
+                lazyListState.firstVisibleItemScrollOffset,
+            )
         }
     }
-    val lazyListState = rememberLazyListState()
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
         // Only unchecked items are manually ordered; keep the drag within that
         // block so the checked items parked at the bottom aren't displaced.
