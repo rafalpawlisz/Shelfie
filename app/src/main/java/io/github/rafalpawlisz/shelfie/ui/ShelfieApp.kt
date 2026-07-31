@@ -412,6 +412,11 @@ fun ShelfieApp(
             initialEmoji = editedProduct.emoji,
             initialBarcodes = state.barcodesByProduct[editedProduct.id].orEmpty(),
             stateKey = editedProduct.id,
+            // Editing: the product's section already stands for a decision —
+            // "no section" included — so nothing here may replace it with a
+            // guess from the name. The line under the field still says what the
+            // name would imply, and picking it stays one tap away.
+            suggestSection = false,
             // Renaming into another product's name would make the same pair of
             // duplicates that creating one does; the product keeps its own name.
             nameConflictOf = { typed ->

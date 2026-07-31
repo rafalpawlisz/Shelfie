@@ -93,6 +93,11 @@ fun ProductFormDialog(
     stateKey: Any? = null,
     // Add mode: focus the (required) name field right away so typing can start.
     autoFocusName: Boolean = false,
+    // Whether the section may follow the typed name until the field is touched.
+    // True while creating a product (the suggestion is the whole convenience),
+    // false when editing an existing one: there the section is already somebody's
+    // answer — including "no section" — and a save must not quietly replace it.
+    suggestSection: Boolean = true,
     // Asked on every keystroke whether the name is already taken; a conflict is
     // shown under the field and blocks the save. Default: nothing to collide
     // with (the picker's path deliberately reuses the product it finds).
@@ -115,7 +120,14 @@ fun ProductFormDialog(
     // before sections existed may carry an arbitrary emoji, which is shown
     // as-is until this form assigns a real section.
     var emoji by rememberSaveable(stateKey) { mutableStateOf(initialEmoji.orEmpty()) }
-    var emojiTouched by rememberSaveable(stateKey) { mutableStateOf(!initialEmoji.isNullOrBlank()) }
+    // Counts as touched when the product arrives with a section — and, in edit
+    // mode, always: a stored blank there means "no section", an answer as
+    // deliberate as any other. Treating it as "not answered yet" is how a plain
+    // Save on an unrelated field (bumping the quantity) used to hand the product
+    // a section from its name, which now also moves it on the shopping list.
+    var emojiTouched by rememberSaveable(stateKey) {
+        mutableStateOf(!suggestSection || !initialEmoji.isNullOrBlank())
+    }
     // Codes are staged locally and committed with the product on confirm
     // (a new product has no id to attach them to until it is saved).
     var barcodes by rememberSaveable(
@@ -123,11 +135,9 @@ fun ProductFormDialog(
         stateSaver = listSaver<List<String>, String>(save = { it }, restore = { it }),
     ) { mutableStateOf(initialBarcodes) }
 
-    // The section fills itself in from the name while the field is untouched. A
-    // product that arrives with one counts as touched: editing "Mleko" must
-    // never silently swap the section somebody chose. Suggesting is deliberately
-    // not saved into `emoji` — that keeps "the user picked this" and "we
-    // guessed this" separable across recompositions.
+    // The section fills itself in from the name while the field is untouched.
+    // Suggesting is deliberately not written into `emoji` — that keeps "the user
+    // picked this" and "we guessed this" separable across recompositions.
     val shownEmoji =
         if (emojiTouched) emoji else CategorySuggester.suggest(name)?.emoji.orEmpty()
 
