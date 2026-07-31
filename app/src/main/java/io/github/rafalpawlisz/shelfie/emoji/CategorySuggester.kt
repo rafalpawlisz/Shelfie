@@ -202,6 +202,7 @@ object CategorySuggester {
         ProductCategory.CLEANING to listOf(
             "papier toaletowy", "papier", "reczniki papierowe", "chusteczki", "chusteczka",
             "reczniki", "folia", "papier do pieczenia", "papier sniadaniowy",
+            "serwetki", "serwetka",
             "plyn", "detergent", "plyn do naczyn", "kapsulki", "proszek", "ploczka",
             "odplamiacz", "wybielacz", "odswiezacz", "plyn do szyb", "mleczko",
             "miotla", "zmiotka", "szufelka", "gabka", "zmywak", "sciereczka", "scierka",
@@ -214,7 +215,11 @@ object CategorySuggester {
         ),
         ProductCategory.HYGIENE to listOf(
             "mydlo", "soap", "zel pod prysznic", "szampon", "odzywka", "balsam",
-            "pasta do zebow", "szczoteczka", "nitka",
+            // "nitka" never answered for the way floss is actually written:
+            // "nić" is too short for the stemmer to reach it, so the word goes
+            // in as itself. The adjective is here for names that lead with it.
+            "pasta do zebow", "szczoteczka", "nitka", "nic", "nici",
+            "dentystyczna", "dentystyczne", "dentystyczny", "floss",
             "krem do rak", "dezodorant", "maszynka", "zyletki", "golenie",
             "podpaski", "tampony", "wkladki",
             "pieluchy", "pieluszki", "butelka dla dziecka",

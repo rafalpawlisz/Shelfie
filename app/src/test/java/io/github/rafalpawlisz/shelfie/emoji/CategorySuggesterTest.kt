@@ -113,6 +113,18 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `napkins and dental floss found their aisles`() {
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("serwetki"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("serwetka"))
+        // "nić" is three letters, so the stemmer leaves it alone and the
+        // dictionary has to carry that exact shape.
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("nić dentystyczna"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("nic dentystyczna"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("nici dentystyczne"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("dentystyczna nić"))
+    }
+
+    @Test
     fun `an unknown name suggests nothing`() {
         assertNull(CategorySuggester.suggest("zgrzeblarka"))
         assertNull(CategorySuggester.suggest(""))
