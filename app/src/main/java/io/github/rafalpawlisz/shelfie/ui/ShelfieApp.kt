@@ -346,6 +346,11 @@ fun ShelfieApp(
                 showAddToListDialog = false
                 newProductForListId = null
             },
+            onConfirmOneOff = { name, amount, note ->
+                viewModel.addOneOffToShoppingList(name, amount, note)
+                showAddToListDialog = false
+                newProductForListId = null
+            },
             // Creating goes through the same full form as the Products tab —
             // one meaning for "add a product". The picker steps aside for it.
             onCreateProduct = { name ->

@@ -91,6 +91,8 @@
     <string name="search_clear">Wyczyść wyszukiwanie</string>
     <string name="search_no_results">Brak pasujących produktów</string>
     <string name="add_product_named">Dodaj „%1$s” do produktów</string>
+    <string name="picker_one_off">Kup „%1$s” jednorazowo</string>
+    <string name="picker_one_off_hint">Nie trafi do produktów — zniknie z listy po zakupach</string>
     <string name="picker_archived_section">Z archiwum</string>
     <string name="picker_archived_returns">Dodanie przywróci go z archiwum</string>
     <string name="product_back_from_archive">Ta nazwa była w archiwum — produkt wrócił z zachowanymi danymi</string>

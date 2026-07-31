@@ -148,8 +148,10 @@ internal fun ListItems(
                     ShoppingListRow(
                         item = item,
                         onToggle = {
-                            if (!item.isChecked && item.amount == null) {
-                                // No amount recorded — ask how many were bought.
+                            if (!item.isChecked && item.amount == null && item.productId != null) {
+                                // No amount recorded — ask how many were bought,
+                                // because checkout banks it into stock. A one-off
+                                // has no stock, so there is nothing to ask.
                                 checkingItemId = item.id
                             } else {
                                 onToggle(item.id, !item.isChecked)
@@ -157,7 +159,10 @@ internal fun ListItems(
                         },
                         onRemove = { onRemove(item.id) },
                         onEditAmount = { editingAmountItemId = item.id },
-                        dragHandleModifier = handleModifier,
+                        // One-offs have no product slot to remember a position
+                        // for; hiding the handle says so instead of offering a
+                        // drag that would snap back.
+                        dragHandleModifier = if (item.productId != null) handleModifier else null,
                     )
                 }
             }
@@ -235,7 +240,8 @@ private fun ShoppingListRow(
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onEditAmount: () -> Unit,
-    dragHandleModifier: Modifier,
+    // null hides the handle: one-off items have no position to drag.
+    dragHandleModifier: Modifier?,
 ) {
     val textColor =
         if (item.isChecked) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
@@ -294,11 +300,13 @@ private fun ShoppingListRow(
                             stringResource(R.string.cd_remove_from_list, item.productName),
                     )
                 }
-                IconButton(modifier = dragHandleModifier, onClick = {}) {
-                    Icon(
-                        imageVector = DragHandleIcon,
-                        contentDescription = stringResource(R.string.cd_drag_handle),
-                    )
+                if (dragHandleModifier != null) {
+                    IconButton(modifier = dragHandleModifier, onClick = {}) {
+                        Icon(
+                            imageVector = DragHandleIcon,
+                            contentDescription = stringResource(R.string.cd_drag_handle),
+                        )
+                    }
                 }
             }
         }

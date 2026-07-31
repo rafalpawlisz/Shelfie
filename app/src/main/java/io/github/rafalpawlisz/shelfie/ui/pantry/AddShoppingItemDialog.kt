@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,6 +70,9 @@ fun AddShoppingItemDialog(
     archivedProducts: List<Product>,
     items: List<ShoppingListItem>,
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
+    // A one-off: a line of text on the list, never a product. Confirmed from
+    // the same amount step, under the typed name.
+    onConfirmOneOff: (name: String, amount: Int?, note: String?) -> Unit,
     // A name the pantry does not have yet: hands it to the product form, which
     // is the one place a product is created. The caller reopens this dialog
     // with the new product in [preselectProductId] once it exists.
@@ -79,6 +83,8 @@ fun AddShoppingItemDialog(
     var selectedProductId by rememberSaveable(preselectProductId) {
         mutableStateOf(preselectProductId)
     }
+    // A one-off in the making: the typed name, promoted to the amount step.
+    var oneOffName by rememberSaveable(preselectProductId) { mutableStateOf<String?>(null) }
     val selectedProduct = products.firstOrNull { it.id == selectedProductId }
         ?: archivedProducts.firstOrNull { it.id == selectedProductId }
     val selectedIsArchived = archivedProducts.any { it.id == selectedProductId }
@@ -88,13 +94,19 @@ fun AddShoppingItemDialog(
     // the search meant a flash of it — keyboard, stolen focus and all — every
     // time the picker reopened around a freshly created product.
     val awaitingProduct = selectedProductId != null && selectedProduct == null
+    val inAmountStep = selectedProductId != null || oneOffName != null
 
     // One meaning of "back" for every way of asking: the arrow in the bar, the
     // system gesture, the hardware button. From the amount step it returns to
     // the list; only the list itself closes the picker. Without this the
     // system back skipped the first step and threw away a chosen product.
     val goBack = {
-        if (selectedProductId == null) onDismiss() else selectedProductId = null
+        if (!inAmountStep) {
+            onDismiss()
+        } else {
+            selectedProductId = null
+            oneOffName = null
+        }
     }
 
     Dialog(
@@ -122,11 +134,12 @@ fun AddShoppingItemDialog(
             }
             // Amount and note live here rather than in the phase below, so the
             // confirm action can sit in the top bar — reachable with the
-            // keyboard up, like the product form's Save.
-            var amountText by rememberSaveable(selectedProductId) {
+            // keyboard up, like the product form's Save. Keyed on both step
+            // owners so a one-off starts from blank fields too.
+            var amountText by rememberSaveable(selectedProductId, oneOffName) {
                 mutableStateOf(existing?.amount?.toString().orEmpty())
             }
-            var noteText by rememberSaveable(selectedProductId) {
+            var noteText by rememberSaveable(selectedProductId, oneOffName) {
                 mutableStateOf(existing?.note.orEmpty())
             }
             val amount = amountText.trim().toIntOrNull()
@@ -139,13 +152,13 @@ fun AddShoppingItemDialog(
                         navigationIcon = {
                             IconButton(onClick = goBack) {
                                 Icon(
-                                    imageVector = if (selectedProductId == null) {
+                                    imageVector = if (!inAmountStep) {
                                         Icons.Default.Clear
                                     } else {
                                         Icons.AutoMirrored.Filled.ArrowBack
                                     },
                                     contentDescription = stringResource(
-                                        if (selectedProductId == null) {
+                                        if (!inAmountStep) {
                                             R.string.action_close
                                         } else {
                                             R.string.action_back
@@ -156,15 +169,18 @@ fun AddShoppingItemDialog(
                         },
                         title = { Text(stringResource(R.string.add_to_shopping_list)) },
                         actions = {
-                            if (selectedProduct != null) {
+                            val confirmedOneOff = oneOffName
+                            if (selectedProduct != null || confirmedOneOff != null) {
                                 TextButton(
                                     enabled = amountValid,
                                     onClick = {
-                                        onConfirm(
-                                            selectedProduct.id,
-                                            if (amountText.isBlank()) null else amount,
-                                            noteText.trim().ifBlank { null },
-                                        )
+                                        val cleanAmount = if (amountText.isBlank()) null else amount
+                                        val cleanNote = noteText.trim().ifBlank { null }
+                                        if (selectedProduct != null) {
+                                            onConfirm(selectedProduct.id, cleanAmount, cleanNote)
+                                        } else {
+                                            onConfirmOneOff(confirmedOneOff!!, cleanAmount, cleanNote)
+                                        }
                                     },
                                 ) {
                                     Text(
@@ -189,7 +205,7 @@ fun AddShoppingItemDialog(
                         .padding(horizontal = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (selectedProduct == null) {
+                    if (selectedProduct == null && oneOffName == null) {
                         // Nothing but the bar while the picked product is still
                         // on its way; back leaves for the search as usual.
                         if (!awaitingProduct) {
@@ -198,12 +214,14 @@ fun AddShoppingItemDialog(
                                 archivedProducts = archivedProducts,
                                 onSelect = { selectedProductId = it },
                                 onCreateProduct = onCreateProduct,
+                                onBuyOneOff = { oneOffName = it },
                             )
                         }
                     } else {
                         Text(
-                            text = listOfNotNull(selectedProduct.emoji, selectedProduct.name)
-                                .joinToString(" "),
+                            text = selectedProduct
+                                ?.let { listOfNotNull(it.emoji, it.name).joinToString(" ") }
+                                ?: oneOffName.orEmpty(),
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(top = 8.dp),
                         )
@@ -212,6 +230,15 @@ fun AddShoppingItemDialog(
                         if (selectedIsArchived) {
                             Text(
                                 text = stringResource(R.string.picker_archived_returns),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        // Said before adding, not discovered at checkout: this
+                        // line is not becoming a product.
+                        if (oneOffName != null) {
+                            Text(
+                                text = stringResource(R.string.picker_one_off_hint),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -244,6 +271,7 @@ private fun SearchPhase(
     archivedProducts: List<Product>,
     onSelect: (productId: String) -> Unit,
     onCreateProduct: (name: String) -> Unit,
+    onBuyOneOff: (name: String) -> Unit,
 ) {
     // The search stays even with an empty pantry: typing a name and creating it
     // here is the shortest way out of "no products yet", better than a sign
@@ -286,6 +314,14 @@ private fun SearchPhase(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.add_product_named, query.trim()))
+        }
+        // The second answer to an unknown name: things bought once (a bulb, a
+        // grave candle) that have no business living among the products.
+        OutlinedButton(
+            onClick = { onBuyOneOff(query.trim()) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.picker_one_off, query.trim()))
         }
     }
     LazyColumn(

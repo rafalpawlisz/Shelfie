@@ -91,6 +91,8 @@
     <string name="search_clear">Clear search</string>
     <string name="search_no_results">No products match</string>
     <string name="add_product_named">Add “%1$s” to your products</string>
+    <string name="picker_one_off">Buy “%1$s” just this once</string>
+    <string name="picker_one_off_hint">Not saved to your products — it leaves the list after shopping</string>
     <string name="picker_archived_section">From the archive</string>
     <string name="picker_archived_returns">Adding this brings it back from the archive</string>
     <string name="product_back_from_archive">That name was in the archive — the product came back with its old details</string>
