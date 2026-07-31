@@ -15,7 +15,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,7 +53,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import io.github.rafalpawlisz.shelfie.R
-import io.github.rafalpawlisz.shelfie.emoji.EmojiSuggester
+import io.github.rafalpawlisz.shelfie.emoji.CategorySuggester
+import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.ui.scanBarcode
 
 /**
@@ -106,6 +111,9 @@ fun ProductFormDialog(
         mutableStateOf(initialMinQuantity?.toString().orEmpty())
     }
     var notes by rememberSaveable(stateKey) { mutableStateOf(initialNotes.orEmpty()) }
+    // The stored value is the section's emoji (see ProductCategory); rows from
+    // before sections existed may carry an arbitrary emoji, which is shown
+    // as-is until this form assigns a real section.
     var emoji by rememberSaveable(stateKey) { mutableStateOf(initialEmoji.orEmpty()) }
     var emojiTouched by rememberSaveable(stateKey) { mutableStateOf(!initialEmoji.isNullOrBlank()) }
     // Codes are staged locally and committed with the product on confirm
@@ -115,12 +123,13 @@ fun ProductFormDialog(
         stateSaver = listSaver<List<String>, String>(save = { it }, restore = { it }),
     ) { mutableStateOf(initialBarcodes) }
 
-    // The emoji fills itself in from the name while the field is untouched. A
+    // The section fills itself in from the name while the field is untouched. A
     // product that arrives with one counts as touched: editing "Mleko" must
-    // never silently swap the emoji somebody chose. Suggesting is deliberately
+    // never silently swap the section somebody chose. Suggesting is deliberately
     // not saved into `emoji` — that keeps "the user picked this" and "we
     // guessed this" separable across recompositions.
-    val shownEmoji = if (emojiTouched) emoji else EmojiSuggester.suggest(name).orEmpty()
+    val shownEmoji =
+        if (emojiTouched) emoji else CategorySuggester.suggest(name)?.emoji.orEmpty()
 
     val quantity = quantityText.toIntOrNull()
     val minQuantity = minQuantityText.trim().ifBlank { null }?.toIntOrNull()
@@ -193,51 +202,42 @@ fun ProductFormDialog(
                         .padding(horizontal = 24.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    // Emoji is a small leading accessory next to the name.
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        OutlinedTextField(
-                            value = shownEmoji,
-                            onValueChange = {
-                                // Touching the field ends the suggesting: from
-                                // here on the value is the user's, including
-                                // when they clear it.
-                                emojiTouched = true
-                                emoji = it
-                            },
-                            label = { Text(stringResource(R.string.product_emoji_label)) },
-                            singleLine = true,
-                            modifier = Modifier.weight(0.3f),
-                        )
-                        val nameFocus = remember { FocusRequester() }
-                        OutlinedTextField(
-                            value = name,
-                            onValueChange = { name = it },
-                            label = { Text(stringResource(R.string.product_name_label)) },
-                            singleLine = true,
-                            isError = nameConflict != null,
-                            supportingText = nameConflict?.let { conflict ->
-                                {
-                                    Text(
-                                        stringResource(
-                                            when (conflict) {
-                                                ProductNameConflict.ACTIVE ->
-                                                    R.string.product_name_taken
-                                                ProductNameConflict.ARCHIVED ->
-                                                    R.string.product_name_in_archive
-                                            },
-                                        ),
-                                    )
-                                }
-                            },
-                            modifier = Modifier.weight(0.7f).focusRequester(nameFocus),
-                        )
-                        if (autoFocusName) {
-                            LaunchedEffect(Unit) { nameFocus.requestFocus() }
-                        }
+                    val nameFocus = remember { FocusRequester() }
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text(stringResource(R.string.product_name_label)) },
+                        singleLine = true,
+                        isError = nameConflict != null,
+                        supportingText = nameConflict?.let { conflict ->
+                            {
+                                Text(
+                                    stringResource(
+                                        when (conflict) {
+                                            ProductNameConflict.ACTIVE ->
+                                                R.string.product_name_taken
+                                            ProductNameConflict.ARCHIVED ->
+                                                R.string.product_name_in_archive
+                                        },
+                                    ),
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().focusRequester(nameFocus),
+                    )
+                    if (autoFocusName) {
+                        LaunchedEffect(Unit) { nameFocus.requestFocus() }
                     }
+                    // The store section: a closed list, not a text field — its
+                    // whole point is that both phones sort the same aisle the
+                    // same way. While untouched it follows the typed name.
+                    CategoryPickerField(
+                        selectedEmoji = shownEmoji,
+                        onPick = { category ->
+                            emojiTouched = true
+                            emoji = category?.emoji.orEmpty()
+                        },
+                    )
                     // Quantity + unit read as one value ("2 l").
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -381,3 +381,60 @@ fun ProductFormDialog(
         )
     }
 }
+
+/**
+ * The store-section picker: a read-only field opening the closed list. A
+ * legacy emoji (from before sections) shows as itself with no name; picking
+ * anything replaces it for good.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategoryPickerField(
+    selectedEmoji: String,
+    onPick: (ProductCategory?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selected = ProductCategory.fromEmoji(selectedEmoji)
+    val label = when {
+        selected != null -> "${selected.emoji}  ${stringResource(selected.nameRes)}"
+        selectedEmoji.isNotBlank() -> selectedEmoji
+        else -> stringResource(R.string.category_none)
+    }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+    ) {
+        OutlinedTextField(
+            value = label,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.product_category_label)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.category_none)) },
+                onClick = {
+                    onPick(null)
+                    expanded = false
+                },
+            )
+            ProductCategory.entries.forEach { category ->
+                DropdownMenuItem(
+                    text = { Text("${category.emoji}  ${stringResource(category.nameRes)}") },
+                    onClick = {
+                        onPick(category)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
