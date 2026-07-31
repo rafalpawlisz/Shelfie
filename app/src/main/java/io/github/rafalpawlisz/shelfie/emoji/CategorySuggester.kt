@@ -97,6 +97,9 @@ object CategorySuggester {
             "croissant", "rogal", "rogalik", "drozdzowka", "precel",
             "tortilla", "pita", "lawasz", "nalesniki", "placki",
             "bagietka", "ciabatta", "paczki", "paczek", "donut", "oponki",
+            // A loaf, not a chocolate bar — the phrase has to outrank "baton",
+            // which the sweets aisle claims.
+            "baton chleb",
         ),
         ProductCategory.MEAT to listOf(
             "kurczak", "kura", "drob", "udka", "skrzydelka", "chicken", "indyk",
@@ -222,14 +225,27 @@ object CategorySuggester {
             "skarpetki", "rajstopy",
             "karma dla psa", "karma psa", "psia karma", "karma dla kota", "zwirek", "karma kota",
             "nasiona kwiatow", "ziemia do kwiatow", "nawoz",
-            "paczka", "przesylka", "zeszyt", "olowek", "pisak", "kartki",
+            // Not "paczka": it stems to the same shape as the bakery's
+            // "paczki", which claims it first — a dead entry that answered
+            // "bread" for a parcel.
+            "przesylka", "zeszyt", "olowek", "pisak", "kartki",
             "nozyczki", "nozyk", "ladowarka", "przedluzacz", "kabel", "parasol", "parasolka",
         ),
     )
 
-    /** Multi-word keys, kept in dictionary order, matched against the phrase. */
+    /**
+     * Multi-word keys, longest first, matched as substrings of the name.
+     *
+     * Length decides, not dictionary order: a phrase that contains another
+     * phrase is the more specific of the two, and matching by dictionary order
+     * made the longer one unreachable — "paluszki rybne mrozone" could never
+     * beat "paluszki rybne", so frozen fish sticks landed in the fish aisle
+     * despite an entry saying otherwise. Harmless while both answers were the
+     * same emoji; a contradiction once the answers are named sections.
+     */
     private val PHRASES: List<Pair<String, ProductCategory>> = DICTIONARY
         .flatMap { (category, words) -> words.filter { ' ' in it }.map { it to category } }
+        .sortedByDescending { (phrase, _) -> phrase.length }
 
     /** Single words, reduced to stems; the first entry to claim a stem keeps it. */
     private val STEMS: Map<String, ProductCategory> = buildMap {

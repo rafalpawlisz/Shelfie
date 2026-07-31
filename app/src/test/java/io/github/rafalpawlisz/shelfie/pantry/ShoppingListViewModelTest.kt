@@ -1326,6 +1326,28 @@ class ShoppingListViewModelTest {
         )
     }
 
+    @Test
+    fun `a one-off is never borrowed as a position neighbour`() = runTest {
+        val repository = FakeProductRepository()
+        // Both sectionless, so they share the trailing group with one-offs.
+        repository.addProduct(name = "Tajemnica", quantity = 0, unit = null, emoji = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.addToShoppingList(viewModel.uiState.value.products.single().id, amount = null)
+        viewModel.addOneOffToShoppingList("żarówka", amount = null)
+        val before = viewModel.uiState.value.shoppingList.map { it.productName }
+        assertEquals(listOf("Tajemnica", "żarówka"), before)
+
+        // Dragging the product under the one-off would otherwise copy the
+        // one-off's position — creation time in millis — into the product's
+        // order row, parking it at the end of its aisle for good.
+        viewModel.moveShoppingItem(fromIndex = 0, toIndex = 1)
+
+        val product = viewModel.uiState.value.shoppingList.first { it.productId != null }
+        assertTrue("position must stay in the hand-assigned range", product.position < 1_000.0)
+    }
+
     // --- One-off items ---
 
     @Test

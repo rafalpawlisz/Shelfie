@@ -559,13 +559,15 @@ class PantryViewModel(
         // would put the row straight back. Landing there is a no-op instead.
         val movedSection = sectionOf(moved)
         val without = items.toMutableList().apply { removeAt(fromIndex) }
-        // Neighbours must be unchecked and of the same section — a row across
-        // either boundary keeps its own position range and must not pull the
-        // dropped item into it.
-        val prevItem = without.getOrNull(toIndex - 1)
-            ?.takeUnless { it.isChecked || sectionOf(it) != movedSection }
-        val nextItem = without.getOrNull(toIndex)
-            ?.takeUnless { it.isChecked || sectionOf(it) != movedSection }
+        // Neighbours must be unchecked, of the same section, and product-backed.
+        // A row across either boundary keeps its own position range and must
+        // not pull the dropped item into it — and a one-off's "position" is its
+        // creation time in millis, so borrowing it would push a real product to
+        // the end of its aisle forever (positions outlive the item).
+        fun ShoppingListItem.usableNeighbour(): Boolean =
+            !isChecked && sectionOf(this) == movedSection && productId != null
+        val prevItem = without.getOrNull(toIndex - 1)?.takeIf { it.usableNeighbour() }
+        val nextItem = without.getOrNull(toIndex)?.takeIf { it.usableNeighbour() }
         // Nothing of the same section on either side of the drop — the drag
         // left its aisle entirely; the resync snaps the row back.
         if (prevItem == null && nextItem == null) return

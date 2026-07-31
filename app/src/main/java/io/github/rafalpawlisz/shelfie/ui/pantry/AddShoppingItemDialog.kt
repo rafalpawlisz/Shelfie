@@ -315,15 +315,21 @@ private fun SearchPhase(
         ) {
             Text(stringResource(R.string.add_product_named, query.trim()))
         }
-        // The second answer to an unknown name: things bought once (a bulb, a
-        // grave candle) that have no business living among the products.
-        OutlinedButton(
-            onClick = { onBuyOneOff(query.trim()) },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.picker_one_off, query.trim()))
-        }
     }
+    // The other answer to a name the pantry does not have: things bought once
+    // (a bulb, a grave candle) that have no business living among the products.
+    //
+    // Gated on an EXACT match, not on the search being empty: the search
+    // matches substrings, so "mleko" finds "Mleko owsiane" and the one-off
+    // route used to vanish for any name that merely occurs inside a product's.
+    // Repeats are the one-off's whole point, so only the product itself — the
+    // better answer, listed above — hides the offer. It rides at the end of the
+    // list rather than above it: an escape hatch belongs after the results, not
+    // in front of them.
+    val exactMatch = (visibleProducts + visibleArchived).any {
+        it.name.trim().equals(query.trim(), ignoreCase = true)
+    }
+    val offerOneOff = query.isNotBlank() && !exactMatch
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -349,6 +355,16 @@ private fun SearchPhase(
                     dimmed = true,
                     onClick = { onSelect(product.id) },
                 )
+            }
+        }
+        if (offerOneOff) {
+            item(key = "one-off") {
+                OutlinedButton(
+                    onClick = { onBuyOneOff(query.trim()) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                ) {
+                    Text(stringResource(R.string.picker_one_off, query.trim()))
+                }
             }
         }
     }

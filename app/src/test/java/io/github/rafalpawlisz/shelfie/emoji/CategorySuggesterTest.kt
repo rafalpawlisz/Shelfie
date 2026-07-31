@@ -60,6 +60,26 @@ class CategorySuggesterTest {
         assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("kapusta"))
         assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("masło orzechowe"))
         assertEquals(ProductCategory.DAIRY, CategorySuggester.suggest("masło"))
+        // A loaf is bread even though the sweets aisle owns the word "baton".
+        assertEquals(ProductCategory.BREAD, CategorySuggester.suggest("baton chleb"))
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("baton"))
+    }
+
+    @Test
+    fun `the longer phrase wins over a phrase inside it`() {
+        // Frozen fish sticks are in the freezer, plain ones at the fish
+        // counter. Dictionary order cannot decide this — the longer phrase has
+        // to, or the specific entry is unreachable.
+        assertEquals(ProductCategory.FROZEN, CategorySuggester.suggest("paluszki rybne mrożone"))
+        assertEquals(ProductCategory.FISH, CategorySuggester.suggest("paluszki rybne"))
+    }
+
+    @Test
+    fun `a parcel is not a doughnut`() {
+        // "paczka" stems onto the bakery's "paczki", so the word is left out of
+        // the dictionary rather than kept as an entry that answers "bread".
+        assertEquals(ProductCategory.HOME, CategorySuggester.suggest("przesyłka"))
+        assertEquals(ProductCategory.BREAD, CategorySuggester.suggest("pączki"))
     }
 
     @Test
