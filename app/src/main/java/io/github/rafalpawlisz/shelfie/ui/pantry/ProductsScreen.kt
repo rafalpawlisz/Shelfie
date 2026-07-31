@@ -88,9 +88,15 @@ fun ProductsScreen(
             // flat: the answer is one or two rows, and a header over each of
             // them is noise, not structure.
             if (query.isBlank()) {
-                visibleProducts.groupedBySection().forEach { (section, group) ->
-                    item(key = "section-${section?.name ?: "none"}") {
-                        SectionHeader(section, modifier = Modifier.animateItem())
+                val grouped = visibleProducts.groupedBySection()
+                // A pantry where nothing has a section yet would get a single
+                // "No section" label over everything, which explains nothing.
+                val headers = grouped.size > 1 || grouped.singleOrNull()?.first != null
+                grouped.forEach { (section, group) ->
+                    if (headers) {
+                        item(key = "section-${section?.name ?: "none"}") {
+                            SectionHeader(section, modifier = Modifier.animateItem())
+                        }
                     }
                     items(group, key = { it.id }) { product ->
                         ProductListItem(

@@ -135,11 +135,15 @@ fun ProductFormDialog(
         stateSaver = listSaver<List<String>, String>(save = { it }, restore = { it }),
     ) { mutableStateOf(initialBarcodes) }
 
+    // What the name implies, computed once per name rather than per keystroke in
+    // every field: the picker field needs it for the note under itself, and an
+    // untouched section field follows it.
+    val suggestedSection = remember(name) { CategorySuggester.suggest(name) }
+
     // The section fills itself in from the name while the field is untouched.
     // Suggesting is deliberately not written into `emoji` — that keeps "the user
     // picked this" and "we guessed this" separable across recompositions.
-    val shownEmoji =
-        if (emojiTouched) emoji else CategorySuggester.suggest(name)?.emoji.orEmpty()
+    val shownEmoji = if (emojiTouched) emoji else suggestedSection?.emoji.orEmpty()
 
     val quantity = quantityText.toIntOrNull()
     val minQuantity = minQuantityText.trim().ifBlank { null }?.toIntOrNull()
@@ -243,11 +247,15 @@ fun ProductFormDialog(
                     // same way. While untouched it follows the typed name.
                     CategoryPickerField(
                         selectedEmoji = shownEmoji,
+                        // Below the box, not inside the field: the field carries
+                        // the dropdown's anchor, and Material measures a
+                        // supportingText inside that node — which pushed the
+                        // opened menu away from the input by the note's height.
                         // What the name implies, so a pick that disagrees with
                         // it says so under the field. Nothing acts on this — it
                         // is the answer to "why is milk in the fish aisle?",
                         // which the closed field otherwise hides.
-                        suggestion = CategorySuggester.suggest(name),
+                        suggestion = suggestedSection,
                         onPick = { category ->
                             emojiTouched = true
                             emoji = category?.emoji.orEmpty()
@@ -429,16 +437,6 @@ private fun CategoryPickerField(
             readOnly = true,
             label = { Text(stringResource(R.string.product_category_label)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            supportingText = differingSuggestion?.let { suggested ->
-                {
-                    Text(
-                        stringResource(
-                            R.string.category_from_name,
-                            "${suggested.emoji}  ${stringResource(suggested.nameRes)}",
-                        ),
-                    )
-                }
-            },
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
@@ -446,6 +444,7 @@ private fun CategoryPickerField(
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth(),
         ) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.category_none)) },
@@ -464,6 +463,17 @@ private fun CategoryPickerField(
                 )
             }
         }
+    }
+    if (differingSuggestion != null) {
+        Text(
+            text = stringResource(
+                R.string.category_from_name,
+                "${differingSuggestion.emoji}  ${stringResource(differingSuggestion.nameRes)}",
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp),
+        )
     }
 }
 

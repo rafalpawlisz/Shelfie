@@ -34,8 +34,12 @@ enum class ProductCategory(val emoji: String, @param:StringRes val nameRes: Int)
     companion object {
         /**
          * The section a stored emoji stands for, or null for blank and for
-         * emoji from before sections existed — those rows display their old
-         * emoji untouched and fall into line at their next edit.
+         * emoji from before sections existed. Such rows keep showing whatever
+         * they hold and group with the sectionless ones until somebody picks a
+         * section for them: nothing assigns one behind the user's back, not
+         * even a save (see ProductFormDialog.suggestSection). A pantry filled
+         * before sections existed therefore stays one sectionless block until
+         * its products are visited.
          */
         fun fromEmoji(emoji: String?): ProductCategory? =
             entries.firstOrNull { it.emoji == emoji?.trim() }

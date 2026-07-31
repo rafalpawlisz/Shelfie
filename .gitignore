@@ -37,3 +37,5 @@ firestore-tests/node_modules
 *-debug.log
 npm-debug.log*
 /.firebase
+# Holds the local JDK name, so it differs per machine.
+/.idea/misc.xml
