@@ -82,6 +82,14 @@ internal fun ProductListItem(
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (isLow) MaterialTheme.colorScheme.warning else textColor,
                 )
+                // Only when somebody wrote one down; most products have none.
+                if (product.expiresOn != null) {
+                    Text(
+                        text = stringResource(R.string.expires_on, product.expiresOn),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (dimmed) textColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             trailingContent()
         }

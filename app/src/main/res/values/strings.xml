@@ -106,6 +106,10 @@
     <string name="product_category_label">Store section</string>
     <string name="category_none">No section</string>
     <string name="cart_section">In the cart</string>
+    <string name="product_expires_label">Best before (optional)</string>
+    <string name="product_expires_placeholder">Tap to pick a date</string>
+    <string name="cd_clear_expiry">Clear the date</string>
+    <string name="expires_on">Best before %1$s</string>
     <string name="category_from_name">From the name: %1$s</string>
     <string name="category_produce">Fruit &amp; vegetables</string>
     <string name="category_bread">Bread &amp; bakery</string>

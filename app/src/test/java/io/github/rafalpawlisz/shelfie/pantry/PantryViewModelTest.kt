@@ -61,6 +61,27 @@ class PantryViewModelTest {
     }
 
     @Test
+    fun `a best-before date is kept, and editing can clear it`() = runTest {
+        val repository = FakeProductRepository()
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+
+        viewModel.addProduct(name = "Syrop", quantity = 1, unit = null, expiresOn = "2026-08-20")
+        val product = viewModel.uiState.value.products.single()
+        assertEquals("2026-08-20", product.expiresOn)
+
+        // Clearing the field is a real answer, not "leave it as it was".
+        viewModel.updateProduct(
+            id = product.id,
+            name = product.name,
+            quantity = product.quantity,
+            unit = product.unit,
+            expiresOn = null,
+        )
+        assertNull(viewModel.uiState.value.products.single().expiresOn)
+    }
+
+    @Test
     fun `addProduct reaches a name the pantry already has instead of doubling it`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(

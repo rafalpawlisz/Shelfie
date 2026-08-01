@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -15,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -27,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -56,6 +61,9 @@ import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.emoji.CategorySuggester
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.ui.scanBarcode
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 /**
  * Shared add/edit product form, shown as a full-screen dialog: the form has
@@ -76,6 +84,7 @@ fun ProductFormDialog(
         minQuantity: Int?,
         notes: String?,
         emoji: String?,
+        expiresOn: String?,
         // The user's intent, not a snapshot: reporting the staged list whole
         // would let a save wipe barcodes that arrived (from the household)
         // while the form was open, since they look like removals.
@@ -89,6 +98,7 @@ fun ProductFormDialog(
     initialMinQuantity: Int? = null,
     initialNotes: String? = null,
     initialEmoji: String? = null,
+    initialExpiresOn: String? = null,
     initialBarcodes: List<String> = emptyList(),
     stateKey: Any? = null,
     // Add mode: focus the (required) name field right away so typing can start.
@@ -116,6 +126,9 @@ fun ProductFormDialog(
         mutableStateOf(initialMinQuantity?.toString().orEmpty())
     }
     var notes by rememberSaveable(stateKey) { mutableStateOf(initialNotes.orEmpty()) }
+    // "yyyy-MM-dd" or empty; only ever set by the date picker, so the field
+    // cannot hold something that is not a date.
+    var expiresOn by rememberSaveable(stateKey) { mutableStateOf(initialExpiresOn.orEmpty()) }
     // The stored value is the section's emoji (see ProductCategory); rows from
     // before sections existed may carry an arbitrary emoji, which is shown
     // as-is until this form assigns a real section.
@@ -195,6 +208,7 @@ fun ProductFormDialog(
                                         minQuantity,
                                         notes.trim().ifBlank { null },
                                         shownEmoji.trim().ifBlank { null },
+                                        expiresOn.ifBlank { null },
                                         barcodes - initialBarcodes.toSet(),
                                         initialBarcodes - barcodes.toSet(),
                                     )
@@ -295,6 +309,14 @@ fun ProductFormDialog(
                             null
                         },
                         modifier = Modifier.fillMaxWidth(),
+                    )
+                    // Optional and never guessed: for most of the pantry there
+                    // is nothing worth writing down, and the value is in the
+                    // rarely touched things at the back of the cupboard.
+                    ExpiryField(
+                        value = expiresOn,
+                        onPick = { expiresOn = it },
+                        onClear = { expiresOn = "" },
                     )
                     OutlinedTextField(
                         value = notes,
@@ -476,4 +498,81 @@ private fun CategoryPickerField(
         )
     }
 }
+
+/**
+ * The best-before field: read-only, opened by tapping, cleared by the trailing
+ * button. Typing is deliberately impossible — a date typed by hand is a date
+ * that can be "30.02" or in the wrong century, and everything downstream sorts
+ * this value as text.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExpiryField(value: String, onPick: (String) -> Unit, onClear: () -> Unit) {
+    var showPicker by rememberSaveable { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    // A read-only field ignores clicks on itself, so the tap is read from its
+    // interaction source instead of wrapping the field in a clickable box —
+    // that box would swallow the trailing button's own clicks.
+    LaunchedEffect(interactionSource) {
+        interactionSource.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Release) showPicker = true
+        }
+    }
+    OutlinedTextField(
+        value = value,
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(stringResource(R.string.product_expires_label)) },
+        placeholder = { Text(stringResource(R.string.product_expires_placeholder)) },
+        trailingIcon = if (value.isNotBlank()) {
+            {
+                IconButton(onClick = onClear) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = stringResource(R.string.cd_clear_expiry),
+                    )
+                }
+            }
+        } else {
+            null
+        },
+        interactionSource = interactionSource,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (showPicker) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = value.toEpochMillisOrNull(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        state.selectedDateMillis?.let { onPick(it.toIsoDate()) }
+                        showPicker = false
+                    },
+                ) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPicker = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        ) {
+            DatePicker(state = state)
+        }
+    }
+}
+
+// The picker speaks in UTC-midnight millis; the stored value is a plain date.
+// Both conversions pin the zone to UTC, so a date never shifts a day on the way
+// through.
+private fun String.toEpochMillisOrNull(): Long? = runCatching {
+    LocalDate.parse(this).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+}.getOrNull()
+
+private fun Long.toIsoDate(): String =
+    Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate().toString()
 

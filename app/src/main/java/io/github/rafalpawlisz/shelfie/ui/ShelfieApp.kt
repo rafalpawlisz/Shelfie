@@ -299,9 +299,9 @@ fun ShelfieApp(
                 productNameConflict(state.products, state.archivedProducts, typed)
             },
             // A new product has nothing to remove from.
-            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, added, _ ->
+            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, expiresOn, added, _ ->
                 viewModel.addProduct(
-                    name, quantity, unit, minQuantity, notes, emoji,
+                    name, quantity, unit, minQuantity, notes, emoji, expiresOn,
                     barcodes = added,
                 )
                 showAddDialog = false
@@ -374,7 +374,7 @@ fun ShelfieApp(
             confirmLabel = stringResource(R.string.action_add),
             initialName = newForListName,
             stateKey = newForListName,
-            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, added, _ ->
+            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, expiresOn, added, _ ->
                 viewModel.addProductForList(
                     name = name,
                     quantity = quantity,
@@ -382,6 +382,7 @@ fun ShelfieApp(
                     minQuantity = minQuantity,
                     notes = notes,
                     emoji = emoji,
+                    expiresOn = expiresOn,
                     barcodes = added,
                 )
                 newProductForListName = null
@@ -413,6 +414,7 @@ fun ShelfieApp(
             initialMinQuantity = editedProduct.minQuantity,
             initialNotes = editedProduct.notes,
             initialEmoji = editedProduct.emoji,
+            initialExpiresOn = editedProduct.expiresOn,
             initialBarcodes = state.barcodesByProduct[editedProduct.id].orEmpty(),
             stateKey = editedProduct.id,
             // Editing: the product's section already stands for a decision —
@@ -430,9 +432,9 @@ fun ShelfieApp(
                     selfId = editedProduct.id,
                 )
             },
-            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, added, removed ->
+            onConfirm = { name, quantity, unit, minQuantity, notes, emoji, expiresOn, added, removed ->
                 viewModel.updateProduct(
-                    editedProduct.id, name, quantity, unit, minQuantity, notes, emoji,
+                    editedProduct.id, name, quantity, unit, minQuantity, notes, emoji, expiresOn,
                     addedBarcodes = added,
                     removedBarcodes = removed,
                 )
