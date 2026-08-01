@@ -220,7 +220,7 @@ fun AddShoppingItemDialog(
                     } else {
                         Text(
                             text = selectedProduct
-                                ?.let { listOfNotNull(it.emoji, it.name).joinToString(" ") }
+                                ?.let { listOfNotNull(decorationFor(it.name), it.name).joinToString(" ") }
                                 ?: oneOffName.orEmpty(),
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(top = 8.dp),

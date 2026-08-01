@@ -39,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rafalpawlisz.shelfie.R
 import kotlinx.coroutines.flow.collectLatest
 import io.github.rafalpawlisz.shelfie.ui.pantry.AddShoppingItemDialog
+import io.github.rafalpawlisz.shelfie.ui.pantry.decorationFor
 import io.github.rafalpawlisz.shelfie.ui.pantry.LowStockSuggestion
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
 import io.github.rafalpawlisz.shelfie.ui.pantry.ProductFormDialog
@@ -315,7 +316,7 @@ fun ShelfieApp(
         val product = state.products.firstOrNull { it.id == suggestion.productId }
         RestockDialog(
             productLabel = product
-                ?.let { listOfNotNull(it.emoji, it.name).joinToString(" ") }
+                ?.let { listOfNotNull(decorationFor(it.name), it.name).joinToString(" ") }
                 ?: suggestion.productName,
             lists = state.lists,
             defaultListId = viewModel.defaultRestockListId(),

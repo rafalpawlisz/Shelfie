@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.emoji.DecorationSuggester
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.ui.theme.warning
@@ -65,7 +66,11 @@ internal fun ProductListItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = listOfNotNull(product.emoji, product.name).joinToString(" "),
+                    // The decoration, not the product's section: the section
+                    // is what the group header above already says, and
+                    // repeating it on every row of the group says nothing.
+                    text = listOfNotNull(decorationFor(product.name), product.name)
+                        .joinToString(" "),
                     style = MaterialTheme.typography.titleMedium,
                     color = textColor,
                 )
@@ -145,6 +150,15 @@ internal fun EmptyState(
 
 /** The store section a product belongs to; null for none and for pre-section emoji. */
 internal fun Product.section(): ProductCategory? = ProductCategory.fromEmoji(emoji)
+
+/**
+ * The emoji drawn before a name, read from the name every time. Nothing stores
+ * it, so it cannot disagree with the name it decorates, and a product the
+ * dictionary has never heard of simply goes without one.
+ */
+@Composable
+internal fun decorationFor(name: String): String? =
+    remember(name) { DecorationSuggester.suggest(name) }
 
 /**
  * Products in aisle order, grouped by section, with the sectionless group last.

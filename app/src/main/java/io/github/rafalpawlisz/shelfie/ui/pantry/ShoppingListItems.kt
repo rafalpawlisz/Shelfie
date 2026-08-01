@@ -307,7 +307,10 @@ private fun ShoppingListRow(
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
                 Text(
-                    text = listOfNotNull(item.productEmoji, item.productName).joinToString(" "),
+                    // Same rule as the pantry: the section is in the header
+                    // above, so the row wears the product's own emoji.
+                    text = listOfNotNull(decorationFor(item.productName), item.productName)
+                        .joinToString(" "),
                     style = MaterialTheme.typography.titleMedium,
                     color = textColor,
                     textDecoration = decoration,
