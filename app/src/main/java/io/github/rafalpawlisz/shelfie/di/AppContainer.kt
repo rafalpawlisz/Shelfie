@@ -3,6 +3,7 @@ package io.github.rafalpawlisz.shelfie.di
 import android.content.Context
 import android.util.Log
 import androidx.room.Room
+import io.github.rafalpawlisz.shelfie.BuildConfig
 import io.github.rafalpawlisz.shelfie.data.AuthRepository
 import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.FirebaseAuthRepository
@@ -131,6 +132,13 @@ class AppContainer(private val context: Context) {
     }
 
     val householdRepository: HouseholdRepository by lazy {
-        FirestoreHouseholdRepository(syncState = syncStateStore)
+        FirestoreHouseholdRepository(
+            syncState = syncStateStore,
+            // Name and code together: the name is what a person recognises, the
+            // code is what actually decides whether an update landed. A debug
+            // build shows up as its placeholder "1.0 (1)", which is exactly the
+            // tell you want when a phone is running something homemade.
+            appVersion = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+        )
     }
 }

@@ -23,6 +23,11 @@ class FirestoreHouseholdRepository(
     // Written by createHousehold only, to mark a household as this device's own
     // before anyone can observe it. See the note there.
     private val syncState: SyncStateStore? = null,
+    // This build's version, stamped beside the activity time so the project
+    // owner can see what the household is actually running — an update that
+    // never got installed is otherwise invisible until it breaks something.
+    // null leaves the field alone, which is what tests and fakes want.
+    private val appVersion: String? = null,
 ) : HouseholdRepository {
 
     override fun observeHousehold(uid: String): Flow<Household?> = callbackFlow {
@@ -233,10 +238,14 @@ class FirestoreHouseholdRepository(
         val document = db.collection(HOUSEHOLDS).document(householdId)
         val before = System.currentTimeMillis()
         document.update(
-            mapOf(
-                FIELD_LAST_ACTIVE_AT to FieldValue.serverTimestamp(),
-                "$FIELD_MEMBER_ACTIVITY.$uid" to FieldValue.serverTimestamp(),
-            ),
+            buildMap {
+                put(FIELD_LAST_ACTIVE_AT, FieldValue.serverTimestamp())
+                put("$FIELD_MEMBER_ACTIVITY.$uid", FieldValue.serverTimestamp())
+                // Rides along with the stamp rather than getting a write of its
+                // own: it changes at most once per release and is only ever
+                // read by a human, so a write per version would buy nothing.
+                appVersion?.let { put("$FIELD_MEMBER_VERSIONS.$uid", it) }
+            },
         ).await()
         val after = System.currentTimeMillis()
 
@@ -270,6 +279,9 @@ class FirestoreHouseholdRepository(
             mapOf(
                 "members.$uid" to FieldValue.delete(),
                 "$FIELD_MEMBER_ACTIVITY.$uid" to FieldValue.delete(),
+                // Same reasoning as the stamp: a version left behind names a
+                // membership that no longer exists and nobody can remove.
+                "$FIELD_MEMBER_VERSIONS.$uid" to FieldValue.delete(),
             ),
         )
     }
@@ -299,6 +311,7 @@ class FirestoreHouseholdRepository(
         const val FIELD_HOUSEHOLD_ID = "householdId"
         const val FIELD_LAST_ACTIVE_AT = "lastActiveAt"
         const val FIELD_MEMBER_ACTIVITY = "memberActivity"
+        const val FIELD_MEMBER_VERSIONS = "memberVersions"
 
         // Firestore's hard limit on writes in one batch.
         const val BATCH_LIMIT = 500

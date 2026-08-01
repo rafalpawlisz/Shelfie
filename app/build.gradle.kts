@@ -74,6 +74,10 @@ android {
     }
     buildFeatures {
         compose = true
+        // Off by default since AGP 8. Wanted for VERSION_NAME/VERSION_CODE,
+        // which the app reports to its household so the running version is
+        // visible in the database.
+        buildConfig = true
     }
     androidResources {
         // Puts Shelfie in the system's per-app language list (Android 13+),

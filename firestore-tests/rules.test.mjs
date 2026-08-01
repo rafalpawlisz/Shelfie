@@ -336,6 +336,84 @@ describe("households: rename and delete", () => {
     );
   });
 
+  it("a member records their own version alongside the stamps", async () => {
+    await seedHousehold("h1", { [ANNA]: true, [BOB]: true }, "CODE01");
+    // What the app actually writes: both stamps and the version in one update.
+    await assertSucceeds(
+      updateDoc(doc(db(BOB), "households", "h1"), {
+        lastActiveAt: serverTimestamp(),
+        [`memberActivity.${BOB}`]: serverTimestamp(),
+        [`memberVersions.${BOB}`]: "0.2.1 (6)",
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db(ANNA), "households", "h1"), {
+        [`memberVersions.${ANNA}`]: "1.0 (1)",
+      }),
+    );
+  });
+
+  it("nobody writes a version for someone else", async () => {
+    await seedHousehold("h1", { [ANNA]: true, [BOB]: true }, "CODE01", {
+      memberVersions: { [BOB]: "0.2.0 (5)" },
+    });
+    // The field exists to show which phone is behind; writing another
+    // member's entry would let a stale one be dressed up as current.
+    await assertFails(
+      updateDoc(doc(db(ANNA), "households", "h1"), {
+        [`memberVersions.${BOB}`]: "0.2.1 (6)",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(db(ANNA), "households", "h1"), {
+        [`memberVersions.${BOB}`]: deleteField(),
+      }),
+    );
+    await assertFails(updateDoc(doc(db(ANNA), "households", "h1"), { memberVersions: {} }));
+    await assertFails(
+      updateDoc(doc(db(EVE), "households", "h1"), {
+        [`memberVersions.${EVE}`]: "0.2.1 (6)",
+      }),
+    );
+  });
+
+  it("a version is a short string, not a smuggled payload", async () => {
+    await seedHousehold("h1", { [ANNA]: true }, "CODE01");
+    const household = doc(db(ANNA), "households", "h1");
+    await assertFails(updateDoc(household, { [`memberVersions.${ANNA}`]: 6 }));
+    await assertFails(updateDoc(household, { [`memberVersions.${ANNA}`]: "x".repeat(33) }));
+    await assertSucceeds(updateDoc(household, { [`memberVersions.${ANNA}`]: "x".repeat(32) }));
+  });
+
+  it("leaving takes the leaver's own version with it", async () => {
+    await seedHousehold("h1", { [ANNA]: true, [BOB]: true }, "CODE01", {
+      memberActivity: { [ANNA]: new Date("2026-01-01"), [BOB]: new Date("2026-01-02") },
+      memberVersions: { [ANNA]: "0.2.1 (6)", [BOB]: "0.2.0 (5)" },
+    });
+    const household = doc(db(BOB), "households", "h1");
+    // Same trap as the stamp: after this write there is no membership left to
+    // authorise touching the map.
+    await assertFails(
+      updateDoc(household, {
+        [`members.${BOB}`]: deleteField(),
+        [`memberVersions.${ANNA}`]: deleteField(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(household, {
+        [`members.${BOB}`]: deleteField(),
+        [`memberActivity.${BOB}`]: deleteField(),
+        [`memberVersions.${BOB}`]: deleteField(),
+      }),
+    );
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const snap = await getDoc(doc(ctx.firestore(), "households", "h1"));
+      if (Object.keys(snap.data().memberVersions).join() !== ANNA) {
+        throw new Error(`unexpected memberVersions: ${JSON.stringify(snap.data().memberVersions)}`);
+      }
+    });
+  });
+
   it("a rename must produce a real name", async () => {
     await seedHousehold("h1", { [ANNA]: true }, "CODE01");
     const household = doc(db(ANNA), "households", "h1");

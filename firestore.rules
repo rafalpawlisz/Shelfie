@@ -3,7 +3,8 @@ rules_version = '2';
 // Shelfie household model. Everything not explicitly allowed is denied.
 //
 // households/{hid}   { name, members: {uid: true}, inviteCode, createdAt,
-//                      createdBy, lastActiveAt, memberActivity: {uid: time} }
+//                      createdBy, lastActiveAt, memberActivity: {uid: time},
+//                      memberVersions: {uid: "0.2.1 (6)"} }
 // users/{uid}        { householdId }
 // inviteCodes/{code} { householdId }   — code → household index for joining
 service cloud.firestore {
@@ -74,6 +75,28 @@ service cloud.firestore {
           && !(request.auth.uid in request.resource.data.get('memberActivity', {}));
       }
 
+      // The memberVersions map changed for the caller's own key only, to a
+      // string of a plausible length. Same shape as the activity stamp, and
+      // constrained for the same reason: a member who could write anyone's
+      // entry could make another phone look up to date when it is not, which
+      // defeats the only purpose the field has.
+      function setsOwnVersionOnly() {
+        return 'memberVersions' in request.resource.data
+          && request.resource.data.memberVersions
+               .diff(resource.data.get('memberVersions', {}))
+               .affectedKeys().hasOnly([request.auth.uid])
+          && request.resource.data.memberVersions[request.auth.uid] is string
+          && request.resource.data.memberVersions[request.auth.uid].size() <= 32;
+      }
+
+      // The mirror of the above for leaving, matching dropsOwnActivityOnly().
+      function dropsOwnVersionOnly() {
+        return request.resource.data.get('memberVersions', {})
+               .diff(resource.data.get('memberVersions', {}))
+               .affectedKeys().hasOnly([request.auth.uid])
+          && !(request.auth.uid in request.resource.data.get('memberVersions', {}));
+      }
+
       // Creating a household: the creator is its sole member.
       allow create: if signedIn()
         && request.resource.data.members.keys().hasOnly([request.auth.uid])
@@ -93,10 +116,11 @@ service cloud.firestore {
         // own activity stamp — nothing else, and nobody else's.
         || (
           isMember()
-          && changesOnly(['members', 'memberActivity'])
+          && changesOnly(['members', 'memberActivity', 'memberVersions'])
           && membersDiffOnlySelf()
           && !(request.auth.uid in request.resource.data.members)
           && (!touches('memberActivity') || dropsOwnActivityOnly())
+          && (!touches('memberVersions') || dropsOwnVersionOnly())
         )
         // Members may rename the household — to an actual name. changesOnly()
         // counts a removed key as affected, so without the type and length
@@ -107,19 +131,20 @@ service cloud.firestore {
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
         )
-        // Members stamp lastActiveAt and their own memberActivity entry once
-        // per sync session (housekeeping signals for the project owner;
-        // nothing in the app reads them).
+        // Members stamp lastActiveAt, their own memberActivity entry and the
+        // version they are running, once per sync session (housekeeping
+        // signals for the project owner; nothing in the app reads them).
         //
-        // Both halves are constrained: a member may only touch their own
-        // activity entry, and only to the server's clock. Otherwise the field
-        // meant to identify dead members would let a live one forge activity
-        // for them — or backdate someone else into looking prunable.
+        // Every half is constrained: a member may only touch their own entry,
+        // and the time only to the server's clock. Otherwise the fields meant
+        // to identify dead or stale members would let a live one forge
+        // activity for them — or backdate someone else into looking prunable.
         || (
           isMember()
-          && changesOnly(['lastActiveAt', 'memberActivity'])
+          && changesOnly(['lastActiveAt', 'memberActivity', 'memberVersions'])
           && (!touches('lastActiveAt') || stampsNow('lastActiveAt'))
           && (!touches('memberActivity') || stampsOwnActivityOnly())
+          && (!touches('memberVersions') || setsOwnVersionOnly())
         )
       );
 
