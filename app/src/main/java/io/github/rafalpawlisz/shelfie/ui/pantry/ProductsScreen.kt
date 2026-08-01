@@ -61,8 +61,12 @@ fun ProductsScreen(
     // Presentation-only filter; the source lists stay sorted by the repository.
     val visibleProducts = products.filterByName(query)
     val visibleArchived = archivedProducts.filterByName(query)
-    val today = remember { LocalDate.now() }
-    val expiring = visibleProducts.expiringFirst(today)
+    // Counted over the whole pantry, not over the search: the chip answers
+    // "is anything running out of date", which has nothing to do with what is
+    // typed in the box. Scoped to the search it shrank as you typed, and a
+    // query matching nothing expiring emptied it — turning the filter off for
+    // good through the guard below.
+    val expiring = products.expiringFirst(rememberToday())
     // A filter, not a pinned block: the pantry keeps reading aisle by aisle,
     // and dates are looked at when you go looking for them. The chip is the
     // reminder that there is something to look at — it only exists when there
@@ -73,7 +77,7 @@ fun ProductsScreen(
     LaunchedEffect(expiring.isEmpty()) {
         if (expiring.isEmpty()) expiringOnly = false
     }
-    val shownProducts = if (expiringOnly) expiring else visibleProducts
+    val shownProducts = if (expiringOnly) expiring.filterByName(query) else visibleProducts
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
@@ -104,7 +108,10 @@ fun ProductsScreen(
                 modifier = Modifier.padding(start = 16.dp, top = 8.dp),
             )
         }
-        if (query.isNotBlank() && visibleProducts.isEmpty() && visibleArchived.isEmpty()) {
+        // With the filter on, the archive is hidden anyway, so it cannot be the
+        // reason the screen is not empty.
+        val nothingMatches = shownProducts.isEmpty() && (expiringOnly || visibleArchived.isEmpty())
+        if (query.isNotBlank() && nothingMatches) {
             Text(
                 text = stringResource(R.string.search_no_results),
                 style = MaterialTheme.typography.bodyMedium,

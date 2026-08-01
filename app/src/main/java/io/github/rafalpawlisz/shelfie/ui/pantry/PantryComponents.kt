@@ -15,7 +15,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -27,6 +31,9 @@ import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.emoji.DecorationSuggester
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import io.github.rafalpawlisz.shelfie.ui.theme.warning
 import java.time.LocalDate
 
@@ -91,8 +98,7 @@ internal fun ProductListItem(
                 )
                 // Only when somebody wrote one down; most products have none.
                 if (product.expiresOn != null) {
-                    val today = remember { LocalDate.now() }
-                    val status = expiryStatusOf(product.expiresOn, today)
+                    val status = expiryStatusOf(product.expiresOn, rememberToday())
                     Text(
                         text = stringResource(R.string.expires_on, product.expiresOn),
                         style = MaterialTheme.typography.bodySmall,
@@ -150,6 +156,28 @@ internal fun EmptyState(
 
 /** The store section a product belongs to; null for none and for pre-section emoji. */
 internal fun Product.section(): ProductCategory? = ProductCategory.fromEmoji(emoji)
+
+/**
+ * Today's date, re-read every time the app comes back to the foreground.
+ *
+ * A plain remember { LocalDate.now() } is captured on first composition and
+ * kept for as long as the screen lives — which for a pantry left open on a
+ * bedside table means "today" can be several days old, and a date that passed
+ * on Tuesday still reads as fine on Friday. Resuming is the moment that
+ * matters: nobody is watching the list at midnight, but everybody comes back to
+ * it in the morning.
+ */
+@Composable
+internal fun rememberToday(): LocalDate {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var today by remember { mutableStateOf(LocalDate.now()) }
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            today = LocalDate.now()
+        }
+    }
+    return today
+}
 
 /**
  * The emoji drawn before a name, read from the name every time. Nothing stores
