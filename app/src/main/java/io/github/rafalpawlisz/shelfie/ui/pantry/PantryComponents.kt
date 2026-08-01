@@ -15,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -26,6 +27,7 @@ import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.ui.theme.warning
+import java.time.LocalDate
 
 @Composable
 internal fun ProductList(
@@ -84,10 +86,17 @@ internal fun ProductListItem(
                 )
                 // Only when somebody wrote one down; most products have none.
                 if (product.expiresOn != null) {
+                    val today = remember { LocalDate.now() }
+                    val status = expiryStatusOf(product.expiresOn, today)
                     Text(
                         text = stringResource(R.string.expires_on, product.expiresOn),
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (dimmed) textColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = when {
+                            dimmed -> textColor
+                            status == ExpiryStatus.EXPIRED -> MaterialTheme.colorScheme.error
+                            status == ExpiryStatus.SOON -> MaterialTheme.colorScheme.warning
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     )
                 }
             }

@@ -110,6 +110,7 @@
     <string name="product_expires_placeholder">Tap to pick a date</string>
     <string name="cd_clear_expiry">Clear the date</string>
     <string name="expires_on">Best before %1$s</string>
+    <string name="expiring_section">Running out of date (%1$d)</string>
     <string name="category_from_name">From the name: %1$s</string>
     <string name="category_produce">Fruit &amp; vegetables</string>
     <string name="category_bread">Bread &amp; bakery</string>

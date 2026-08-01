@@ -24,6 +24,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -32,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.Product
+import java.time.LocalDate
 
 @Composable
 fun ProductsScreen(
@@ -56,6 +58,12 @@ fun ProductsScreen(
     // Presentation-only filter; the source lists stay sorted by the repository.
     val visibleProducts = products.filterByName(query)
     val visibleArchived = archivedProducts.filterByName(query)
+    // Pinned above the aisles: the things at the back of the cupboard are
+    // exactly the ones nobody scrolls down to, so a date that only shows in
+    // place would arrive too late to act on. They leave their section while
+    // they are up here — a row belongs to one group, as in the cart.
+    val today = remember { LocalDate.now() }
+    val expiring = visibleProducts.expiringFirst(today)
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
@@ -88,10 +96,27 @@ fun ProductsScreen(
             // flat: the answer is one or two rows, and a header over each of
             // them is noise, not structure.
             if (query.isBlank()) {
-                val grouped = visibleProducts.groupedBySection()
+                if (expiring.isNotEmpty()) {
+                    item(key = "section-expiring") {
+                        GroupHeader(
+                            text = stringResource(R.string.expiring_section, expiring.size),
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                    items(expiring, key = { it.id }) { product ->
+                        ProductListItem(
+                            product = product,
+                            modifier = Modifier.animateItem(),
+                            onClick = { onProductClick(product.id) },
+                        )
+                    }
+                }
+                val grouped = (visibleProducts - expiring.toSet()).groupedBySection()
                 // A pantry where nothing has a section yet would get a single
                 // "No section" label over everything, which explains nothing.
-                val headers = grouped.size > 1 || grouped.singleOrNull()?.first != null
+                val headers = expiring.isNotEmpty() ||
+                    grouped.size > 1 ||
+                    grouped.singleOrNull()?.first != null
                 grouped.forEach { (section, group) ->
                     if (headers) {
                         item(key = "section-${section?.name ?: "none"}") {
