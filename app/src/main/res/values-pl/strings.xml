@@ -110,7 +110,7 @@
     <string name="product_expires_placeholder">Dotknij, aby wybrać datę</string>
     <string name="cd_clear_expiry">Wyczyść datę</string>
     <string name="expires_on">Termin %1$s</string>
-    <string name="expiring_section">Kończy się termin (%1$d)</string>
+    <string name="expiring_filter">Kończy się termin (%1$d)</string>
     <string name="category_from_name">Z nazwy: %1$s</string>
     <string name="category_produce">Owoce i warzywa</string>
     <string name="category_bread">Pieczywo</string>

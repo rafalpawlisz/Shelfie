@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +23,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.Product
+import io.github.rafalpawlisz.shelfie.ui.theme.warning
 import java.time.LocalDate
 
 @Composable
@@ -58,12 +61,19 @@ fun ProductsScreen(
     // Presentation-only filter; the source lists stay sorted by the repository.
     val visibleProducts = products.filterByName(query)
     val visibleArchived = archivedProducts.filterByName(query)
-    // Pinned above the aisles: the things at the back of the cupboard are
-    // exactly the ones nobody scrolls down to, so a date that only shows in
-    // place would arrive too late to act on. They leave their section while
-    // they are up here — a row belongs to one group, as in the cart.
     val today = remember { LocalDate.now() }
     val expiring = visibleProducts.expiringFirst(today)
+    // A filter, not a pinned block: the pantry keeps reading aisle by aisle,
+    // and dates are looked at when you go looking for them. The chip is the
+    // reminder that there is something to look at — it only exists when there
+    // is.
+    var expiringOnly by rememberSaveable { mutableStateOf(false) }
+    // Using up or re-dating the last one leaves the filter showing nothing at
+    // all, which reads as an empty pantry.
+    LaunchedEffect(expiring.isEmpty()) {
+        if (expiring.isEmpty()) expiringOnly = false
+    }
+    val shownProducts = if (expiringOnly) expiring else visibleProducts
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
@@ -77,6 +87,23 @@ fun ProductsScreen(
             onQueryChange = { query = it },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
+        if (expiring.isNotEmpty()) {
+            FilterChip(
+                selected = expiringOnly,
+                onClick = { expiringOnly = !expiringOnly },
+                label = {
+                    Text(
+                        text = stringResource(R.string.expiring_filter, expiring.size),
+                        color = if (expiringOnly) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.warning
+                        },
+                    )
+                },
+                modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+            )
+        }
         if (query.isNotBlank() && visibleProducts.isEmpty() && visibleArchived.isEmpty()) {
             Text(
                 text = stringResource(R.string.search_no_results),
@@ -92,31 +119,15 @@ fun ProductsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Grouped by store section while browsing, so the pantry reads in
-            // the same order as the shopping list. While searching it stays
-            // flat: the answer is one or two rows, and a header over each of
-            // them is noise, not structure.
-            if (query.isBlank()) {
-                if (expiring.isNotEmpty()) {
-                    item(key = "section-expiring") {
-                        GroupHeader(
-                            text = stringResource(R.string.expiring_section, expiring.size),
-                            modifier = Modifier.animateItem(),
-                        )
-                    }
-                    items(expiring, key = { it.id }) { product ->
-                        ProductListItem(
-                            product = product,
-                            modifier = Modifier.animateItem(),
-                            onClick = { onProductClick(product.id) },
-                        )
-                    }
-                }
-                val grouped = (visibleProducts - expiring.toSet()).groupedBySection()
+            // the same order as the shopping list. While searching — or with
+            // the expiry filter on — it stays flat: the answer is a handful of
+            // rows in an order of their own, and aisle headers over them are
+            // noise, not structure.
+            if (query.isBlank() && !expiringOnly) {
+                val grouped = shownProducts.groupedBySection()
                 // A pantry where nothing has a section yet would get a single
                 // "No section" label over everything, which explains nothing.
-                val headers = expiring.isNotEmpty() ||
-                    grouped.size > 1 ||
-                    grouped.singleOrNull()?.first != null
+                val headers = grouped.size > 1 || grouped.singleOrNull()?.first != null
                 grouped.forEach { (section, group) ->
                     if (headers) {
                         item(key = "section-${section?.name ?: "none"}") {
@@ -132,7 +143,7 @@ fun ProductsScreen(
                     }
                 }
             } else {
-                items(visibleProducts, key = { it.id }) { product ->
+                items(shownProducts, key = { it.id }) { product ->
                     ProductListItem(
                         product = product,
                         modifier = Modifier.animateItem(),
@@ -140,7 +151,9 @@ fun ProductsScreen(
                     )
                 }
             }
-            if (visibleArchived.isNotEmpty()) {
+            // The archive answers a different question than "what runs out
+            // next", and an archived product is not going to be eaten.
+            if (visibleArchived.isNotEmpty() && !expiringOnly) {
                 item(key = "archived-header") {
                     TextButton(onClick = { archivedExpanded = !archivedExpanded }) {
                         Icon(
