@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.pantry
 
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
+import io.github.rafalpawlisz.shelfie.data.local.sectionEmojiFor
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
@@ -118,7 +119,17 @@ class FakeShoppingListRepository(
                         aChecked != bChecked -> if (aChecked) 1 else -1
                         aChecked -> bItem.checkedAt!!.compareTo(aItem.checkedAt!!)
                         else -> {
-                            val bySection = sectionRank(aProd).compareTo(sectionRank(bProd))
+                            val bySection = sectionRank(
+                                aItem.productId,
+                                aProd?.emoji,
+                                aProd?.name ?: aItem.name.orEmpty(),
+                            ).compareTo(
+                                sectionRank(
+                                    bItem.productId,
+                                    bProd?.emoji,
+                                    bProd?.name ?: bItem.name.orEmpty(),
+                                ),
+                            )
                             if (bySection != 0) return@sortedWith bySection
                             val byPos = positionOf(aItem).compareTo(positionOf(bItem))
                             if (byPos != 0) byPos
@@ -135,7 +146,11 @@ class FakeShoppingListRepository(
                         note = item.note,
                         isChecked = item.checkedAt != null,
                         productName = product?.name ?: item.name.orEmpty(),
-                        productEmoji = product?.emoji,
+                        productEmoji = sectionEmojiFor(
+                            item.productId,
+                            product?.emoji,
+                            product?.name ?: item.name.orEmpty(),
+                        ),
                         productUnit = product?.unit,
                         position = positionOf(item),
                     )
@@ -277,9 +292,11 @@ class FakeShoppingListRepository(
         // createdAt-in-millis fallback.
         const val ONE_OFF_BASE = 1_000_000.0
 
-        // Mirrors the real repository's aisle-walk rank.
-        fun sectionRank(product: io.github.rafalpawlisz.shelfie.model.Product?): Int =
-            ProductCategory.fromEmoji(product?.emoji)?.ordinal ?: ProductCategory.entries.size
+        // Mirrors the real repository's aisle-walk rank, resolved the same way
+        // the row is shown: a product's own section, or a one-off's name.
+        fun sectionRank(productId: String?, emoji: String?, name: String): Int =
+            ProductCategory.fromEmoji(sectionEmojiFor(productId, emoji, name))?.ordinal
+                ?: ProductCategory.entries.size
     }
 
     // Append at the end the first time a product joins a list; keep an existing slot.

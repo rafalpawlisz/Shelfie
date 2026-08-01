@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import io.github.rafalpawlisz.shelfie.emoji.CategorySuggester
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 
 @Entity(
@@ -79,7 +80,21 @@ fun ShoppingListItemRow.toDomain(): ShoppingListItem = ShoppingListItem(
     note = note,
     isChecked = checkedAt != null,
     productName = productName,
-    productEmoji = productEmoji,
+    productEmoji = sectionEmojiFor(productId, productEmoji, productName),
     productUnit = productUnit,
     position = position,
 )
+
+/**
+ * The section a shopping-list row shows and sorts by.
+ *
+ * Where there is a product, the product's own section is the answer and a blank
+ * one means "no section", not "guess" — that is the promise the product form
+ * makes, and reading a section out of the name here would quietly break it.
+ *
+ * A one-off has no product to ask, so its name answers instead. Nothing is
+ * stored: the line is typed once and deleted at checkout, which is too short a
+ * life to be worth a column, a sync field and a picker to correct it.
+ */
+fun sectionEmojiFor(productId: String?, productEmoji: String?, name: String): String? =
+    if (productId != null) productEmoji else CategorySuggester.suggest(name)?.emoji

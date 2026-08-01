@@ -1265,11 +1265,36 @@ class ShoppingListViewModelTest {
         observe(viewModel)
         viewModel.createList("Sklep")
         viewModel.uiState.value.products.forEach { viewModel.addToShoppingList(it.id, amount = null) }
+        // A one-off has no product, so its section comes from its name: the
+        // bulb walks with the household aisle, ahead of the sectionless row.
         viewModel.addOneOffToShoppingList("żarówka", amount = null)
 
         val names = viewModel.uiState.value.shoppingList.map { it.productName }
 
-        assertEquals(listOf("Jablka", "Mleko", "Plyn", "Tajemnica", "żarówka"), names)
+        assertEquals(listOf("Jablka", "Mleko", "Plyn", "żarówka", "Tajemnica"), names)
+    }
+
+    @Test
+    fun `a one-off takes the section its name implies, a product never does`() = runTest {
+        val repository = FakeProductRepository()
+        // A product with no section stays sectionless even though its name is
+        // in the dictionary: an empty section is a choice the form promises to
+        // keep, and only the one-off — which has no form — follows its name.
+        repository.addProduct(name = "Mleko", quantity = 0, unit = null, emoji = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.uiState.value.products.forEach { viewModel.addToShoppingList(it.id, amount = null) }
+        viewModel.addOneOffToShoppingList("kefir", amount = null)
+        viewModel.addOneOffToShoppingList("zgrzeblarka", amount = null)
+
+        val items = viewModel.uiState.value.shoppingList
+
+        assertEquals("🥛", items.first { it.productName == "kefir" }.productEmoji)
+        assertEquals(null, items.first { it.productName == "Mleko" }.productEmoji)
+        // Nothing in the dictionary answers for it — the trailing group.
+        assertEquals(null, items.first { it.productName == "zgrzeblarka" }.productEmoji)
+        assertEquals(listOf("kefir", "Mleko", "zgrzeblarka"), items.map { it.productName })
     }
 
     @Test
@@ -1335,9 +1360,11 @@ class ShoppingListViewModelTest {
         observe(viewModel)
         viewModel.createList("Sklep")
         viewModel.addToShoppingList(viewModel.uiState.value.products.single().id, amount = null)
-        viewModel.addOneOffToShoppingList("żarówka", amount = null)
+        // A name no dictionary entry answers for, so the one-off really does
+        // share the trailing group and can be dragged against.
+        viewModel.addOneOffToShoppingList("zgrzeblarka", amount = null)
         val before = viewModel.uiState.value.shoppingList.map { it.productName }
-        assertEquals(listOf("Tajemnica", "żarówka"), before)
+        assertEquals(listOf("Tajemnica", "zgrzeblarka"), before)
 
         // Dragging the product under the one-off would otherwise copy the
         // one-off's position — creation time in millis — into the product's
@@ -1353,7 +1380,8 @@ class ShoppingListViewModelTest {
     @Test
     fun `a one-off lands on the list under its own name, after the products`() = runTest {
         val repository = FakeProductRepository()
-        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        // Dairy, so the bulb's own aisle (household) still puts it last.
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l", emoji = "🥛")
         val viewModel = makeViewModel(repository)
         observe(viewModel)
         viewModel.createList("Lidl")

@@ -9,6 +9,7 @@ import io.github.rafalpawlisz.shelfie.data.sync.listOrderDocId
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemRow
+import io.github.rafalpawlisz.shelfie.data.local.sectionEmojiFor
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
@@ -115,9 +116,13 @@ class OfflineShoppingListRepository(
             }.map(ShoppingListItemRow::toDomain)
         }
 
-    // The aisle-walk rank; sectionless rows come after every real section.
+    // The aisle-walk rank; sectionless rows come after every real section. Goes
+    // through the same resolution the row is shown with, so a one-off sorts
+    // into the aisle its name names instead of trailing behind every product.
     private fun ShoppingListItemRow.sectionRank(): Int =
-        ProductCategory.fromEmoji(productEmoji)?.ordinal ?: ProductCategory.entries.size
+        ProductCategory.fromEmoji(sectionEmojiFor(productId, productEmoji, productName))
+            ?.ordinal
+            ?: ProductCategory.entries.size
 
     override suspend fun addItem(listId: String, productId: String, amount: Int?, note: String?) {
         dao.addOrMerge(
