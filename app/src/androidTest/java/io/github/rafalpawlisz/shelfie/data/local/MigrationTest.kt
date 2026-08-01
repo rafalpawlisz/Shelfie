@@ -123,8 +123,36 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migrate3To4_addsExpiryLeavingProductsIntact() {
+        helper.createDatabase(TEST_DB, 3).use { db ->
+            db.execSQL(
+                "INSERT INTO products " +
+                    "(id, name, quantity, unit, updatedAt, archivedAt, createdAt, " +
+                    "minQuantity, notes, emoji) " +
+                    "VALUES ('p1', 'Syrop', 1, NULL, 111, NULL, 100, NULL, 'z apteki', '💊')"
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, *ShelfieDatabase.MIGRATIONS).use { db ->
+            db.query("SELECT name, notes, emoji, expiresOn FROM products").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("Syrop", cursor.getString(0))
+                assertEquals("z apteki", cursor.getString(1))
+                assertEquals("💊", cursor.getString(2))
+                // Nobody wrote a date for what was already in the pantry.
+                assertTrue(cursor.isNull(3))
+            }
+            db.execSQL("UPDATE products SET expiresOn = '2026-09-30' WHERE id = 'p1'")
+            db.query("SELECT expiresOn FROM products WHERE id = 'p1'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("2026-09-30", cursor.getString(0))
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test.db"
-        const val CURRENT_VERSION = 3
+        const val CURRENT_VERSION = 4
     }
 }

@@ -300,7 +300,10 @@ fun ShelfieApp(
             },
             // A new product has nothing to remove from.
             onConfirm = { name, quantity, unit, minQuantity, notes, emoji, added, _ ->
-                viewModel.addProduct(name, quantity, unit, minQuantity, notes, emoji, added)
+                viewModel.addProduct(
+                    name, quantity, unit, minQuantity, notes, emoji,
+                    barcodes = added,
+                )
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },

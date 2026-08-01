@@ -24,6 +24,20 @@ data class ProductEntity(
     val notes: String? = null,
     // Visual marker shown before the name on lists.
     val emoji: String? = null,
+    /**
+     * Best-before date as "yyyy-MM-dd", or null when nobody wrote one down.
+     *
+     * A date and nothing more: the printed date on a package has no time and no
+     * timezone, and storing an instant would invent both — then shift the day
+     * across a border or a DST edge. In this form it also sorts and compares as
+     * plain text, chronologically, in SQLite and in Firestore alike.
+     *
+     * It describes what is in the cupboard, not a batch: this is for the rarely
+     * bought things at the back, where the count is one and the date is written
+     * once. Nothing keeps it true by itself — buying a second jar means editing
+     * it, the same as writing it.
+     */
+    val expiresOn: String? = null,
 )
 
 fun ProductEntity.toDomain(): Product = Product(
@@ -34,4 +48,5 @@ fun ProductEntity.toDomain(): Product = Product(
     minQuantity = minQuantity,
     notes = notes,
     emoji = emoji,
+    expiresOn = expiresOn,
 )

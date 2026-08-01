@@ -35,6 +35,7 @@ class FakeProductRepository : ProductRepository {
         minQuantity: Int?,
         notes: String?,
         emoji: String?,
+        expiresOn: String?,
     ): String {
         val id = "id-${nextId++}"
         entries.update {
@@ -47,6 +48,7 @@ class FakeProductRepository : ProductRepository {
                     minQuantity = minQuantity,
                     notes = notes,
                     emoji = emoji,
+                    expiresOn = expiresOn,
                 ),
                 archived = false,
             )
@@ -62,6 +64,7 @@ class FakeProductRepository : ProductRepository {
         minQuantity: Int?,
         notes: String?,
         emoji: String?,
+        expiresOn: String?,
     ) {
         mapProduct(id) {
             it.copy(
@@ -71,6 +74,7 @@ class FakeProductRepository : ProductRepository {
                 minQuantity = minQuantity,
                 notes = notes,
                 emoji = emoji,
+                expiresOn = expiresOn,
             )
         }
     }

@@ -185,12 +185,13 @@ class PantryViewModel(
         minQuantity: Int? = null,
         notes: String? = null,
         emoji: String? = null,
+        expiresOn: String? = null,
         barcodes: List<String> = emptyList(),
     ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            resolveProduct(trimmed, quantity, unit, minQuantity, notes, emoji, barcodes)
+            resolveProduct(trimmed, quantity, unit, minQuantity, notes, emoji, expiresOn, barcodes)
         }
     }
 
@@ -202,11 +203,14 @@ class PantryViewModel(
         minQuantity: Int? = null,
         notes: String? = null,
         emoji: String? = null,
+        expiresOn: String? = null,
         addedBarcodes: List<String> = emptyList(),
         removedBarcodes: List<String> = emptyList(),
     ) {
         viewModelScope.launch {
-            repository.updateProduct(id, name, quantity, unit, minQuantity, notes, emoji)
+            repository.updateProduct(
+                id, name, quantity, unit, minQuantity, notes, emoji, expiresOn,
+            )
             // The form reports what the user changed, so a barcode that the
             // household added while the form was open is left alone instead of
             // looking like a removal. Removals are scoped to this product.
@@ -374,13 +378,15 @@ class PantryViewModel(
         minQuantity: Int? = null,
         notes: String? = null,
         emoji: String? = null,
+        expiresOn: String? = null,
         barcodes: List<String> = emptyList(),
     ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            _productForList.value =
-                resolveProduct(trimmed, quantity, unit, minQuantity, notes, emoji, barcodes)
+            _productForList.value = resolveProduct(
+                trimmed, quantity, unit, minQuantity, notes, emoji, expiresOn, barcodes,
+            )
         }
     }
 
@@ -408,11 +414,12 @@ class PantryViewModel(
         minQuantity: Int?,
         notes: String?,
         emoji: String?,
+        expiresOn: String?,
         barcodes: List<String>,
     ): String {
         val existing = repository.findByName(name)
         val id = if (existing == null) {
-            repository.addProduct(name, quantity, unit, minQuantity, notes, emoji)
+            repository.addProduct(name, quantity, unit, minQuantity, notes, emoji, expiresOn)
         } else {
             // Whether it is archived is asked of the database rather than of
             // uiState, which reports nothing when the screen is not collecting.

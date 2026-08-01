@@ -171,6 +171,7 @@ class RoomSyncLocalStore(
             minQuantity = d.int("minQuantity"),
             notes = d.string("notes"),
             emoji = d.string("emoji"),
+            expiresOn = d.string("expiresOn"),
         )
     }
 

@@ -41,6 +41,7 @@ class OfflineProductRepository(
         minQuantity: Int?,
         notes: String?,
         emoji: String?,
+        expiresOn: String?,
     ): String {
         val now = clock.now()
         val id = UUID.randomUUID().toString()
@@ -55,6 +56,7 @@ class OfflineProductRepository(
                 minQuantity = minQuantity,
                 notes = notes,
                 emoji = emoji,
+                expiresOn = expiresOn,
             )
         )
         return id
@@ -68,6 +70,7 @@ class OfflineProductRepository(
         minQuantity: Int?,
         notes: String?,
         emoji: String?,
+        expiresOn: String?,
     ) {
         dao.update(
             id = id,
@@ -77,6 +80,7 @@ class OfflineProductRepository(
             minQuantity = minQuantity,
             notes = notes,
             emoji = emoji,
+            expiresOn = expiresOn,
             updatedAt = clock.now(),
         )
     }

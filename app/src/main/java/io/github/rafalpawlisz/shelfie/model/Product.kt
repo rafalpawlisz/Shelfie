@@ -8,4 +8,6 @@ data class Product(
     val minQuantity: Int?,
     val notes: String?,
     val emoji: String?,
+    // Best-before date as "yyyy-MM-dd"; null when none was written down.
+    val expiresOn: String? = null,
 )

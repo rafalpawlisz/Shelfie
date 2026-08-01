@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     ],
     // Renumbered from 12 back to 1 before the first release — the development
     // history (schema wipes all along) doesn't need to live in the version.
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class ShelfieDatabase : RoomDatabase() {
@@ -82,6 +82,14 @@ abstract class ShelfieDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf<Migration>(MIGRATION_1_2, MIGRATION_2_3)
+        // 3 → 4: best-before dates. A nullable text column, so the table is
+        // added to, not rebuilt, and every existing product simply has no date.
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE products ADD COLUMN expiresOn TEXT")
+            }
+        }
+
+        val MIGRATIONS = arrayOf<Migration>(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
     }
 }

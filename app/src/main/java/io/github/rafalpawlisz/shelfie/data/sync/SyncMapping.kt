@@ -16,6 +16,7 @@ fun ProductEntity.toSyncDoc(): Map<String, Any?> = mapOf(
     "minQuantity" to minQuantity,
     "notes" to notes,
     "emoji" to emoji,
+    "expiresOn" to expiresOn,
     "archivedAt" to archivedAt,
     "createdAt" to createdAt,
     "updatedAt" to updatedAt,
