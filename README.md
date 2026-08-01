@@ -7,17 +7,34 @@ Built for actual daily use rather than as a demo, so the awkward parts are the
 point: it works offline first, it never asks anyone to make an account, and
 "buying" a thing and "putting it in the pantry" are separate moments.
 
+<p>
+  <img src="docs/screenshots/products.png" alt="The pantry, grouped by store section" width="260">
+  <img src="docs/screenshots/shopping.png" alt="A shopping list walking the store aisle by aisle" width="260">
+  <img src="docs/screenshots/product-form.png" alt="The product form" width="260">
+</p>
+
 ## What it does
 
 - **Products** — the pantry: quantity, unit, an optional minimum, notes,
-  barcodes, and an emoji that fills itself in from the name. Search by name;
-  removing something archives it, and archived products come back when you plan
-  them again. Truly deleting one is possible only when no list refers to it.
+  barcodes, an optional best-before date, and a **store section** from a closed
+  list of sixteen. The section is proposed from the name as you type and can be
+  overridden; the emoji beside a name is separate from it, read from the name
+  and never stored. Search by name; removing something archives it, and archived
+  products come back when you plan them again. Truly deleting one is possible
+  only when no list refers to it.
+- **Best-before dates** — optional, picked from a calendar, never guessed. A
+  chip on the Products tab appears when something is within a month of its date
+  or already past it, and filters the pantry down to those. Meant for the jar at
+  the back of the cupboard, not for the milk you see every day.
 - **Shopping** — several named lists (one per shop), reorderable, with a virtual
   **Low stock** list of everything below its minimum that is not planned yet.
-  Amounts are optional: an item can just say "we need this", and the amount is
-  asked for when you check it off. Finishing a shop moves what you bought into
-  the pantry in one step.
+  A list walks the store section by section, in one fixed aisle order, so both
+  phones read it the same way; checked-off items gather under their own heading
+  at the bottom. Something bought once — birthday candles, an odd spice — can go
+  on a list as a **one-off**, without becoming a product; it takes the aisle its
+  name implies and leaves with the shop. Amounts are optional: an item can just
+  say "we need this", and the amount is asked for when you check it off.
+  Finishing a shop moves what you bought into the pantry in one step.
 - **Use up** — tap a product to spend one, or scan its barcode. Dropping below
   the minimum offers to put it on a list, with undo.
 - **Households** — one household is shared by both phones. Creating one hands
@@ -27,7 +44,8 @@ point: it works offline first, it never asks anyone to make an account, and
   deleting the household; either way the pantry stays on the device and simply
   stops syncing.
 
-Interface strings ship in English and Polish.
+Interface strings ship in English and Polish, and the app declares both to the
+system, so Android 13+ can be told to run this one app in the other language.
 
 ## How it is put together
 
@@ -47,9 +65,11 @@ manual dependency injection (`di/AppContainer.kt`) — no DI framework.
 - **Security rules** (`firestore.rules`) are the safety-critical artifact: a
   member may add or remove only their own membership, stamp only their own
   activity, and only to the server's clock. They have their own test suite.
-- **Emoji suggestions** are a local Polish dictionary with a small stemmer
-  (`emoji/EmojiSuggester.kt`) — no network, no model, and it stops guessing the
-  moment you touch the field.
+- **Reading a name** is done by two local dictionaries sharing one crude Polish
+  stemmer (`emoji/WordDictionary.kt`): one answers with a store section
+  (proposed, overridable, stored and synced), the other with the decorative
+  emoji (derived on every draw, never stored, so it cannot go stale). No
+  network, no model.
 
 ## Building it
 
