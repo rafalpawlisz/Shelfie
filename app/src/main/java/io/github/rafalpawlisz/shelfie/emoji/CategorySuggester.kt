@@ -179,6 +179,11 @@ object CategorySuggester {
             "plaster", "plastry", "bandaz", "opatrunek",
             "tabletki", "witaminy", "magnez", "lek", "leki", "ibuprom", "apap",
             "wata", "patyczki", "gaziki",
+            // The head noun of a whole family of names whose modifier mentions
+            // food: "suplement z czerwonego ryżu" was reaching the rice entry,
+            // because scanning left to right takes the first word it knows and
+            // the word it did not know was the one that mattered.
+            "suplement", "probiotyk", "kolagen",
         ),
         ProductCategory.HOME to listOf(
             "gasnica", "baterie", "bateria", "akumulator", "zarowka", "zarowki",

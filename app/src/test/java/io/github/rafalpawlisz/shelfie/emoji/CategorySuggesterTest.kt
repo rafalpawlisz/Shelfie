@@ -138,6 +138,21 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `a supplement is medicine, whatever it is made of`() {
+        // The miss that put this here: scanning left to right takes the first
+        // word it recognises, so an unknown head noun handed the decision to
+        // the ingredient — and red yeast rice went to the pasta aisle.
+        assertEquals(
+            ProductCategory.PHARMACY,
+            CategorySuggester.suggest("suplement z czerwonego ryżu"),
+        )
+        assertEquals(ProductCategory.PHARMACY, CategorySuggester.suggest("suplementy"))
+        assertEquals(ProductCategory.PHARMACY, CategorySuggester.suggest("probiotyk"))
+        // The plain foodstuff keeps its own aisle.
+        assertEquals(ProductCategory.DRY_GOODS, CategorySuggester.suggest("ryż"))
+    }
+
+    @Test
     fun `an unknown name suggests nothing`() {
         assertNull(CategorySuggester.suggest("zgrzeblarka"))
         assertNull(CategorySuggester.suggest(""))
