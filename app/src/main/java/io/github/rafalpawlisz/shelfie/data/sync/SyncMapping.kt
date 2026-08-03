@@ -40,6 +40,9 @@ fun ShoppingListItemEntity.toSyncDoc(): Map<String, Any?> = mapOf(
     // field before one-offs land on a shared list.
     "name" to name,
     "amount" to amount,
+    // What the amount counts on a one-off; an older app just ignores the field
+    // and shows the bare number, which is what it did before this existed.
+    "unit" to unit,
     "note" to note,
     "checkedAt" to checkedAt,
     "createdAt" to createdAt,

@@ -152,7 +152,13 @@ class OfflineShoppingListRepository(
         )
     }
 
-    override suspend fun addOneOffItem(listId: String, name: String, amount: Int?, note: String?) {
+    override suspend fun addOneOffItem(
+        listId: String,
+        name: String,
+        amount: Int?,
+        unit: String?,
+        note: String?,
+    ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         val now = clock.now()
@@ -166,6 +172,7 @@ class OfflineShoppingListRepository(
                 productId = null,
                 name = trimmed,
                 amount = amount,
+                unit = unit?.trim()?.ifBlank { null },
                 note = note?.trim()?.ifBlank { null },
                 checkedAt = null,
                 createdAt = now,
@@ -183,8 +190,14 @@ class OfflineShoppingListRepository(
         dao.setAmount(id, amount, clock.now())
     }
 
-    override suspend fun setItemDetails(id: String, amount: Int?, note: String?) {
-        dao.setDetails(id, amount, note?.trim()?.ifBlank { null }, clock.now())
+    override suspend fun setItemDetails(id: String, amount: Int?, unit: String?, note: String?) {
+        dao.setDetails(
+            id = id,
+            amount = amount,
+            unit = unit?.trim()?.ifBlank { null },
+            note = note?.trim()?.ifBlank { null },
+            timestamp = clock.now(),
+        )
     }
 
     override suspend fun moveItem(id: String, targetListId: String) {

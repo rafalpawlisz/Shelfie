@@ -351,8 +351,8 @@ fun ShelfieApp(
                 showAddToListDialog = false
                 newProductForListId = null
             },
-            onConfirmOneOff = { name, amount, note ->
-                viewModel.addOneOffToShoppingList(name, amount, note)
+            onConfirmOneOff = { name, amount, unit, note ->
+                viewModel.addOneOffToShoppingList(name, amount, unit, note)
                 showAddToListDialog = false
                 newProductForListId = null
             },

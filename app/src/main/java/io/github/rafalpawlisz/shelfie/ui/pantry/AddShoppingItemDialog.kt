@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -72,7 +73,7 @@ fun AddShoppingItemDialog(
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
     // A one-off: a line of text on the list, never a product. Confirmed from
     // the same amount step, under the typed name.
-    onConfirmOneOff: (name: String, amount: Int?, note: String?) -> Unit,
+    onConfirmOneOff: (name: String, amount: Int?, unit: String?, note: String?) -> Unit,
     // A name the pantry does not have yet: hands it to the product form, which
     // is the one place a product is created. The caller reopens this dialog
     // with the new product in [preselectProductId] once it exists.
@@ -142,6 +143,11 @@ fun AddShoppingItemDialog(
             var noteText by rememberSaveable(selectedProductId, oneOffName) {
                 mutableStateOf(existing?.note.orEmpty())
             }
+            // A one-off's own unit: what its amount counts. A product needs no
+            // field here — its unit is part of the product.
+            var unitText by rememberSaveable(selectedProductId, oneOffName) {
+                mutableStateOf("")
+            }
             val amount = amountText.trim().toIntOrNull()
             val amountValid = amountText.isBlank() || (amount != null && amount > 0)
 
@@ -179,7 +185,12 @@ fun AddShoppingItemDialog(
                                         if (selectedProduct != null) {
                                             onConfirm(selectedProduct.id, cleanAmount, cleanNote)
                                         } else {
-                                            onConfirmOneOff(confirmedOneOff!!, cleanAmount, cleanNote)
+                                            onConfirmOneOff(
+                                                confirmedOneOff!!,
+                                                cleanAmount,
+                                                unitText.trim().ifBlank { null },
+                                                cleanNote,
+                                            )
                                         }
                                     },
                                 ) {
@@ -243,14 +254,48 @@ fun AddShoppingItemDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        OutlinedTextField(
-                            value = amountText,
-                            onValueChange = { amountText = it },
-                            label = { Text(stringResource(R.string.shopping_amount_label)) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        if (oneOffName != null) {
+                            // Amount + unit read as one value ("200 g",
+                            // "3 opakowania"), paired the way the product form
+                            // pairs quantity and unit.
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                OutlinedTextField(
+                                    value = amountText,
+                                    onValueChange = { amountText = it },
+                                    label = {
+                                        Text(
+                                            stringResource(R.string.shopping_amount_label_short),
+                                        )
+                                    },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Number,
+                                    ),
+                                    modifier = Modifier.weight(0.4f),
+                                )
+                                OutlinedTextField(
+                                    value = unitText,
+                                    onValueChange = { unitText = it },
+                                    label = { Text(stringResource(R.string.product_unit_label)) },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(0.6f),
+                                )
+                            }
+                        } else {
+                            OutlinedTextField(
+                                value = amountText,
+                                onValueChange = { amountText = it },
+                                label = { Text(stringResource(R.string.shopping_amount_label)) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                         OutlinedTextField(
                             value = noteText,
                             onValueChange = { noteText = it },

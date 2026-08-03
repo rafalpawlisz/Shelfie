@@ -177,8 +177,39 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migrate5To6_addsUnitLeavingOneOffItemsIntact() {
+        helper.createDatabase(TEST_DB, 5).use { db ->
+            db.execSQL(
+                "INSERT INTO shopping_lists (id, name, createdAt, updatedAt, position, archivedAt, " +
+                    "sectionOrder) VALUES ('l1', 'Lidl', 100, 100, 1.0, NULL, NULL)"
+            )
+            // A one-off written down before units existed: "3" and nothing more.
+            db.execSQL(
+                "INSERT INTO shopping_list_items (id, listId, productId, name, amount, note, " +
+                    "checkedAt, createdAt, updatedAt) " +
+                    "VALUES ('i1', 'l1', NULL, 'znicz', 3, NULL, NULL, 100, 100)"
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, *ShelfieDatabase.MIGRATIONS).use { db ->
+            db.query("SELECT name, amount, unit FROM shopping_list_items WHERE id = 'i1'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("znicz", c.getString(0))
+                assertEquals(3, c.getInt(1))
+                // Still a bare count, which is what it always was.
+                assertTrue(c.isNull(2))
+            }
+            db.execSQL("UPDATE shopping_list_items SET unit = 'opakowania' WHERE id = 'i1'")
+            db.query("SELECT unit FROM shopping_list_items WHERE id = 'i1'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("opakowania", c.getString(0))
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test.db"
-        const val CURRENT_VERSION = 5
+        const val CURRENT_VERSION = 6
     }
 }

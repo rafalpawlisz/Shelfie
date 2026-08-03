@@ -3,6 +3,7 @@ package io.github.rafalpawlisz.shelfie.ui.pantry
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -33,11 +34,17 @@ internal fun ItemEditDialog(
     currentListId: String?,
     unavailableListIds: Set<String>,
     initialAmount: Int?,
+    // A one-off's own unit, and null for a product row — which is also how this
+    // dialog knows whether to offer the field at all: a product's unit belongs
+    // to the product, and is edited in the product form.
+    initialUnit: String?,
+    isOneOff: Boolean,
     initialNote: String?,
-    onConfirm: (amount: Int?, note: String?, targetListId: String?) -> Unit,
+    onConfirm: (amount: Int?, unit: String?, note: String?, targetListId: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var amountText by rememberSaveable { mutableStateOf(initialAmount?.toString().orEmpty()) }
+    var unitText by rememberSaveable { mutableStateOf(initialUnit.orEmpty()) }
     var noteText by rememberSaveable { mutableStateOf(initialNote.orEmpty()) }
     var targetListId by rememberSaveable { mutableStateOf(currentListId) }
     val amount = amountText.trim().toIntOrNull()
@@ -62,13 +69,36 @@ internal fun ItemEditDialog(
                         }
                     }
                 }
-                OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { amountText = it },
-                    label = { Text(stringResource(R.string.shopping_amount_label)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
+                if (isOneOff) {
+                    // Amount + unit read as one value ("200 g").
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = amountText,
+                            onValueChange = { amountText = it },
+                            label = {
+                                Text(stringResource(R.string.shopping_amount_label_short))
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(0.4f),
+                        )
+                        OutlinedTextField(
+                            value = unitText,
+                            onValueChange = { unitText = it },
+                            label = { Text(stringResource(R.string.product_unit_label)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.6f),
+                        )
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { amountText = it },
+                        label = { Text(stringResource(R.string.shopping_amount_label)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                }
                 OutlinedTextField(
                     value = noteText,
                     onValueChange = { noteText = it },
@@ -83,6 +113,7 @@ internal fun ItemEditDialog(
                 onClick = {
                     onConfirm(
                         if (amountText.isBlank()) null else amount,
+                        unitText.trim().ifBlank { null },
                         noteText.trim().ifBlank { null },
                         targetListId?.takeIf { it != currentListId },
                     )

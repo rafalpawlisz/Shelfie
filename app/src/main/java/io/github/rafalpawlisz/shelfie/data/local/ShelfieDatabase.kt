@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     ],
     // Renumbered from 12 back to 1 before the first release — the development
     // history (schema wipes all along) doesn't need to live in the version.
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class ShelfieDatabase : RoomDatabase() {
@@ -99,7 +99,20 @@ abstract class ShelfieDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS =
-            arrayOf<Migration>(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        // 5 → 6: a one-off item can say what its amount counts ("200 g",
+        // "3 opakowania"). Nullable, so every existing row stays a bare count.
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE shopping_list_items ADD COLUMN unit TEXT")
+            }
+        }
+
+        val MIGRATIONS = arrayOf<Migration>(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+        )
     }
 }

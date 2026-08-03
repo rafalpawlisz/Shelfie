@@ -34,6 +34,8 @@ class FakeShoppingListRepository(
         val productId: String?,
         val name: String? = null,
         val amount: Int?,
+        // A one-off's own unit; product rows read theirs off the product.
+        val unit: String? = null,
         val note: String? = null,
         // null = to buy; increasing value = in cart. Monotonic stand-in for the
         // real checkedAt timestamp, so "most recently checked" sorts highest.
@@ -177,7 +179,9 @@ class FakeShoppingListRepository(
                             product?.emoji,
                             product?.name ?: item.name.orEmpty(),
                         ),
-                        productUnit = product?.unit,
+                        // Mirrors the DAO's COALESCE: a one-off's own unit
+                        // stands in for the product's.
+                        productUnit = product?.unit ?: item.unit,
                         position = positionOf(item),
                     )
                 }
@@ -211,7 +215,13 @@ class FakeShoppingListRepository(
         }
     }
 
-    override suspend fun addOneOffItem(listId: String, name: String, amount: Int?, note: String?) {
+    override suspend fun addOneOffItem(
+        listId: String,
+        name: String,
+        amount: Int?,
+        unit: String?,
+        note: String?,
+    ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         // Mirrors the DAO: a plain insert, never a merge — one-offs occupy no
@@ -223,6 +233,7 @@ class FakeShoppingListRepository(
                 productId = null,
                 name = trimmed,
                 amount = amount,
+                unit = unit?.trim()?.ifBlank { null },
                 note = note?.trim()?.ifBlank { null },
                 checkedAt = null,
                 seq = ++oneOffSeq,
@@ -242,10 +253,23 @@ class FakeShoppingListRepository(
         items.update { list -> list.map { if (it.id == id) it.copy(amount = amount) else it } }
     }
 
-    override suspend fun setItemDetails(id: String, amount: Int?, note: String?) {
+    override suspend fun setItemDetails(id: String, amount: Int?, unit: String?, note: String?) {
         val cleanNote = note?.trim()?.ifBlank { null }
+        val cleanUnit = unit?.trim()?.ifBlank { null }
         items.update { list ->
-            list.map { if (it.id == id) it.copy(amount = amount, note = cleanNote) else it }
+            list.map {
+                if (it.id != id) {
+                    it
+                } else {
+                    // Mirrors the DAO's CASE: only a one-off takes a unit from
+                    // here; a product row keeps its product's.
+                    it.copy(
+                        amount = amount,
+                        unit = if (it.productId == null) cleanUnit else it.unit,
+                        note = cleanNote,
+                    )
+                }
+            }
         }
     }
 

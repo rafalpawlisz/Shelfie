@@ -46,6 +46,10 @@ data class ShoppingListItemEntity(
     // How many to buy; > 0 when set. null = "just buy it" — the amount is asked
     // for when the item is checked off, so checkout math still works.
     val amount: Int?,
+    // What the [amount] counts: "g", "opakowania". Only ever set on a one-off —
+    // where there is a product, the product's unit is the unit, the same way its
+    // name is the name. null = a bare count.
+    val unit: String? = null,
     // One-off shopping note ("the blue one", "only if on sale") — independent of
     // the product's own notes. Lives and dies with this row: checkout/removal
     // deletes the row, taking the note with it.

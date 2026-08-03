@@ -1439,7 +1439,48 @@ class ShoppingListViewModelTest {
         assertNull(oneOff.productId)
         assertEquals("żarówka", oneOff.productName)
         assertEquals(2, oneOff.amount)
+        // No unit given, so the row shows a bare count.
         assertNull(oneOff.productUnit)
+    }
+
+    @Test
+    fun `a one-off can say what its amount counts`() = runTest {
+        val repository = FakeProductRepository()
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+
+        // The two shapes this exists for: a weight and a packaging count.
+        viewModel.addOneOffToShoppingList("szynka", amount = 200, unit = " g ")
+        viewModel.addOneOffToShoppingList("chusteczki", amount = 3, unit = "opakowania")
+
+        val items = viewModel.uiState.value.shoppingList
+        assertEquals("g", items.first { it.productName == "szynka" }.productUnit)
+        assertEquals(200, items.first { it.productName == "szynka" }.amount)
+        assertEquals("opakowania", items.first { it.productName == "chusteczki" }.productUnit)
+    }
+
+    @Test
+    fun `editing a one-off changes its unit, editing a product row cannot`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l", emoji = "🥛")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        viewModel.addToShoppingList(viewModel.uiState.value.products.single().id, amount = 1)
+        viewModel.addOneOffToShoppingList("szynka", amount = 200, unit = "g")
+
+        val oneOff = viewModel.uiState.value.shoppingList.first { it.productId == null }
+        val productRow = viewModel.uiState.value.shoppingList.first { it.productId != null }
+        // Weighed at the counter, not by the gram after all.
+        viewModel.updateShoppingItem(oneOff.id, amount = 2, unit = "plastry", note = null)
+        // The product's unit belongs to the product: the edit dialog offers no
+        // field for it, and even if something passed one it must not stick.
+        viewModel.updateShoppingItem(productRow.id, amount = 2, unit = "beczki", note = null)
+
+        val updated = viewModel.uiState.value.shoppingList
+        assertEquals("plastry", updated.first { it.productId == null }.productUnit)
+        assertEquals("l", updated.first { it.productId != null }.productUnit)
     }
 
     @Test
@@ -1468,7 +1509,7 @@ class ShoppingListViewModelTest {
         val viewModel = makeViewModel(repository)
         observe(viewModel)
         viewModel.createList("Lidl")
-        viewModel.addOneOffToShoppingList("znicz", amount = 3, note = "czerwony")
+        viewModel.addOneOffToShoppingList("znicz", amount = 3, unit = "sztuki", note = "czerwony")
         val item = viewModel.uiState.value.shoppingList.single()
 
         viewModel.removeShoppingItem(item.id)
@@ -1479,6 +1520,7 @@ class ShoppingListViewModelTest {
                 productId = null,
                 productName = "znicz",
                 amount = 3,
+                unit = "sztuki",
                 note = "czerwony",
             ),
         )
@@ -1487,6 +1529,8 @@ class ShoppingListViewModelTest {
         assertNull(restored.productId)
         assertEquals("znicz", restored.productName)
         assertEquals(3, restored.amount)
+        // The unit comes back with it: "3" alone is not what was written down.
+        assertEquals("sztuki", restored.productUnit)
         assertEquals("czerwony", restored.note)
     }
 

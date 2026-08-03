@@ -33,8 +33,17 @@ interface ShoppingListRepository {
      * A one-off item: a line of text on the list, bought once, never part of
      * the pantry. It has no stock to bank at checkout — "Finish shopping"
      * simply removes it — and repeats of the same name are allowed.
+     *
+     * [unit] is what the amount counts ("g", "opakowania"): a one-off has no
+     * product to inherit a unit from, so it carries its own.
      */
-    suspend fun addOneOffItem(listId: String, name: String, amount: Int?, note: String? = null)
+    suspend fun addOneOffItem(
+        listId: String,
+        name: String,
+        amount: Int?,
+        unit: String? = null,
+        note: String? = null,
+    )
 
     // True when the product already sits on any active (non-archived) list —
     // used to keep the low-stock suggestion from nagging about planned items.
@@ -48,7 +57,9 @@ interface ShoppingListRepository {
     fun observeReferencedProductIds(): Flow<List<String>>
     suspend fun setChecked(id: String, checked: Boolean)
     suspend fun setItemAmount(id: String, amount: Int?)
-    suspend fun setItemDetails(id: String, amount: Int?, note: String?)
+    // [unit] only lands on a one-off; a product row keeps its product's unit
+    // whatever is passed here.
+    suspend fun setItemDetails(id: String, amount: Int?, unit: String?, note: String?)
 
     // Move the item (amount + note travel along) to another list; arrives
     // unchecked, in its remembered slot there. No-op for the same list.

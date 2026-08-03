@@ -56,6 +56,41 @@ class OneOffItemDaoTest {
         )
 
     @Test
+    fun aOneOffCarriesItsOwnUnitWhileAProductRowKeepsTheProductsOne() = runTest {
+        seedList()
+        db.productDao().upsert(
+            ProductEntity(
+                id = "p1",
+                name = "Mleko",
+                quantity = 0,
+                unit = "l",
+                updatedAt = 1,
+                archivedAt = null,
+                createdAt = 1,
+            ),
+        )
+        dao.addOrMerge("l1", "p1", amount = 2, note = null, newId = "i1", timestamp = 100)
+        dao.insert(
+            oneOff("i2", "szynka", createdAt = 200).copy(amount = 200, unit = "g"),
+        )
+
+        val rows = dao.observeItems("l1").first().associateBy { it.id }
+        // The COALESCE, from both sides: the product's unit for a product row,
+        // the row's own for a one-off.
+        assertEquals("l", rows.getValue("i1").productUnit)
+        assertEquals("g", rows.getValue("i2").productUnit)
+
+        // An edit cannot smuggle a unit onto a product row — its unit lives on
+        // the product, and the UPDATE guards that rather than trusting callers.
+        dao.setDetails("i1", amount = 2, unit = "beczki", note = null, timestamp = 300)
+        dao.setDetails("i2", amount = 3, unit = "plastry", note = null, timestamp = 300)
+
+        val after = dao.observeItems("l1").first().associateBy { it.id }
+        assertEquals("l", after.getValue("i1").productUnit)
+        assertEquals("plastry", after.getValue("i2").productUnit)
+    }
+
+    @Test
     fun twoOneOffsOfTheSameNameCoexistAndShowTheirOwnName() = runTest {
         seedList()
         dao.insert(oneOff("i1", "żarówka", createdAt = 100))

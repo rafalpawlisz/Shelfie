@@ -63,6 +63,9 @@ data class RemovedShoppingItem(
     val productId: String?,
     val productName: String,
     val amount: Int?,
+    // A one-off's own unit ("g", "opakowania"); null for product-backed rows,
+    // which read their unit off the product when they come back.
+    val unit: String?,
     val note: String?,
 )
 
@@ -470,10 +473,16 @@ class PantryViewModel(
      * Row-tap edit: amount and the one-off note saved together; a different
      * [targetListId] additionally moves the item to that list.
      */
-    fun updateShoppingItem(id: String, amount: Int?, note: String?, targetListId: String? = null) {
+    fun updateShoppingItem(
+        id: String,
+        amount: Int?,
+        unit: String? = null,
+        note: String?,
+        targetListId: String? = null,
+    ) {
         if (amount != null && amount <= 0) return
         viewModelScope.launch {
-            shoppingListRepository.setItemDetails(id, amount, note)
+            shoppingListRepository.setItemDetails(id, amount, unit, note)
             if (targetListId != null) shoppingListRepository.moveItem(id, targetListId)
         }
     }
@@ -503,6 +512,9 @@ class PantryViewModel(
                         productId = item.productId,
                         productName = item.productName,
                         amount = item.amount,
+                        // Only a one-off's own unit is worth carrying: a product
+                        // row reads its unit off the product on the way back.
+                        unit = item.productUnit.takeIf { item.productId == null },
                         note = item.note,
                     ),
                 )
@@ -532,6 +544,7 @@ class PantryViewModel(
                     removed.listId,
                     removed.productName,
                     removed.amount,
+                    removed.unit,
                     removed.note,
                 )
             } else {
@@ -602,11 +615,16 @@ class PantryViewModel(
         ProductCategory.fromEmoji(item.productEmoji)
 
     /** A one-off onto the currently selected list; see [ShoppingListRepository.addOneOffItem]. */
-    fun addOneOffToShoppingList(name: String, amount: Int?, note: String? = null) {
+    fun addOneOffToShoppingList(
+        name: String,
+        amount: Int?,
+        unit: String? = null,
+        note: String? = null,
+    ) {
         val listId = selectedListId.value ?: return
         if (name.isBlank()) return
         viewModelScope.launch {
-            shoppingListRepository.addOneOffItem(listId, name, amount, note)
+            shoppingListRepository.addOneOffItem(listId, name, amount, unit, note)
         }
     }
 

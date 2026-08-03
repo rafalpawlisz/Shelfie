@@ -160,7 +160,8 @@ interface ShoppingListDao {
         "SELECT i.id AS id, i.productId AS productId, i.amount AS amount, i.note AS note, " +
             "i.checkedAt AS checkedAt, COALESCE(p.name, i.name, '') AS productName, " +
             "p.emoji AS productEmoji, " +
-            "p.unit AS productUnit, COALESCE(o.position, " +
+            // A one-off's own unit stands in for the product's, like its name.
+            "COALESCE(p.unit, i.unit) AS productUnit, COALESCE(o.position, " +
             "CASE WHEN i.productId IS NULL THEN i.createdAt * 1.0 END, 0.0) AS position, " +
             // The list's aisle order rides along with every row rather than
             // arriving on a second flow: one query is one consistent snapshot,
@@ -239,12 +240,17 @@ interface ShoppingListDao {
     @Query("UPDATE shopping_list_items SET amount = :amount, updatedAt = :timestamp WHERE id = :id")
     suspend fun setAmount(id: String, amount: Int?, timestamp: Long)
 
-    // The row-tap edit dialog saves amount and note together.
+    // The row-tap edit dialog saves amount, unit and note together.
+    //
+    // The unit is written only where there is no product: for a product row the
+    // product's unit is the unit, and the CASE keeps that invariant here rather
+    // than trusting every caller to pass null.
     @Query(
-        "UPDATE shopping_list_items SET amount = :amount, note = :note, updatedAt = :timestamp " +
+        "UPDATE shopping_list_items SET amount = :amount, note = :note, " +
+            "unit = CASE WHEN productId IS NULL THEN :unit ELSE unit END, updatedAt = :timestamp " +
             "WHERE id = :id"
     )
-    suspend fun setDetails(id: String, amount: Int?, note: String?, timestamp: Long)
+    suspend fun setDetails(id: String, amount: Int?, unit: String?, note: String?, timestamp: Long)
 
     @Query("DELETE FROM shopping_list_items WHERE id = :id")
     suspend fun delete(id: String)
@@ -332,6 +338,8 @@ interface ShoppingListDao {
                     productId = productId,
                     name = null,
                     amount = amount,
+                    // The product's unit is the unit.
+                    unit = null,
                     note = note,
                     checkedAt = null,
                     createdAt = timestamp,
@@ -343,7 +351,7 @@ interface ShoppingListDao {
                 // the add dialog pre-fills the current values, so what's confirmed
                 // is what you get (no merge math). A checked entry goes back to
                 // the to-buy state.
-                setDetails(existing.id, amount, note, timestamp)
+                setDetails(existing.id, amount, unit = null, note = note, timestamp = timestamp)
                 setChecked(existing.id, checkedAt = null, updatedAt = timestamp)
             }
         }
