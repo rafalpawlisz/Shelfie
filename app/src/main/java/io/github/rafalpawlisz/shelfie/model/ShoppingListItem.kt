@@ -16,8 +16,4 @@ data class ShoppingListItem(
     // Manual sort position within the list (per list+product for a product, on
     // the row itself for a one-off).
     val position: Double,
-    // False when [position] is only a fallback (a one-off nobody has dragged
-    // yet, sorted by creation time). Such a row must not lend its position to a
-    // neighbour: a timestamp in millis is not a slot.
-    val hasManualPosition: Boolean = true,
 )

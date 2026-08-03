@@ -1396,7 +1396,7 @@ class ShoppingListViewModelTest {
     }
 
     @Test
-    fun `a one-off is never borrowed as a position neighbour`() = runTest {
+    fun `dragging a product past a one-off places it without inheriting a timestamp`() = runTest {
         val repository = FakeProductRepository()
         // Both sectionless, so they share the trailing group with one-offs.
         repository.addProduct(name = "Tajemnica", quantity = 0, unit = null, emoji = null)
@@ -1407,16 +1407,55 @@ class ShoppingListViewModelTest {
         // A name no dictionary entry answers for, so the one-off really does
         // share the trailing group and can be dragged against.
         viewModel.addOneOffToShoppingList("zgrzeblarka", amount = null)
-        val before = viewModel.uiState.value.shoppingList.map { it.productName }
-        assertEquals(listOf("Tajemnica", "zgrzeblarka"), before)
+        assertEquals(
+            listOf("Tajemnica", "zgrzeblarka"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
 
-        // Dragging the product under the one-off would otherwise copy the
-        // one-off's position — creation time in millis — into the product's
-        // order row, parking it at the end of its aisle for good.
         viewModel.moveShoppingItem(fromIndex = 0, toIndex = 1)
 
+        // The drag has to actually happen...
+        assertEquals(
+            listOf("zgrzeblarka", "Tajemnica"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+        // ...without the product inheriting the one-off's creation time, which
+        // would live on in product_list_order and park it at the end of its
+        // aisle for good — long after the one-off left at checkout.
         val product = viewModel.uiState.value.shoppingList.first { it.productId != null }
-        assertTrue("position must stay in the hand-assigned range", product.position < 1_000.0)
+        assertTrue(
+            "position must stay in the hand-assigned range, was ${product.position}",
+            product.position < 1_000.0,
+        )
+    }
+
+    @Test
+    fun `a product dragged past an already placed one-off keeps a sane slot`() = runTest {
+        // The regression this exists for: a one-off dragged once had a slot, so
+        // "has a slot" was mistaken for "is safe to borrow from" — and its slot
+        // is a creation timestamp when its own neighbours were fresh one-offs.
+        // A product landing next to it inherited 1.7e12 and never came back.
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Tajemnica", quantity = 0, unit = null, emoji = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.addOneOffToShoppingList("zgrzeblarka", amount = null)
+        viewModel.addOneOffToShoppingList("krosno", amount = null)
+        // One-offs first, so the product joins an aisle that has been dragged.
+        viewModel.moveShoppingItem(fromIndex = 1, toIndex = 0)
+        viewModel.addToShoppingList(viewModel.uiState.value.products.single().id, amount = null)
+
+        val productIndex = viewModel.uiState.value.shoppingList
+            .indexOfFirst { it.productId != null }
+        viewModel.moveShoppingItem(fromIndex = productIndex, toIndex = 0)
+
+        val after = viewModel.uiState.value.shoppingList
+        assertEquals("Tajemnica", after.first().productName)
+        assertTrue(
+            "no row may keep a timestamp slot, got ${after.map { it.position }}",
+            after.all { it.position < 1_000.0 },
+        )
     }
 
     @Test
@@ -1475,10 +1514,13 @@ class ShoppingListViewModelTest {
             listOf("Tajemnica", "zgrzeblarka", "Zagadka"),
             viewModel.uiState.value.shoppingList.map { it.productName },
         )
-        val oneOff = viewModel.uiState.value.shoppingList.first { it.productId == null }
-        // A real slot now, not a timestamp — so it can be dragged against.
-        assertTrue("expected a hand-assigned slot", oneOff.position < 1_000.0)
-        assertTrue(oneOff.hasManualPosition)
+        // Every row of the aisle now carries a hand-assigned slot, the one-off
+        // included: no timestamp is left for a later drag to borrow.
+        val aisle = viewModel.uiState.value.shoppingList
+        assertTrue(
+            "expected hand-assigned slots, got ${aisle.map { it.position }}",
+            aisle.all { it.position < 1_000.0 },
+        )
     }
 
     @Test

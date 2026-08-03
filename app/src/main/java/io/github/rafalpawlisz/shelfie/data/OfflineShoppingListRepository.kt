@@ -11,6 +11,7 @@ import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemRow
 import io.github.rafalpawlisz.shelfie.data.local.sectionEmojiFor
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
+import io.github.rafalpawlisz.shelfie.model.ItemSlot
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.SectionOrder
@@ -214,12 +215,8 @@ class OfflineShoppingListRepository(
         sync.onDeleted(SyncCollection.ITEMS, removed)
     }
 
-    override suspend fun setItemPosition(listId: String, productId: String, position: Double) {
-        dao.setPosition(listId, productId, position, clock.now())
-    }
-
-    override suspend fun setOneOffPosition(id: String, position: Double) {
-        dao.setOneOffPosition(id, position, clock.now())
+    override suspend fun setItemPositions(listId: String, slots: List<ItemSlot>) {
+        dao.setPositions(listId, slots, clock.now())
     }
 
     override suspend fun listExists(id: String): Boolean = dao.listExists(id)

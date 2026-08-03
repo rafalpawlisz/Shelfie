@@ -1,5 +1,6 @@
 package io.github.rafalpawlisz.shelfie.data
 
+import io.github.rafalpawlisz.shelfie.model.ItemSlot
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
@@ -74,13 +75,13 @@ interface ShoppingListRepository {
      */
     suspend fun listExists(id: String): Boolean
 
-    // Manual reorder: persist a product's sort position within the list. The
-    // position lives in its own table, so it survives the item being removed.
-    suspend fun setItemPosition(listId: String, productId: String, position: Double)
-
     /**
-     * The same for a one-off, whose slot lives on its own row: it has no product
-     * to key an order row by, and nothing to remember once checkout removes it.
+     * Manual reorder: persist the slots of one aisle, in one transaction.
+     *
+     * A whole aisle rather than the moved row alone, because its rows keep their
+     * slots in two different places (see [ItemSlot]) and a single row's new
+     * number is only meaningful next to the others'. Products' slots live on and
+     * are found again when the product is re-added.
      */
-    suspend fun setOneOffPosition(id: String, position: Double)
+    suspend fun setItemPositions(listId: String, slots: List<ItemSlot>)
 }

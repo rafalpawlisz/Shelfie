@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import io.github.rafalpawlisz.shelfie.model.ItemSlot
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import kotlinx.coroutines.flow.Flow
 
@@ -163,9 +164,6 @@ interface ShoppingListDao {
             // A one-off's own unit stands in for the product's, like its name.
             "COALESCE(p.unit, i.unit) AS productUnit, COALESCE(o.position, i.position, " +
             "CASE WHEN i.productId IS NULL THEN i.createdAt * 1.0 END, 0.0) AS position, " +
-            // The same two slots without the timestamp fallback, so a caller can
-            // tell a placed row from one that merely sorts somewhere.
-            "COALESCE(o.position, i.position) AS manualPosition, " +
             // The list's aisle order rides along with every row rather than
             // arriving on a second flow: one query is one consistent snapshot,
             // so rows and the order they sort by cannot be a beat apart.
@@ -330,6 +328,26 @@ interface ShoppingListDao {
             "WHERE id = :id AND productId IS NULL"
     )
     suspend fun setOneOffPosition(id: String, position: Double, timestamp: Long)
+
+    /**
+     * An aisle's new order, written in one transaction: a product's slot into its
+     * order row, a one-off's onto the row itself. All or nothing, so a half-
+     * renumbered aisle is never observable.
+     */
+    @Transaction
+    suspend fun setPositions(listId: String, slots: List<ItemSlot>, timestamp: Long) {
+        for (slot in slots) {
+            if (slot.productId == null) {
+                setOneOffPosition(slot.itemId, slot.position, timestamp)
+            } else {
+                // The order row exists from the moment the product joined the
+                // list, but a pull from another device could have removed it;
+                // ensure it rather than silently dropping the reorder.
+                ensurePosition(listId, slot.productId, timestamp)
+                setPosition(listId, slot.productId, slot.position, timestamp)
+            }
+        }
+    }
 
     @Transaction
     suspend fun addOrMerge(

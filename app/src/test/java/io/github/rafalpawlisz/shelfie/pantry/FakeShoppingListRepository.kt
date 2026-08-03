@@ -3,6 +3,7 @@ package io.github.rafalpawlisz.shelfie.pantry
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.data.local.sectionEmojiFor
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
+import io.github.rafalpawlisz.shelfie.model.ItemSlot
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.SectionOrder
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
@@ -188,7 +189,6 @@ class FakeShoppingListRepository(
                         // stands in for the product's.
                         productUnit = product?.unit ?: item.unit,
                         position = positionOf(item),
-                        hasManualPosition = manualPositionOf(item) != null,
                     )
                 }
         }
@@ -320,14 +320,20 @@ class FakeShoppingListRepository(
         items.update { list -> list.filterNot { it.id in processedIds } }
     }
 
-    override suspend fun setItemPosition(listId: String, productId: String, position: Double) {
-        positions.update { it + ((listId to productId) to position) }
-    }
-
-    override suspend fun setOneOffPosition(id: String, position: Double) {
-        // Mirrors the DAO's guard: the row's own slot, and only for a one-off.
+    override suspend fun setItemPositions(listId: String, slots: List<ItemSlot>) {
+        // Mirrors the DAO: a product's slot into the order map, a one-off's onto
+        // the row itself — and never the other way round.
+        positions.update { map ->
+            map + slots.mapNotNull { slot ->
+                slot.productId?.let { (listId to it) to slot.position }
+            }
+        }
+        val byId = slots.filter { it.productId == null }.associate { it.itemId to it.position }
         items.update { list ->
-            list.map { if (it.id == id && it.productId == null) it.copy(position = position) else it }
+            list.map { item ->
+                val slot = byId[item.id]
+                if (slot != null && item.productId == null) item.copy(position = slot) else item
+            }
         }
     }
 

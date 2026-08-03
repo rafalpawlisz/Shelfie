@@ -3,6 +3,7 @@ package io.github.rafalpawlisz.shelfie.data.local
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.github.rafalpawlisz.shelfie.model.ItemSlot
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -108,10 +109,9 @@ class OneOffItemDaoTest {
         dao.insert(oneOff("i2", "znicz", createdAt = 200))
 
         val before = dao.observeItems("l1").first().associateBy { it.id }
-        // The product has a slot from its order row; the one-off has none yet and
-        // sorts by creation time instead.
-        assertEquals(1.0, before.getValue("i1").manualPosition!!, 0.0)
-        assertEquals(null, before.getValue("i2").manualPosition)
+        // The product sorts by its order row; the one-off has no slot yet and
+        // falls back to creation time.
+        assertEquals(1.0, before.getValue("i1").position, 0.0)
         assertEquals(200.0, before.getValue("i2").position, 0.0)
 
         dao.setOneOffPosition("i2", position = 0.5, timestamp = 300)
@@ -121,8 +121,45 @@ class OneOffItemDaoTest {
 
         val after = dao.observeItems("l1").first().associateBy { it.id }
         assertEquals(0.5, after.getValue("i2").position, 0.0)
-        assertEquals(0.5, after.getValue("i2").manualPosition!!, 0.0)
         assertEquals(1.0, after.getValue("i1").position, 0.0)
+    }
+
+    @Test
+    fun setPositionsRenumbersAMixedAisleIntoBothHomes() = runTest {
+        seedList()
+        db.productDao().upsert(
+            ProductEntity(
+                id = "p1",
+                name = "Mleko",
+                quantity = 0,
+                unit = null,
+                updatedAt = 1,
+                archivedAt = null,
+                createdAt = 1,
+            ),
+        )
+        dao.addOrMerge("l1", "p1", amount = null, note = null, newId = "i1", timestamp = 100)
+        dao.insert(oneOff("i2", "znicz", createdAt = 200))
+
+        // The one-off first, the product second — the point being that one call
+        // places both, each in the place its kind of row keeps a slot.
+        dao.setPositions(
+            listId = "l1",
+            slots = listOf(
+                ItemSlot(itemId = "i2", productId = null, position = 1.0),
+                ItemSlot(itemId = "i1", productId = "p1", position = 2.0),
+            ),
+            timestamp = 300,
+        )
+
+        val rows = dao.observeItems("l1").first().associateBy { it.id }
+        assertEquals(1.0, rows.getValue("i2").position, 0.0)
+        assertEquals(2.0, rows.getValue("i1").position, 0.0)
+        // The product's slot went to its order row, where it outlives the item:
+        // removing and re-adding it must find the same place.
+        dao.delete("i1")
+        dao.addOrMerge("l1", "p1", amount = null, note = null, newId = "i1b", timestamp = 400)
+        assertEquals(2.0, dao.observeItems("l1").first().first { it.id == "i1b" }.position, 0.0)
     }
 
     @Test

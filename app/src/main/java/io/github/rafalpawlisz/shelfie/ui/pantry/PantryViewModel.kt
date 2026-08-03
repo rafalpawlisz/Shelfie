@@ -11,6 +11,7 @@ import io.github.rafalpawlisz.shelfie.data.BarcodeRepository
 import io.github.rafalpawlisz.shelfie.data.ProductRepository
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.data.UiPreferences
+import io.github.rafalpawlisz.shelfie.model.ItemSlot
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
@@ -565,9 +566,18 @@ class PantryViewModel(
 
     /**
      * Persist a manual reorder: move the item at [fromIndex] to [toIndex] within
-     * the current sorted shopping list. Only the moved item's position changes —
-     * it's set to the midpoint between its new neighbours (fractional indexing),
-     * so absent products keep their remembered slots.
+     * the current sorted shopping list.
+     *
+     * The whole aisle is renumbered 1, 2, 3… in its new order rather than the
+     * moved row alone taking the midpoint between its neighbours. Midpoints were
+     * cheaper — one row written — but they assume every row in a section already
+     * carries a comparable slot, and two things break that: a product's slot
+     * lives in product_list_order while a one-off's lives on its own row, and an
+     * undragged one-off has no slot at all (it sorts by creation time, a number
+     * in the trillions). Borrowing across that gap wrote a timestamp into a
+     * product's slot, which outlives the row and stranded the product at the end
+     * of its aisle for good. Renumbering has no gap to cross, cannot tie, and
+     * repairs any slot an earlier drag mangled. A section is a handful of rows.
      */
     fun moveShoppingItem(fromIndex: Int, toIndex: Int) {
         val listId = selectedListId.value ?: return
@@ -577,46 +587,28 @@ class PantryViewModel(
         // Only unchecked items carry a manual position; checked items are parked at
         // the bottom by check time and aren't repositioned by dragging.
         if (moved.isChecked) return
-        // A drag never crosses a section: the section is the product's, not the
-        // row's, so dropping into another aisle could not stick — the sort
-        // would put the row straight back. Landing there is a no-op instead.
         val movedSection = sectionOf(moved)
+        // Rows the moved one can be ordered against: same aisle, still to buy.
+        fun ShoppingListItem.sameAisle(): Boolean =
+            !isChecked && sectionOf(this) == movedSection
         val without = items.toMutableList().apply { removeAt(fromIndex) }
-        // Neighbours must be unchecked and of the same section: a row across
-        // either boundary keeps its own position range and must not pull the
-        // dropped item into it.
-        //
-        // The third condition depends on what is being dragged. An undragged
-        // one-off's "position" is its creation time in millis; landing a PRODUCT
-        // there would write that timestamp into product_list_order, which
-        // outlives the item and would strand the product at the end of its aisle
-        // for good. A one-off's own slot dies with the row at checkout, so it
-        // can safely borrow a timestamp — and must be able to, or a section
-        // holding nothing but fresh one-offs could never be reordered at all.
-        val movedIsOneOff = moved.productId == null
-        fun ShoppingListItem.usableNeighbour(): Boolean =
-            !isChecked && sectionOf(this) == movedSection && (movedIsOneOff || hasManualPosition)
-        val prevItem = without.getOrNull(toIndex - 1)?.takeIf { it.usableNeighbour() }
-        val nextItem = without.getOrNull(toIndex)?.takeIf { it.usableNeighbour() }
-        // Nothing of the same section on either side of the drop — the drag
-        // left its aisle entirely; the resync snaps the row back.
-        if (prevItem == null && nextItem == null) return
-        val prev = prevItem?.position
-        val next = nextItem?.position
-        val newPosition = when {
-            prev == null && next == null -> moved.position
-            prev == null -> next!! - 1.0
-            next == null -> prev + 1.0
-            else -> (prev + next) / 2.0
-        }
-        viewModelScope.launch {
-            val movedProductId = moved.productId
-            if (movedProductId == null) {
-                shoppingListRepository.setOneOffPosition(moved.id, newPosition)
-            } else {
-                shoppingListRepository.setItemPosition(listId, movedProductId, newPosition)
+        // A drag never crosses a section: the section is the product's, not the
+        // row's, so dropping into another aisle could not stick — the sort would
+        // put the row straight back. With nothing of this aisle on either side of
+        // the drop, the drag left it entirely; the resync snaps the row back.
+        val landsInAisle = without.getOrNull(toIndex - 1)?.sameAisle() == true ||
+            without.getOrNull(toIndex)?.sameAisle() == true
+        if (!landsInAisle) return
+        val reordered = without.apply { add(toIndex, moved) }
+        val slots = reordered.filter { it.sameAisle() }
+            .mapIndexed { index, item ->
+                ItemSlot(
+                    itemId = item.id,
+                    productId = item.productId,
+                    position = index + 1.0,
+                )
             }
-        }
+        viewModelScope.launch { shoppingListRepository.setItemPositions(listId, slots) }
     }
 
     // null covers one-offs, pre-section emoji and "no section" alike — they all

@@ -83,11 +83,6 @@ data class ShoppingListItemRow(
     // What the row sorts by: the product's slot, or a one-off's own slot, or —
     // for a one-off nobody has dragged — its creation time.
     val position: Double,
-    // The slot as an actual assignment rather than a fallback: null means this
-    // row has never been placed by hand (an undragged one-off), and so must not
-    // be borrowed as a position neighbour — its "position" is a timestamp in
-    // millis, which would push a real neighbour to the end of the aisle for good.
-    val manualPosition: Double?,
     // The owning list's aisle order, straight from shopping_lists; null = the
     // default order.
     val sectionOrder: String? = null,
@@ -103,7 +98,6 @@ fun ShoppingListItemRow.toDomain(): ShoppingListItem = ShoppingListItem(
     productEmoji = sectionEmojiFor(productId, productEmoji, productName),
     productUnit = productUnit,
     position = position,
-    hasManualPosition = manualPosition != null,
 )
 
 /**
