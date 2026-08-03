@@ -69,28 +69,43 @@ internal fun ListItems(
     var checkingItemId by rememberSaveable { mutableStateOf<String?>(null) }
     val haptic = LocalHapticFeedback.current
 
-    // Local mirror so a drag animates smoothly. It re-syncs from [items] whenever
-    // the upstream order actually changes (e.g. after a move is persisted) — but
-    // never mid-drag, or an emission from the household would rebuild the list
-    // under the finger and snap the row back. Keyed on the flag too, so the
-    // mirror catches up the moment the gesture ends.
+    // Local mirror so a drag animates smoothly. It re-syncs from [items] when the
+    // upstream order changes — but never mid-drag, or an emission from the
+    // household would rebuild the list under the finger and snap the row back.
     var draggingRow by remember { mutableStateOf(false) }
+    // Set on a drop that was handed to the ViewModel, cleared by the emission
+    // that carries it back. In between, the mirror is AHEAD of Room: re-syncing
+    // from the list we just dragged away from put the row back where it started
+    // and then animated it into place a moment later, which reads as the row
+    // hopping somewhere by itself after you let go.
+    var awaitingDrop by remember { mutableStateOf(false) }
     val ordered = remember { mutableStateListOf<ShoppingListItem>().apply { addAll(items) } }
     val lazyListState = rememberLazyListState()
-    LaunchedEffect(items, draggingRow) {
-        if (!draggingRow && ordered != items) {
-            ordered.clear()
-            ordered.addAll(items)
-            // Keep the viewport where it is. A keyed LazyColumn anchors scroll
-            // to the first visible ITEM, so when checking off the top row sent
-            // it to the bottom (checked items park there), the list obediently
-            // followed it down. Re-request the same index/offset for the next
-            // layout: the position stays, whatever moved underneath.
-            lazyListState.requestScrollToItem(
-                lazyListState.firstVisibleItemIndex,
-                lazyListState.firstVisibleItemScrollOffset,
-            )
-        }
+    fun resyncFromUpstream() {
+        if (ordered == items) return
+        ordered.clear()
+        ordered.addAll(items)
+        // Keep the viewport where it is. A keyed LazyColumn anchors scroll
+        // to the first visible ITEM, so when checking off the top row sent
+        // it to the bottom (checked items park there), the list obediently
+        // followed it down. Re-request the same index/offset for the next
+        // layout: the position stays, whatever moved underneath.
+        lazyListState.requestScrollToItem(
+            lazyListState.firstVisibleItemIndex,
+            lazyListState.firstVisibleItemScrollOffset,
+        )
+    }
+    LaunchedEffect(items) {
+        // Whatever this emission holds, the reorder round-trip is over: either it
+        // is our own drop coming back (a no-op resync) or a newer truth to take.
+        awaitingDrop = false
+        if (!draggingRow) resyncFromUpstream()
+    }
+    LaunchedEffect(draggingRow) {
+        // The gesture ended without a persisted move (a drag that went nowhere,
+        // or one the ViewModel declined): the mirror may hold a rearrangement
+        // nothing will confirm, so take the upstream order back.
+        if (!draggingRow && !awaitingDrop) resyncFromUpstream()
     }
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
         // Section headers sit between the rows now, so LazyColumn indices no
@@ -190,7 +205,13 @@ internal fun ListItems(
                         onDragStopped = {
                             val from = items.indexOfFirst { it.id == item.id }
                             val to = ordered.indexOfFirst { it.id == item.id }
-                            if (from != -1 && to != -1 && from != to) onMove(from, to)
+                            if (from != -1 && to != -1 && from != to) {
+                                // Flagged before the flag that ends the drag, so
+                                // the mirror is never re-synced from the order
+                                // this move is about to replace.
+                                awaitingDrop = true
+                                onMove(from, to)
+                            }
                             draggingRow = false
                         },
                     )
