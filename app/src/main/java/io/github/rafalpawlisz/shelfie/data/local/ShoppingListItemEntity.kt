@@ -54,6 +54,13 @@ data class ShoppingListItemEntity(
     // the product's own notes. Lives and dies with this row: checkout/removal
     // deletes the row, taking the note with it.
     val note: String?,
+    // A one-off's manual sort slot within its section, once it has been dragged;
+    // null until then, and the row sorts by creation time instead. Only ever set
+    // where [productId] is null: a product's slot lives in product_list_order,
+    // because it has to outlive the row (removing and re-adding a product must
+    // return it to its place). A one-off has nothing to outlive — it dies at
+    // checkout — so its slot belongs on the row.
+    val position: Double? = null,
     // null = still to buy; non-null = in the cart (marked bought). The amount
     // is applied to the product's quantity only at checkout(), not when checked.
     val checkedAt: Long?,
@@ -73,8 +80,14 @@ data class ShoppingListItemRow(
     val productName: String,
     val productEmoji: String?,
     val productUnit: String?,
-    // From the LEFT JOIN on product_list_order; COALESCE'd to 0.0 when absent.
+    // What the row sorts by: the product's slot, or a one-off's own slot, or —
+    // for a one-off nobody has dragged — its creation time.
     val position: Double,
+    // The slot as an actual assignment rather than a fallback: null means this
+    // row has never been placed by hand (an undragged one-off), and so must not
+    // be borrowed as a position neighbour — its "position" is a timestamp in
+    // millis, which would push a real neighbour to the end of the aisle for good.
+    val manualPosition: Double?,
     // The owning list's aisle order, straight from shopping_lists; null = the
     // default order.
     val sectionOrder: String? = null,
@@ -90,6 +103,7 @@ fun ShoppingListItemRow.toDomain(): ShoppingListItem = ShoppingListItem(
     productEmoji = sectionEmojiFor(productId, productEmoji, productName),
     productUnit = productUnit,
     position = position,
+    hasManualPosition = manualPosition != null,
 )
 
 /**

@@ -208,10 +208,10 @@ internal fun ListItems(
                         },
                         onRemove = { onRemove(item.id) },
                         onEditAmount = { editingAmountItemId = item.id },
-                        // One-offs have no product slot to remember a position
-                        // for; hiding the handle says so instead of offering a
-                        // drag that would snap back.
-                        dragHandleModifier = if (item.productId != null) handleModifier else null,
+                        // Checked rows are parked at the bottom by check time, so
+                        // dragging one could only snap back; everything still to
+                        // buy can be placed, one-offs included.
+                        dragHandleModifier = if (!item.isChecked) handleModifier else null,
                     )
                 }
             }

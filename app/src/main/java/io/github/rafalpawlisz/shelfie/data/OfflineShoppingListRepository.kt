@@ -218,6 +218,10 @@ class OfflineShoppingListRepository(
         dao.setPosition(listId, productId, position, clock.now())
     }
 
+    override suspend fun setOneOffPosition(id: String, position: Double) {
+        dao.setOneOffPosition(id, position, clock.now())
+    }
+
     override suspend fun listExists(id: String): Boolean = dao.listExists(id)
 
     override suspend fun isOnAnyList(productId: String): Boolean = dao.isOnActiveList(productId)

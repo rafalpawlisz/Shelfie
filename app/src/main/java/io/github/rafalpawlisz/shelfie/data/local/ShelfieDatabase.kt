@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     ],
     // Renumbered from 12 back to 1 before the first release — the development
     // history (schema wipes all along) doesn't need to live in the version.
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class ShelfieDatabase : RoomDatabase() {
@@ -107,12 +107,22 @@ abstract class ShelfieDatabase : RoomDatabase() {
             }
         }
 
+        // 6 → 7: a one-off can be dragged into place within its section, and
+        // keeps that slot on its own row. Nullable: every existing one-off goes
+        // on sorting by creation time until somebody drags it.
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE shopping_list_items ADD COLUMN position REAL")
+            }
+        }
+
         val MIGRATIONS = arrayOf<Migration>(
             MIGRATION_1_2,
             MIGRATION_2_3,
             MIGRATION_3_4,
             MIGRATION_4_5,
             MIGRATION_5_6,
+            MIGRATION_6_7,
         )
     }
 }

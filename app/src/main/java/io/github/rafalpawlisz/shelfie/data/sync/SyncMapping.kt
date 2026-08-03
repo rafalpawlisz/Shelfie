@@ -43,6 +43,9 @@ fun ShoppingListItemEntity.toSyncDoc(): Map<String, Any?> = mapOf(
     // What the amount counts on a one-off; an older app just ignores the field
     // and shows the bare number, which is what it did before this existed.
     "unit" to unit,
+    // A one-off's own slot within its section; absent until it is dragged, and
+    // an older app just keeps sorting it by creation time.
+    "position" to position,
     "note" to note,
     "checkedAt" to checkedAt,
     "createdAt" to createdAt,

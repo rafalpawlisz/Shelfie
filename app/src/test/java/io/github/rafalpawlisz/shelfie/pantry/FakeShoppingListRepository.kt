@@ -36,6 +36,8 @@ class FakeShoppingListRepository(
         val amount: Int?,
         // A one-off's own unit; product rows read theirs off the product.
         val unit: String? = null,
+        // A one-off's own manual slot, once dragged; null until then.
+        val position: Double? = null,
         val note: String? = null,
         // null = to buy; increasing value = in cart. Monotonic stand-in for the
         // real checkedAt timestamp, so "most recently checked" sorts highest.
@@ -116,11 +118,14 @@ class FakeShoppingListRepository(
 
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
         combine(items, products.observeProducts(), positions, lists) { list, active, pos, allLists ->
-            // Mirrors the DAO's position fallback: one-offs have no manual
-            // slot and sort at the end of the unchecked block, in add order.
+            // Mirrors the DAO's COALESCE: the product's slot, or a one-off's own
+            // slot once dragged, or — for a one-off nobody placed — creation
+            // order, which lands it at the end of the unchecked block.
+            fun manualPositionOf(item: Item): Double? =
+                if (item.productId == null) item.position else pos[listId to item.productId]
             fun positionOf(item: Item): Double =
-                if (item.productId == null) ONE_OFF_BASE + item.seq
-                else pos[listId to item.productId] ?: 0.0
+                manualPositionOf(item)
+                    ?: if (item.productId == null) ONE_OFF_BASE + item.seq else 0.0
             // Mirrors the join on shopping_lists: this list's own aisle order.
             val order = SectionOrder.parse(
                 allLists.firstOrNull { it.id == listId }?.sectionOrder,
@@ -183,6 +188,7 @@ class FakeShoppingListRepository(
                         // stands in for the product's.
                         productUnit = product?.unit ?: item.unit,
                         position = positionOf(item),
+                        hasManualPosition = manualPositionOf(item) != null,
                     )
                 }
         }
@@ -316,6 +322,13 @@ class FakeShoppingListRepository(
 
     override suspend fun setItemPosition(listId: String, productId: String, position: Double) {
         positions.update { it + ((listId to productId) to position) }
+    }
+
+    override suspend fun setOneOffPosition(id: String, position: Double) {
+        // Mirrors the DAO's guard: the row's own slot, and only for a one-off.
+        items.update { list ->
+            list.map { if (it.id == id && it.productId == null) it.copy(position = position) else it }
+        }
     }
 
     // Mirrors the DAO: archived lists still exist (they keep their items).

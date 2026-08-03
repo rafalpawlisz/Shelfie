@@ -575,22 +575,27 @@ class PantryViewModel(
         if (fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) return
         val moved = items[fromIndex]
         // Only unchecked items carry a manual position; checked items are parked at
-        // the bottom by check time and aren't repositioned by dragging. One-off
-        // items have no product slot to remember a position for.
+        // the bottom by check time and aren't repositioned by dragging.
         if (moved.isChecked) return
-        val movedProductId = moved.productId ?: return
         // A drag never crosses a section: the section is the product's, not the
         // row's, so dropping into another aisle could not stick — the sort
         // would put the row straight back. Landing there is a no-op instead.
         val movedSection = sectionOf(moved)
         val without = items.toMutableList().apply { removeAt(fromIndex) }
-        // Neighbours must be unchecked, of the same section, and product-backed.
-        // A row across either boundary keeps its own position range and must
-        // not pull the dropped item into it — and a one-off's "position" is its
-        // creation time in millis, so borrowing it would push a real product to
-        // the end of its aisle forever (positions outlive the item).
+        // Neighbours must be unchecked and of the same section: a row across
+        // either boundary keeps its own position range and must not pull the
+        // dropped item into it.
+        //
+        // The third condition depends on what is being dragged. An undragged
+        // one-off's "position" is its creation time in millis; landing a PRODUCT
+        // there would write that timestamp into product_list_order, which
+        // outlives the item and would strand the product at the end of its aisle
+        // for good. A one-off's own slot dies with the row at checkout, so it
+        // can safely borrow a timestamp — and must be able to, or a section
+        // holding nothing but fresh one-offs could never be reordered at all.
+        val movedIsOneOff = moved.productId == null
         fun ShoppingListItem.usableNeighbour(): Boolean =
-            !isChecked && sectionOf(this) == movedSection && productId != null
+            !isChecked && sectionOf(this) == movedSection && (movedIsOneOff || hasManualPosition)
         val prevItem = without.getOrNull(toIndex - 1)?.takeIf { it.usableNeighbour() }
         val nextItem = without.getOrNull(toIndex)?.takeIf { it.usableNeighbour() }
         // Nothing of the same section on either side of the drop — the drag
@@ -605,7 +610,12 @@ class PantryViewModel(
             else -> (prev + next) / 2.0
         }
         viewModelScope.launch {
-            shoppingListRepository.setItemPosition(listId, movedProductId, newPosition)
+            val movedProductId = moved.productId
+            if (movedProductId == null) {
+                shoppingListRepository.setOneOffPosition(moved.id, newPosition)
+            } else {
+                shoppingListRepository.setItemPosition(listId, movedProductId, newPosition)
+            }
         }
     }
 

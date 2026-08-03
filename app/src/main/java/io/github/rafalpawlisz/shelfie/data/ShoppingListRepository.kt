@@ -77,4 +77,10 @@ interface ShoppingListRepository {
     // Manual reorder: persist a product's sort position within the list. The
     // position lives in its own table, so it survives the item being removed.
     suspend fun setItemPosition(listId: String, productId: String, position: Double)
+
+    /**
+     * The same for a one-off, whose slot lives on its own row: it has no product
+     * to key an order row by, and nothing to remember once checkout removes it.
+     */
+    suspend fun setOneOffPosition(id: String, position: Double)
 }

@@ -1419,6 +1419,89 @@ class ShoppingListViewModelTest {
         assertTrue("position must stay in the hand-assigned range", product.position < 1_000.0)
     }
 
+    @Test
+    fun `one-offs can be dragged into order within their section`() = runTest {
+        val repository = FakeProductRepository()
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        // Three sectionless names, so they share one group and add in order.
+        viewModel.addOneOffToShoppingList("zgrzeblarka", amount = null)
+        viewModel.addOneOffToShoppingList("krosno", amount = null)
+        viewModel.addOneOffToShoppingList("czółenko", amount = null)
+        assertEquals(
+            listOf("zgrzeblarka", "krosno", "czółenko"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+
+        // Last to first. Nothing here has been placed by hand yet, so this is
+        // exactly the case that used to be impossible: a one-off's neighbours
+        // are one-offs, and the drag has to work anyway.
+        viewModel.moveShoppingItem(fromIndex = 2, toIndex = 0)
+
+        assertEquals(
+            listOf("czółenko", "zgrzeblarka", "krosno"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+        // And the slot sticks: a second drag moves it back, rather than the
+        // first one having been a one-time animation.
+        viewModel.moveShoppingItem(fromIndex = 0, toIndex = 2)
+        assertEquals(
+            listOf("zgrzeblarka", "krosno", "czółenko"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
+    @Test
+    fun `a dragged one-off takes its place among the products of its section`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Tajemnica", quantity = 0, unit = null, emoji = null)
+        repository.addProduct(name = "Zagadka", quantity = 0, unit = null, emoji = null)
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.uiState.value.products.forEach { viewModel.addToShoppingList(it.id, amount = null) }
+        viewModel.addOneOffToShoppingList("zgrzeblarka", amount = null)
+        assertEquals(
+            listOf("Tajemnica", "Zagadka", "zgrzeblarka"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+
+        // Between the two products, where the trailing-by-creation-time default
+        // could never put it.
+        viewModel.moveShoppingItem(fromIndex = 2, toIndex = 1)
+
+        assertEquals(
+            listOf("Tajemnica", "zgrzeblarka", "Zagadka"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+        val oneOff = viewModel.uiState.value.shoppingList.first { it.productId == null }
+        // A real slot now, not a timestamp — so it can be dragged against.
+        assertTrue("expected a hand-assigned slot", oneOff.position < 1_000.0)
+        assertTrue(oneOff.hasManualPosition)
+    }
+
+    @Test
+    fun `a one-off dragged out of its section stays put`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Mleko", quantity = 0, unit = null, emoji = "🥛")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.addToShoppingList(viewModel.uiState.value.products.single().id, amount = null)
+        // Sectionless, so it trails the dairy group in a group of its own.
+        viewModel.addOneOffToShoppingList("zgrzeblarka", amount = null)
+
+        // Dropping it into the dairy aisle: its section comes from its name, so
+        // the sort would put it straight back. A no-op instead of a flicker.
+        viewModel.moveShoppingItem(fromIndex = 1, toIndex = 0)
+
+        assertEquals(
+            listOf("Mleko", "zgrzeblarka"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
     // --- One-off items ---
 
     @Test

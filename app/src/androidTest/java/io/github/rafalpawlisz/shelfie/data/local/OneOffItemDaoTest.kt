@@ -91,6 +91,41 @@ class OneOffItemDaoTest {
     }
 
     @Test
+    fun aOneOffKeepsItsOwnSlotAndAProductRowCannotTakeOneHere() = runTest {
+        seedList()
+        db.productDao().upsert(
+            ProductEntity(
+                id = "p1",
+                name = "Mleko",
+                quantity = 0,
+                unit = null,
+                updatedAt = 1,
+                archivedAt = null,
+                createdAt = 1,
+            ),
+        )
+        dao.addOrMerge("l1", "p1", amount = null, note = null, newId = "i1", timestamp = 100)
+        dao.insert(oneOff("i2", "znicz", createdAt = 200))
+
+        val before = dao.observeItems("l1").first().associateBy { it.id }
+        // The product has a slot from its order row; the one-off has none yet and
+        // sorts by creation time instead.
+        assertEquals(1.0, before.getValue("i1").manualPosition!!, 0.0)
+        assertEquals(null, before.getValue("i2").manualPosition)
+        assertEquals(200.0, before.getValue("i2").position, 0.0)
+
+        dao.setOneOffPosition("i2", position = 0.5, timestamp = 300)
+        // The guard: a product row's slot is product_list_order's business, and
+        // this statement must not touch it.
+        dao.setOneOffPosition("i1", position = 99.0, timestamp = 300)
+
+        val after = dao.observeItems("l1").first().associateBy { it.id }
+        assertEquals(0.5, after.getValue("i2").position, 0.0)
+        assertEquals(0.5, after.getValue("i2").manualPosition!!, 0.0)
+        assertEquals(1.0, after.getValue("i1").position, 0.0)
+    }
+
+    @Test
     fun twoOneOffsOfTheSameNameCoexistAndShowTheirOwnName() = runTest {
         seedList()
         dao.insert(oneOff("i1", "żarówka", createdAt = 100))

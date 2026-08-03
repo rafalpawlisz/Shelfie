@@ -208,8 +208,37 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migrate6To7_addsAOneOffSlotWithoutDisturbingCreationOrder() {
+        helper.createDatabase(TEST_DB, 6).use { db ->
+            db.execSQL(
+                "INSERT INTO shopping_lists (id, name, createdAt, updatedAt, position, archivedAt, " +
+                    "sectionOrder) VALUES ('l1', 'Lidl', 100, 100, 1.0, NULL, NULL)"
+            )
+            db.execSQL(
+                "INSERT INTO shopping_list_items (id, listId, productId, name, amount, unit, note, " +
+                    "checkedAt, createdAt, updatedAt) " +
+                    "VALUES ('i1', 'l1', NULL, 'znicz', NULL, NULL, NULL, NULL, 100, 100)"
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 7, true, *ShelfieDatabase.MIGRATIONS).use { db ->
+            db.query("SELECT name, position FROM shopping_list_items WHERE id = 'i1'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("znicz", c.getString(0))
+                // Unplaced, so it keeps sorting by creation time as before.
+                assertTrue(c.isNull(1))
+            }
+            db.execSQL("UPDATE shopping_list_items SET position = 2.5 WHERE id = 'i1'")
+            db.query("SELECT position FROM shopping_list_items WHERE id = 'i1'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(2.5, c.getDouble(0), 0.0)
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test.db"
-        const val CURRENT_VERSION = 6
+        const val CURRENT_VERSION = 7
     }
 }

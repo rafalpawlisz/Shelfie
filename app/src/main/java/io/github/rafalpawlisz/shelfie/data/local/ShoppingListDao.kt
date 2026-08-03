@@ -161,8 +161,11 @@ interface ShoppingListDao {
             "i.checkedAt AS checkedAt, COALESCE(p.name, i.name, '') AS productName, " +
             "p.emoji AS productEmoji, " +
             // A one-off's own unit stands in for the product's, like its name.
-            "COALESCE(p.unit, i.unit) AS productUnit, COALESCE(o.position, " +
+            "COALESCE(p.unit, i.unit) AS productUnit, COALESCE(o.position, i.position, " +
             "CASE WHEN i.productId IS NULL THEN i.createdAt * 1.0 END, 0.0) AS position, " +
+            // The same two slots without the timestamp fallback, so a caller can
+            // tell a placed row from one that merely sorts somewhere.
+            "COALESCE(o.position, i.position) AS manualPosition, " +
             // The list's aisle order rides along with every row rather than
             // arriving on a second flow: one query is one consistent snapshot,
             // so rows and the order they sort by cannot be a beat apart.
@@ -318,6 +321,15 @@ interface ShoppingListDao {
             "WHERE listId = :listId AND productId = :productId"
     )
     suspend fun setPosition(listId: String, productId: String, position: Double, timestamp: Long)
+
+    // A one-off's slot lives on its own row (it has no product to key an order
+    // row by, and nothing to remember after checkout). The productId guard keeps
+    // this away from product rows, whose slot is product_list_order's business.
+    @Query(
+        "UPDATE shopping_list_items SET position = :position, updatedAt = :timestamp " +
+            "WHERE id = :id AND productId IS NULL"
+    )
+    suspend fun setOneOffPosition(id: String, position: Double, timestamp: Long)
 
     @Transaction
     suspend fun addOrMerge(
