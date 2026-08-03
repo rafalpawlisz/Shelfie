@@ -4,7 +4,9 @@ import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.data.local.sectionEmojiFor
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
+import io.github.rafalpawlisz.shelfie.model.SectionOrder
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
+import io.github.rafalpawlisz.shelfie.model.rankOf
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +23,8 @@ class FakeShoppingListRepository(
         val name: String,
         val position: Double,
         val archivedAt: Long? = null,
+        // Stored the way the real column is: comma-separated names, null = default.
+        val sectionOrder: String? = null,
     )
 
     private data class Item(
@@ -60,7 +64,14 @@ class FakeShoppingListRepository(
         lists.map { entries -> entries.filter { it.archivedAt != null }.toSortedDomain() }
 
     private fun List<ListEntry>.toSortedDomain(): List<ShoppingList> =
-        map { ShoppingList(id = it.id, name = it.name, position = it.position) }
+        map {
+            ShoppingList(
+                id = it.id,
+                name = it.name,
+                position = it.position,
+                sectionOrder = SectionOrder.parse(it.sectionOrder),
+            )
+        }
             .sortedWith(compareBy({ it.position }, { it.name.lowercase() }))
 
     override suspend fun createList(name: String): String {
@@ -72,6 +83,13 @@ class FakeShoppingListRepository(
 
     override suspend fun renameList(id: String, name: String) {
         lists.update { list -> list.map { if (it.id == id) it.copy(name = name.trim()) else it } }
+    }
+
+    override suspend fun setSectionOrder(listId: String, order: List<ProductCategory>) {
+        val stored = SectionOrder.store(order)
+        lists.update { list ->
+            list.map { if (it.id == listId) it.copy(sectionOrder = stored) else it }
+        }
     }
 
     override suspend fun archiveList(id: String) {
@@ -95,12 +113,16 @@ class FakeShoppingListRepository(
     }
 
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
-        combine(items, products.observeProducts(), positions) { list, active, pos ->
+        combine(items, products.observeProducts(), positions, lists) { list, active, pos, allLists ->
             // Mirrors the DAO's position fallback: one-offs have no manual
             // slot and sort at the end of the unchecked block, in add order.
             fun positionOf(item: Item): Double =
                 if (item.productId == null) ONE_OFF_BASE + item.seq
                 else pos[listId to item.productId] ?: 0.0
+            // Mirrors the join on shopping_lists: this list's own aisle order.
+            val order = SectionOrder.parse(
+                allLists.firstOrNull { it.id == listId }?.sectionOrder,
+            )
             list.filter { it.listId == listId }
                 .mapNotNull { item ->
                     if (item.productId == null) return@mapNotNull item to null
@@ -119,15 +141,19 @@ class FakeShoppingListRepository(
                         aChecked != bChecked -> if (aChecked) 1 else -1
                         aChecked -> bItem.checkedAt!!.compareTo(aItem.checkedAt!!)
                         else -> {
-                            val bySection = sectionRank(
-                                aItem.productId,
-                                aProd?.emoji,
-                                aProd?.name ?: aItem.name.orEmpty(),
+                            val bySection = order.rankOf(
+                                sectionOf(
+                                    aItem.productId,
+                                    aProd?.emoji,
+                                    aProd?.name ?: aItem.name.orEmpty(),
+                                ),
                             ).compareTo(
-                                sectionRank(
-                                    bItem.productId,
-                                    bProd?.emoji,
-                                    bProd?.name ?: bItem.name.orEmpty(),
+                                order.rankOf(
+                                    sectionOf(
+                                        bItem.productId,
+                                        bProd?.emoji,
+                                        bProd?.name ?: bItem.name.orEmpty(),
+                                    ),
                                 ),
                             )
                             if (bySection != 0) return@sortedWith bySection
@@ -292,11 +318,10 @@ class FakeShoppingListRepository(
         // createdAt-in-millis fallback.
         const val ONE_OFF_BASE = 1_000_000.0
 
-        // Mirrors the real repository's aisle-walk rank, resolved the same way
-        // the row is shown: a product's own section, or a one-off's name.
-        fun sectionRank(productId: String?, emoji: String?, name: String): Int =
-            ProductCategory.fromEmoji(sectionEmojiFor(productId, emoji, name))?.ordinal
-                ?: ProductCategory.entries.size
+        // Resolved the same way the row is shown: a product's own section, or
+        // a one-off's name. The list's order turns it into a rank.
+        fun sectionOf(productId: String?, emoji: String?, name: String): ProductCategory? =
+            ProductCategory.fromEmoji(sectionEmojiFor(productId, emoji, name))
     }
 
     // Append at the end the first time a product joins a list; keep an existing slot.

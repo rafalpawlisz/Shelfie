@@ -25,6 +25,7 @@ fun ProductEntity.toSyncDoc(): Map<String, Any?> = mapOf(
 fun ShoppingListEntity.toSyncDoc(): Map<String, Any?> = mapOf(
     "name" to name,
     "position" to position,
+    "sectionOrder" to sectionOrder,
     "archivedAt" to archivedAt,
     "createdAt" to createdAt,
     "updatedAt" to updatedAt,

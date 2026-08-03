@@ -31,6 +31,10 @@ interface ShoppingListDao {
     @Query("UPDATE shopping_lists SET name = :name, updatedAt = :updatedAt WHERE id = :id")
     suspend fun renameList(id: String, name: String, updatedAt: Long)
 
+    // null restores the default aisle order.
+    @Query("UPDATE shopping_lists SET sectionOrder = :order, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setSectionOrder(id: String, order: String?, updatedAt: Long)
+
     // Soft delete: keeps the row (and its items + order) so the list can be restored.
     @Query("UPDATE shopping_lists SET archivedAt = :timestamp, updatedAt = :timestamp WHERE id = :id")
     suspend fun archiveList(id: String, timestamp: Long)
@@ -157,8 +161,13 @@ interface ShoppingListDao {
             "i.checkedAt AS checkedAt, COALESCE(p.name, i.name, '') AS productName, " +
             "p.emoji AS productEmoji, " +
             "p.unit AS productUnit, COALESCE(o.position, " +
-            "CASE WHEN i.productId IS NULL THEN i.createdAt * 1.0 END, 0.0) AS position " +
+            "CASE WHEN i.productId IS NULL THEN i.createdAt * 1.0 END, 0.0) AS position, " +
+            // The list's aisle order rides along with every row rather than
+            // arriving on a second flow: one query is one consistent snapshot,
+            // so rows and the order they sort by cannot be a beat apart.
+            "l.sectionOrder AS sectionOrder " +
             "FROM shopping_list_items i " +
+            "JOIN shopping_lists l ON l.id = i.listId " +
             "LEFT JOIN products p ON p.id = i.productId " +
             "LEFT JOIN product_list_order o ON o.listId = i.listId AND o.productId = i.productId " +
             "WHERE i.listId = :listId AND (i.productId IS NULL OR p.archivedAt IS NULL)"

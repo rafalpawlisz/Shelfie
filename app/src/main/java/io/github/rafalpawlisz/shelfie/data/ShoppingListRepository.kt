@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.data
 
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
+import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import kotlinx.coroutines.flow.Flow
@@ -12,6 +13,9 @@ interface ShoppingListRepository {
     fun observeArchivedLists(): Flow<List<ShoppingList>>
     suspend fun createList(name: String): String
     suspend fun renameList(id: String, name: String)
+
+    /** The aisle order this shop is walked in; the default order stores nothing. */
+    suspend fun setSectionOrder(listId: String, order: List<ProductCategory>)
     suspend fun archiveList(id: String)
     suspend fun restoreList(id: String)
     suspend fun deleteList(id: String)

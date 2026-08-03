@@ -151,8 +151,34 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migrate4To5_addsAisleOrderLeavingListsIntact() {
+        helper.createDatabase(TEST_DB, 4).use { db ->
+            db.execSQL(
+                "INSERT INTO shopping_lists (id, name, createdAt, updatedAt, position, archivedAt) " +
+                    "VALUES ('l1', 'Lidl', 100, 100, 1.0, NULL)"
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 5, true, *ShelfieDatabase.MIGRATIONS).use { db ->
+            db.query("SELECT name, position, sectionOrder FROM shopping_lists").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("Lidl", cursor.getString(0))
+                assertEquals(1.0, cursor.getDouble(1), 0.0)
+                // An existing list walks the default order until someone says
+                // otherwise, and "nobody said" is expressed by NULL.
+                assertTrue(cursor.isNull(2))
+            }
+            db.execSQL("UPDATE shopping_lists SET sectionOrder = 'HYGIENE,BREAD' WHERE id = 'l1'")
+            db.query("SELECT sectionOrder FROM shopping_lists WHERE id = 'l1'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("HYGIENE,BREAD", cursor.getString(0))
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test.db"
-        const val CURRENT_VERSION = 4
+        const val CURRENT_VERSION = 5
     }
 }

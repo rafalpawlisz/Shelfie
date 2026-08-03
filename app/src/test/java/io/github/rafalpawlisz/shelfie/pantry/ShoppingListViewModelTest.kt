@@ -2,6 +2,7 @@ package io.github.rafalpawlisz.shelfie.pantry
 
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.ui.pantry.LowStockSuggestion
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
 import io.github.rafalpawlisz.shelfie.ui.pantry.RemovedShoppingItem
@@ -1295,6 +1296,49 @@ class ShoppingListViewModelTest {
         // Nothing in the dictionary answers for it — the trailing group.
         assertEquals(null, items.first { it.productName == "zgrzeblarka" }.productEmoji)
         assertEquals(listOf("kefir", "Mleko", "zgrzeblarka"), items.map { it.productName })
+    }
+
+    @Test
+    fun `each list walks its own aisle order`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Mleko", quantity = 0, unit = null, emoji = "🥛")
+        repository.addProduct(name = "Chleb", quantity = 0, unit = null, emoji = "🍞")
+        repository.addProduct(name = "Mydlo", quantity = 0, unit = null, emoji = "🧼")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.lists.single().id
+        viewModel.uiState.value.products.forEach { viewModel.addToShoppingList(it.id, amount = null) }
+        // The default: bread, then dairy, then hygiene.
+        assertEquals(
+            listOf("Chleb", "Mleko", "Mydlo"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+
+        // This shop starts with the chemist's shelf and ends with bread.
+        viewModel.setSectionOrder(
+            lidl,
+            listOf(ProductCategory.HYGIENE, ProductCategory.DAIRY, ProductCategory.BREAD) +
+                ProductCategory.entries.filterNot {
+                    it == ProductCategory.HYGIENE ||
+                        it == ProductCategory.DAIRY ||
+                        it == ProductCategory.BREAD
+                },
+        )
+
+        assertEquals(
+            listOf("Mydlo", "Mleko", "Chleb"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+        // The second shop is untouched by the first one's layout.
+        viewModel.createList("Biedronka")
+        val biedronka = viewModel.uiState.value.lists.first { it.id != lidl }.id
+        viewModel.selectList(biedronka)
+        viewModel.uiState.value.products.forEach { viewModel.addToShoppingList(it.id, amount = null) }
+        assertEquals(
+            listOf("Chleb", "Mleko", "Mydlo"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
     }
 
     @Test

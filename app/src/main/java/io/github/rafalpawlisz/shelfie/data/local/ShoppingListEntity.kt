@@ -14,4 +14,7 @@ data class ShoppingListEntity(
     // Soft delete: null = active. Archiving keeps the row (and its items + order)
     // so the list can be restored intact; only a permanent delete drops it.
     val archivedAt: Long? = null,
+    // The aisle order for this shop, comma-separated section names; null = the
+    // default. One value, not a row per section — see [SectionOrder].
+    val sectionOrder: String? = null,
 )

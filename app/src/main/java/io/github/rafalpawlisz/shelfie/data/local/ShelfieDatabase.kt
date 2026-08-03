@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     ],
     // Renumbered from 12 back to 1 before the first release — the development
     // history (schema wipes all along) doesn't need to live in the version.
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class ShelfieDatabase : RoomDatabase() {
@@ -90,6 +90,16 @@ abstract class ShelfieDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf<Migration>(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        // 4 → 5: a per-list aisle order. One nullable text column holding the
+        // whole order (see SectionOrder), so the table is only added to and
+        // every existing list keeps walking the default order.
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE shopping_lists ADD COLUMN sectionOrder TEXT")
+            }
+        }
+
+        val MIGRATIONS =
+            arrayOf<Migration>(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
     }
 }

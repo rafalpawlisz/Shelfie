@@ -71,6 +71,9 @@ data class ShoppingListItemRow(
     val productUnit: String?,
     // From the LEFT JOIN on product_list_order; COALESCE'd to 0.0 when absent.
     val position: Double,
+    // The owning list's aisle order, straight from shopping_lists; null = the
+    // default order.
+    val sectionOrder: String? = null,
 )
 
 fun ShoppingListItemRow.toDomain(): ShoppingListItem = ShoppingListItem(

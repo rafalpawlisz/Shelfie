@@ -183,6 +183,7 @@ class RoomSyncLocalStore(
             updatedAt = d.long("updatedAt") ?: return null,
             position = d.double("position") ?: return null,
             archivedAt = d.long("archivedAt"),
+            sectionOrder = d.string("sectionOrder"),
         )
     }
 

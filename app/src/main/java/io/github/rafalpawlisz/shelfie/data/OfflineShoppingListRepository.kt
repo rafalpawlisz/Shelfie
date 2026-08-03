@@ -13,7 +13,9 @@ import io.github.rafalpawlisz.shelfie.data.local.sectionEmojiFor
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
+import io.github.rafalpawlisz.shelfie.model.SectionOrder
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
+import io.github.rafalpawlisz.shelfie.model.rankOf
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
@@ -35,7 +37,14 @@ class OfflineShoppingListRepository(
 
     private fun List<ShoppingListEntity>.toSortedDomain(): List<ShoppingList> {
         val collator = nameCollator()
-        return map { ShoppingList(id = it.id, name = it.name, position = it.position) }
+        return map {
+            ShoppingList(
+                id = it.id,
+                name = it.name,
+                position = it.position,
+                sectionOrder = SectionOrder.parse(it.sectionOrder),
+            )
+        }
             .sortedWith { a, b ->
                 // Manual order; name as a stable, locale-aware tiebreak.
                 val byPosition = a.position.compareTo(b.position)
@@ -61,6 +70,14 @@ class OfflineShoppingListRepository(
 
     override suspend fun renameList(id: String, name: String) {
         dao.renameList(id = id, name = name.trim(), updatedAt = clock.now())
+    }
+
+    override suspend fun setSectionOrder(listId: String, order: List<ProductCategory>) {
+        dao.setSectionOrder(
+            id = listId,
+            order = SectionOrder.store(order),
+            updatedAt = clock.now(),
+        )
     }
 
     override suspend fun archiveList(id: String) {
@@ -90,6 +107,8 @@ class OfflineShoppingListRepository(
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
         dao.observeItems(listId).map { rows ->
             val collator = nameCollator()
+            // Every row carries the same list's order; no rows, nothing to sort.
+            val order = SectionOrder.parse(rows.firstOrNull()?.sectionOrder)
             // Unchecked (still to buy) first, walked store section by store
             // section in the global aisle order; within a section the manual
             // position, then name. Sectionless rows — one-offs, emoji from
@@ -107,7 +126,8 @@ class OfflineShoppingListRepository(
                         if (byTime != 0) byTime else collator.compare(a.productName, b.productName)
                     }
                     else -> {
-                        val bySection = a.sectionRank().compareTo(b.sectionRank())
+                        val bySection = order.rankOf(a.section())
+                            .compareTo(order.rankOf(b.section()))
                         if (bySection != 0) return@sortedWith bySection
                         val byPosition = a.position.compareTo(b.position)
                         if (byPosition != 0) byPosition else collator.compare(a.productName, b.productName)
@@ -116,13 +136,10 @@ class OfflineShoppingListRepository(
             }.map(ShoppingListItemRow::toDomain)
         }
 
-    // The aisle-walk rank; sectionless rows come after every real section. Goes
-    // through the same resolution the row is shown with, so a one-off sorts
-    // into the aisle its name names instead of trailing behind every product.
-    private fun ShoppingListItemRow.sectionRank(): Int =
+    // Resolved the same way the row is shown, so a one-off lands in the aisle
+    // its name names instead of trailing behind every product.
+    private fun ShoppingListItemRow.section(): ProductCategory? =
         ProductCategory.fromEmoji(sectionEmojiFor(productId, productEmoji, productName))
-            ?.ordinal
-            ?: ProductCategory.entries.size
 
     override suspend fun addItem(listId: String, productId: String, amount: Int?, note: String?) {
         dao.addOrMerge(

@@ -286,6 +286,11 @@ class PantryViewModel(
         viewModelScope.launch { shoppingListRepository.renameList(id, name) }
     }
 
+    /** The aisle order for one shop; shops are laid out differently. */
+    fun setSectionOrder(listId: String, order: List<ProductCategory>) {
+        viewModelScope.launch { shoppingListRepository.setSectionOrder(listId, order) }
+    }
+
     /**
      * Persist a manual reorder of the lists: move the list at [fromIndex] to
      * [toIndex]. Only the moved list's position changes — it's set to the midpoint
