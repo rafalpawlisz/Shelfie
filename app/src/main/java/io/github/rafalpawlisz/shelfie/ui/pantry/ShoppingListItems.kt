@@ -58,7 +58,9 @@ internal fun ListItems(
     onRemove: (id: String) -> Unit,
     onUpdateItem: (id: String, amount: Int?, unit: String?, note: String?, targetListId: String?) -> Unit,
     onCheckWithAmount: (id: String, amount: Int) -> Unit,
-    onMove: (fromIndex: Int, toIndex: Int) -> Unit,
+    // Returns whether the move was accepted and a write dispatched; the drag
+    // mirror holds the dropped order only for a move that will echo back.
+    onMove: (fromIndex: Int, toIndex: Int) -> Boolean,
     onFinishShopping: () -> Unit,
 ) {
     val checkedCount = items.count { it.isChecked }
@@ -206,11 +208,16 @@ internal fun ListItems(
                             val from = items.indexOfFirst { it.id == item.id }
                             val to = ordered.indexOfFirst { it.id == item.id }
                             if (from != -1 && to != -1 && from != to) {
-                                // Flagged before the flag that ends the drag, so
+                                // Armed before the flag that ends the drag, so
                                 // the mirror is never re-synced from the order
-                                // this move is about to replace.
-                                awaitingDrop = true
-                                onMove(from, to)
+                                // this move is about to replace — but only for
+                                // a move the ViewModel accepted. A declined one
+                                // (stale indices under a mid-drag household
+                                // emission, a drop outside the aisle) echoes
+                                // nothing back, and a mirror waiting for that
+                                // echo would show the unpersisted order until
+                                // some unrelated change happened to land.
+                                awaitingDrop = onMove(from, to)
                             }
                             draggingRow = false
                         },

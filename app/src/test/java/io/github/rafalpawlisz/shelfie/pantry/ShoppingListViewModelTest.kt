@@ -1524,6 +1524,61 @@ class ShoppingListViewModelTest {
     }
 
     @Test
+    fun `moveShoppingItem reports whether a write was dispatched`() = runTest {
+        // The drag mirror in the UI arms itself on this answer: after an
+        // accepted move it waits for Room's echo before re-syncing, after a
+        // declined one there is no echo to wait for — trusting a declined move
+        // left the mirror showing an order the database never held.
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Mleko", quantity = 0, unit = null, emoji = "🥛")
+        repository.addProduct(name = "Ser", quantity = 0, unit = null, emoji = "🥛")
+        repository.addProduct(name = "Chleb", quantity = 0, unit = null, emoji = "🍞")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.uiState.value.products.forEach { viewModel.addToShoppingList(it.id, amount = null) }
+        // Sorted: Chleb (bread), Mleko, Ser (dairy).
+
+        // A real move within the dairy aisle.
+        assertTrue(viewModel.moveShoppingItem(fromIndex = 2, toIndex = 1))
+        // A drop outside the aisle: declined, nothing will echo.
+        assertFalse(viewModel.moveShoppingItem(fromIndex = 0, toIndex = 2))
+        // Indices from a list that no longer looks like this: declined too.
+        assertFalse(viewModel.moveShoppingItem(fromIndex = 0, toIndex = 9))
+        assertFalse(viewModel.moveShoppingItem(fromIndex = 1, toIndex = 1))
+    }
+
+    @Test
+    fun `a one-off moved to another list leaves its slot behind`() = runTest {
+        val repository = FakeProductRepository()
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.createList("Targ")
+        val sklep = viewModel.uiState.value.lists.first { it.name == "Sklep" }.id
+        val targ = viewModel.uiState.value.lists.first { it.name == "Targ" }.id
+        viewModel.selectList(targ)
+        viewModel.addOneOffToShoppingList("wiadro", amount = null)
+        viewModel.selectList(sklep)
+        viewModel.addOneOffToShoppingList("zgrzeblarka", amount = null)
+        viewModel.addOneOffToShoppingList("krosno", amount = null)
+        // Dragged to the front, so it holds a small hand-assigned slot (1.0) —
+        // a number that would outrank everything on the target list.
+        viewModel.moveShoppingItem(fromIndex = 1, toIndex = 0)
+        val moved = viewModel.uiState.value.shoppingList.first { it.productName == "krosno" }
+
+        viewModel.updateShoppingItem(moved.id, amount = null, note = null, targetListId = targ)
+
+        viewModel.selectList(targ)
+        // It arrives like a newly written line — at the end, not parachuted to
+        // the top on the strength of a slot that meant something elsewhere.
+        assertEquals(
+            listOf("wiadro", "krosno"),
+            viewModel.uiState.value.shoppingList.map { it.productName },
+        )
+    }
+
+    @Test
     fun `a one-off dragged out of its section stays put`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Mleko", quantity = 0, unit = null, emoji = "🥛")

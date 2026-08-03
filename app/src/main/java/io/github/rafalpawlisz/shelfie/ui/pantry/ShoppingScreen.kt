@@ -40,7 +40,7 @@ fun ShoppingScreen(
     onRemove: (id: String) -> Unit,
     onUpdateItem: (id: String, amount: Int?, unit: String?, note: String?, targetListId: String?) -> Unit,
     onCheckWithAmount: (id: String, amount: Int) -> Unit,
-    onMove: (fromIndex: Int, toIndex: Int) -> Unit,
+    onMove: (fromIndex: Int, toIndex: Int) -> Boolean,
     onRestockProduct: (Product) -> Unit,
     onAddAllLowStock: (listId: String) -> Unit,
     onFinishShopping: () -> Unit,

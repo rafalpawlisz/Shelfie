@@ -184,9 +184,14 @@ interface ShoppingListDao {
     @Query("SELECT * FROM shopping_list_items WHERE id = :id")
     suspend fun getById(id: String): ShoppingListItemEntity?
 
-    // Reassign an item to another list; it arrives unchecked (a fresh plan there).
+    // Reassign an item to another list; it arrives unchecked (a fresh plan
+    // there). A one-off's slot is cleared too: the number meant "between these
+    // neighbours" on the OLD list, and against the target's own 1..N numbering
+    // it would drop the row mid-aisle in a spot nobody chose — arriving at the
+    // end, like a newly added line, is the honest default. (Products are
+    // unaffected: their slot lives in product_list_order, per list.)
     @Query(
-        "UPDATE shopping_list_items SET listId = :listId, checkedAt = NULL, " +
+        "UPDATE shopping_list_items SET listId = :listId, checkedAt = NULL, position = NULL, " +
             "updatedAt = :timestamp WHERE id = :id"
     )
     suspend fun reassignList(id: String, listId: String, timestamp: Long)

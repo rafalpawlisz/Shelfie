@@ -293,7 +293,14 @@ class FakeShoppingListRepository(
         }
         items.update { list ->
             list.map {
-                if (it.id == id) it.copy(listId = targetListId, checkedAt = null) else it
+                if (it.id == id) {
+                    // Mirrors reassignList: arrives unchecked, and a one-off's
+                    // slot stays behind — it meant "between these neighbours"
+                    // on the old list.
+                    it.copy(listId = targetListId, checkedAt = null, position = null)
+                } else {
+                    it
+                }
             }
         }
     }

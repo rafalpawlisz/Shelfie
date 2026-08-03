@@ -578,15 +578,24 @@ class PantryViewModel(
      * product's slot, which outlives the row and stranded the product at the end
      * of its aisle for good. Renumbering has no gap to cross, cannot tie, and
      * repairs any slot an earlier drag mangled. A section is a handful of rows.
+     *
+     * Returns whether a write was actually dispatched. The caller's drag mirror
+     * holds the dropped order until Room echoes it back — but a declined move
+     * (indices gone stale mid-drag under a household emission, a drop outside
+     * the aisle) echoes nothing, and a mirror waiting for that echo would show
+     * the unpersisted order until some unrelated change happened to land. All
+     * the validation is synchronous, so the caller learns before the write.
      */
-    fun moveShoppingItem(fromIndex: Int, toIndex: Int) {
-        val listId = selectedListId.value ?: return
+    fun moveShoppingItem(fromIndex: Int, toIndex: Int): Boolean {
+        val listId = selectedListId.value ?: return false
         val items = uiState.value.shoppingList
-        if (fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) return
+        if (fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) {
+            return false
+        }
         val moved = items[fromIndex]
         // Only unchecked items carry a manual position; checked items are parked at
         // the bottom by check time and aren't repositioned by dragging.
-        if (moved.isChecked) return
+        if (moved.isChecked) return false
         val movedSection = sectionOf(moved)
         // Rows the moved one can be ordered against: same aisle, still to buy.
         fun ShoppingListItem.sameAisle(): Boolean =
@@ -598,7 +607,7 @@ class PantryViewModel(
         // the drop, the drag left it entirely; the resync snaps the row back.
         val landsInAisle = without.getOrNull(toIndex - 1)?.sameAisle() == true ||
             without.getOrNull(toIndex)?.sameAisle() == true
-        if (!landsInAisle) return
+        if (!landsInAisle) return false
         val reordered = without.apply { add(toIndex, moved) }
         val slots = reordered.filter { it.sameAisle() }
             .mapIndexed { index, item ->
@@ -609,6 +618,7 @@ class PantryViewModel(
                 )
             }
         viewModelScope.launch { shoppingListRepository.setItemPositions(listId, slots) }
+        return true
     }
 
     // null covers one-offs, pre-section emoji and "no section" alike — they all

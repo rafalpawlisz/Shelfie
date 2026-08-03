@@ -24,7 +24,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -39,6 +40,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
+import io.github.rafalpawlisz.shelfie.model.SectionOrder
 import io.github.rafalpawlisz.shelfie.ui.DragHandleIcon
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -66,7 +68,21 @@ internal fun SectionOrderDialog(
     onConfirm: (List<ProductCategory>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val order = remember { mutableStateListOf<ProductCategory>().apply { addAll(initialOrder) } }
+    // Saveable across a configuration change: sixteen drags are too much work
+    // to lose to a rotation. Enums ride the bundle as their names, through the
+    // same forgiving parser the database column uses.
+    val order = rememberSaveable(
+        saver = listSaver(
+            save = { it.map(ProductCategory::name) },
+            restore = { names ->
+                mutableStateListOf<ProductCategory>().apply {
+                    addAll(SectionOrder.parse(names.joinToString(",")))
+                }
+            },
+        ),
+    ) {
+        mutableStateListOf<ProductCategory>().apply { addAll(initialOrder) }
+    }
     val lazyListState = rememberLazyListState()
     val haptic = LocalHapticFeedback.current
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
