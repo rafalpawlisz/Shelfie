@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.Product
+import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 
@@ -30,6 +31,7 @@ fun ShoppingScreen(
     onSelectList: (String) -> Unit,
     onCreateList: (String) -> Unit,
     onRenameList: (id: String, name: String) -> Unit,
+    onSetSectionOrder: (id: String, order: List<ProductCategory>) -> Unit,
     onArchiveList: (id: String) -> Unit,
     onRestoreList: (id: String) -> Unit,
     onDeleteList: (id: String) -> Unit,
@@ -64,6 +66,7 @@ fun ShoppingScreen(
             },
             onCreateList = onCreateList,
             onRenameList = onRenameList,
+            onSetSectionOrder = onSetSectionOrder,
             onArchiveList = onArchiveList,
             onRestoreList = onRestoreList,
             onDeleteList = onDeleteList,

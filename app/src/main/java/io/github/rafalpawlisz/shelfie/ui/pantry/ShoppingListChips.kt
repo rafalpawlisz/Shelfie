@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.ui.theme.warning
 import sh.calvin.reorderable.ReorderableItem
@@ -61,6 +62,7 @@ internal fun ListChipsRow(
     onSelectList: (String) -> Unit,
     onCreateList: (String) -> Unit,
     onRenameList: (id: String, name: String) -> Unit,
+    onSetSectionOrder: (id: String, order: List<ProductCategory>) -> Unit,
     onArchiveList: (id: String) -> Unit,
     onRestoreList: (id: String) -> Unit,
     onDeleteList: (id: String) -> Unit,
@@ -69,6 +71,7 @@ internal fun ListChipsRow(
     var menuListId by rememberSaveable { mutableStateOf<String?>(null) }
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var renamingListId by rememberSaveable { mutableStateOf<String?>(null) }
+    var orderingListId by rememberSaveable { mutableStateOf<String?>(null) }
     var showArchiveDialog by rememberSaveable { mutableStateOf(false) }
     var deletingArchivedId by rememberSaveable { mutableStateOf<String?>(null) }
     val haptic = LocalHapticFeedback.current
@@ -166,6 +169,10 @@ internal fun ListChipsRow(
                             onClick = { menuListId = null; renamingListId = list.id },
                         )
                         DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_section_order)) },
+                            onClick = { menuListId = null; orderingListId = list.id },
+                        )
+                        DropdownMenuItem(
                             text = { Text(stringResource(R.string.action_archive)) },
                             onClick = { menuListId = null; onArchiveList(list.id) },
                         )
@@ -212,6 +219,19 @@ internal fun ListChipsRow(
             confirmLabel = stringResource(R.string.action_save),
             onConfirm = { onRenameList(renaming.id, it); renamingListId = null },
             onDismiss = { renamingListId = null },
+        )
+    }
+
+    val ordering = lists.firstOrNull { it.id == orderingListId }
+    if (ordering != null) {
+        SectionOrderDialog(
+            listName = ordering.name,
+            initialOrder = ordering.sectionOrder,
+            onConfirm = { order ->
+                onSetSectionOrder(ordering.id, order)
+                orderingListId = null
+            },
+            onDismiss = { orderingListId = null },
         )
     }
 

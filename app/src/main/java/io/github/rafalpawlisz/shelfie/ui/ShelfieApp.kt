@@ -243,6 +243,7 @@ fun ShelfieApp(
                             onSelectList = viewModel::selectList,
                             onCreateList = viewModel::createList,
                             onRenameList = viewModel::renameList,
+                            onSetSectionOrder = viewModel::setSectionOrder,
                             onArchiveList = viewModel::archiveList,
                             onRestoreList = viewModel::restoreList,
                             onDeleteList = viewModel::deleteList,
