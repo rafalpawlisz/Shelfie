@@ -75,6 +75,14 @@ internal fun ListItems(
     // upstream order changes — but never mid-drag, or an emission from the
     // household would rebuild the list under the finger and snap the row back.
     var draggingRow by remember { mutableStateOf(false) }
+    // The dragged row's section, meaningful only while [draggingRow]. It decides
+    // which OTHER rows count as drop targets: the library assumes every target
+    // it picks will actually be swapped with (it predicts the dragged row's new
+    // offset and waits up to a second for the layout to confirm), so a target
+    // whose swap we would refuse must never enter the candidate set at all —
+    // refusing in the callback left the row drawn at the slot it never took,
+    // visibly jumping away from the finger at the aisle boundary.
+    var draggedSection by remember { mutableStateOf<ProductCategory?>(null) }
     // Set on a drop that was handed to the ViewModel, cleared by the emission
     // that carries it back. In between, the mirror is AHEAD of Room: re-syncing
     // from the list we just dragged away from put the row back where it started
@@ -115,7 +123,9 @@ internal fun ListItems(
         // two rows of the same section: the section is the product's, not the
         // row's, so crossing a header could never stick (the sort would put
         // the row straight back), and the checked block at the bottom is not
-        // draggable territory either.
+        // draggable territory either. Per-item `enabled` keeps such targets out
+        // of the library's sight before it gets here; this guard is what makes
+        // the invariant hold even if that filter and this callback disagree.
         val fromIndex = ordered.indexOfFirst { it.id == from.key }
         val toIndex = ordered.indexOfFirst { it.id == to.key }
         if (fromIndex == -1 || toIndex == -1) return@rememberReorderableLazyListState
@@ -194,13 +204,22 @@ internal fun ListItems(
                     return@items
                 }
                 val item = (entry as HeaderOrItem.Row).item
-                ReorderableItem(reorderableState, key = item.id) { _ ->
+                ReorderableItem(
+                    reorderableState,
+                    key = item.id,
+                    // A row is a drop target only when a drop on it could stick:
+                    // unchecked, and — while something is being dragged — of the
+                    // dragged row's own aisle. See [draggedSection].
+                    enabled = !item.isChecked &&
+                        (!draggingRow || sectionOf(item) == draggedSection),
+                ) { _ ->
                     // Built inside the reorderable scope so draggableHandle binds
                     // correctly, then handed to the row as a plain Modifier. On
                     // drop, translate the net move into indices over the upstream
                     // list so the ViewModel can persist the moved item's position.
                     val handleModifier = Modifier.draggableHandle(
                         onDragStarted = {
+                            draggedSection = sectionOf(item)
                             draggingRow = true
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         },
