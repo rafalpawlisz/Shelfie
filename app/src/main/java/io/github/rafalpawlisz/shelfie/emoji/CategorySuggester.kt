@@ -183,7 +183,7 @@ object CategorySuggester {
             // food: "suplement z czerwonego ryżu" was reaching the rice entry,
             // because scanning left to right takes the first word it knows and
             // the word it did not know was the one that mattered.
-            "suplement", "probiotyk", "kolagen",
+            "suplement", "probiotyk", "kolagen", "elektrolity",
         ),
         ProductCategory.HOME to listOf(
             "gasnica", "baterie", "bateria", "akumulator", "zarowka", "zarowki",

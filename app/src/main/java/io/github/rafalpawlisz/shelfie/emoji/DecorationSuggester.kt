@@ -136,7 +136,7 @@ object DecorationSuggester {
             // See the note in CategorySuggester: the head noun a supplement's
             // name leads with, so the ingredient in the rest of it stops
             // deciding.
-            "suplement", "probiotyk", "kolagen",
+            "suplement", "probiotyk", "kolagen", "elektrolity",
         ),
         "🧦" to listOf("skarpetki", "rajstopy"),
         "🍼" to listOf("pieluchy", "pieluszki", "kaszka", "butelka dla dziecka"),

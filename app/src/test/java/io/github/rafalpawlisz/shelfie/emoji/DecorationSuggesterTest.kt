@@ -55,6 +55,7 @@ class DecorationSuggesterTest {
     fun `a supplement wears a pill, not its ingredient`() {
         assertEquals("💊", DecorationSuggester.suggest("suplement z czerwonego ryżu"))
         assertEquals("🍚", DecorationSuggester.suggest("ryż"))
+        assertEquals("💊", DecorationSuggester.suggest("elektrolity"))
     }
 
     @Test

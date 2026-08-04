@@ -153,6 +153,18 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `electrolytes reach the medicine cabinet in every case ending`() {
+        // Reported from real shopping on 2026-08-04: "elektrolity" fell through
+        // to no section at all. All three forms ride one entry via the stemmer.
+        assertEquals(ProductCategory.PHARMACY, CategorySuggester.suggest("elektrolity"))
+        assertEquals(ProductCategory.PHARMACY, CategorySuggester.suggest("elektrolit"))
+        assertEquals(
+            ProductCategory.PHARMACY,
+            CategorySuggester.suggest("opakowanie elektrolitów"),
+        )
+    }
+
+    @Test
     fun `an unknown name suggests nothing`() {
         assertNull(CategorySuggester.suggest("zgrzeblarka"))
         assertNull(CategorySuggester.suggest(""))
