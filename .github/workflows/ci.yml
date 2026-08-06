@@ -51,12 +51,27 @@ jobs:
       - name: Build and run unit tests
         run: ./gradlew :app:assembleDebug :app:testDebugUnitTest
 
+      # Lint is not decoration here: it caught ten Compose errors that had been
+      # sitting in the tree for weeks, because until now nothing ran it and a
+      # green CI said everything was fine. Warnings fail too — see the lint
+      # block in app/build.gradle.kts for what is deliberately excused.
+      - name: Lint
+        run: ./gradlew :app:lintDebug
+
       - name: Upload test reports on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: app/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Upload the lint report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
 
   # The security rules are the most safety-critical artifact in the repo and

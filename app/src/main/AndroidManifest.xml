@@ -17,11 +17,17 @@
 
         allowBackup governs cloud backup; the extraction rules are what turn off
         device transfer on Android 12+, so both have to say it.
+
+        Lint asks for fullBackupContent alongside the extraction rules, for the
+        versions below 12 the latter does not reach. There is nothing for it to
+        say here: allowBackup="false" already switches backup off outright on
+        every version, and a rules file only shapes a backup that happens.
     -->
     <application
         android:name=".ShelfieApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        tools:ignore="DataExtractionRules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -34,7 +40,6 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.Shelfie"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

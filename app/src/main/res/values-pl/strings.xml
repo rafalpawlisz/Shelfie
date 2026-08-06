@@ -148,6 +148,5 @@
     <string name="delete_product_in_use">Ten produkt jest teraz na liście zakupów — zostaje w archiwum</string>
     <string name="action_cancel">Anuluj</string>
     <string name="archived_section">Zarchiwizowane (%1$d)</string>
-    <string name="cd_increase_quantity">Zwiększ ilość produktu %1$s</string>
     <string name="cd_decrease_quantity">Zmniejsz ilość produktu %1$s</string>
 </resources>

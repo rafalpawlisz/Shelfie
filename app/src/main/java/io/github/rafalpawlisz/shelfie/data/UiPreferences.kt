@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.data
 
 import android.content.Context
+import androidx.core.content.edit
 
 /**
  * Small, local UI preferences (not synced, not part of the pantry data).
@@ -19,7 +20,7 @@ class SharedPreferencesUiPreferences(context: Context) : UiPreferences {
     override var lastRestockListId: String?
         get() = prefs.getString(KEY_LAST_RESTOCK_LIST, null)
         set(value) {
-            prefs.edit().putString(KEY_LAST_RESTOCK_LIST, value).apply()
+            prefs.edit { putString(KEY_LAST_RESTOCK_LIST, value) }
         }
 
     private companion object {

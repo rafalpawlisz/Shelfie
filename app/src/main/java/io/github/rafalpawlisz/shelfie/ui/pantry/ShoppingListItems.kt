@@ -340,8 +340,10 @@ private fun ShoppingListRow(
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onEditAmount: () -> Unit,
-    // null hides the handle: one-off items have no position to drag.
-    dragHandleModifier: Modifier?,
+    // Not the row's own modifier — it belongs to the drag handle inside, and is
+    // built in the reorderable scope the row itself has no access to. null hides
+    // the handle: a checked row is parked by check time and cannot be placed.
+    @Suppress("ModifierParameter") dragHandleModifier: Modifier?,
 ) {
     val textColor =
         if (item.isChecked) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface

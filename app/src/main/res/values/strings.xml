@@ -1,5 +1,6 @@
 <resources>
-    <string name="app_name">Shelfie</string>
+    <!-- The name of the app, the same in every language. -->
+    <string name="app_name" translatable="false">Shelfie</string>
     <string name="empty_state_title">Your pantry is empty</string>
     <string name="empty_state_message">Tap + to add your first product</string>
     <string name="empty_state_go_to_products">Add products in the Products tab first</string>
@@ -13,8 +14,10 @@
     <string name="shopping_amount_label">Amount to buy (optional)</string>
     <string name="edit_item">Edit item</string>
     <string name="check_amount_title">How many did you get?</string>
-    <string name="shopping_amount">×%1$d</string>
-    <string name="shopping_amount_with_unit">%1$d %2$s</string>
+    <!-- Pure layout: a number, a separator, a unit somebody typed themselves.
+         Nothing here is language, so there is nothing to translate. -->
+    <string name="shopping_amount" translatable="false">×%1$d</string>
+    <string name="shopping_amount_with_unit" translatable="false">%1$d %2$s</string>
     <string name="finish_shopping">Finish shopping (%1$d)</string>
     <plurals name="finish_shopping_message">
         <item quantity="one">Add %1$d item to your pantry and finish shopping?</item>
@@ -45,7 +48,9 @@
     <string name="low_stock_list">Low stock (%1$d)</string>
     <string name="low_stock_hint">Products below minimum — tap one to add it to a list</string>
     <string name="action_add_all">Add all</string>
-    <string name="quantity_below_min">%1$s · min %2$d</string>
+    <!-- "min" is the same abbreviation in both languages; drop the attribute
+         the day one needs a different word. -->
+    <string name="quantity_below_min" translatable="false">%1$s · min %2$d</string>
     <string name="action_undo">Undo</string>
     <string name="shopping_item_removed">Removed: %1$s</string>
     <string name="undo_list_gone">That list no longer exists</string>
@@ -150,7 +155,6 @@
     <string name="delete_product_in_use">That product is on a shopping list now — it stays in the archive</string>
     <string name="action_cancel">Cancel</string>
     <string name="archived_section">Archived (%1$d)</string>
-    <string name="cd_increase_quantity">Increase quantity of %1$s</string>
     <string name="cd_decrease_quantity">Decrease quantity of %1$s</string>
-    <string name="quantity_with_unit">%1$d %2$s</string>
+    <string name="quantity_with_unit" translatable="false">%1$d %2$s</string>
 </resources>

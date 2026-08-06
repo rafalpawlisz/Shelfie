@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.data.sync
 
 import android.content.Context
+import androidx.core.content.edit
 
 /**
  * Durable, device-local memory of what this device has already synced.
@@ -50,25 +51,25 @@ class SharedPreferencesSyncStateStore(context: Context) : SyncStateStore {
     override var lastSyncedHouseholdId: String?
         get() = prefs.getString(KEY_HOUSEHOLD_ID, null)
         set(value) {
-            prefs.edit().putString(KEY_HOUSEHOLD_ID, value).apply()
+            prefs.edit { putString(KEY_HOUSEHOLD_ID, value) }
         }
 
     override var lastSyncedAt: Long
         get() = prefs.getLong(KEY_LAST_SYNCED_AT, 0L)
         set(value) {
-            prefs.edit().putLong(KEY_LAST_SYNCED_AT, value).apply()
+            prefs.edit { putLong(KEY_LAST_SYNCED_AT, value) }
         }
 
     override var clockOffsetMillis: Long
         get() = prefs.getLong(KEY_CLOCK_OFFSET, 0L)
         set(value) {
-            prefs.edit().putLong(KEY_CLOCK_OFFSET, value).apply()
+            prefs.edit { putLong(KEY_CLOCK_OFFSET, value) }
         }
 
     override var lastHouseholdInviteCode: String?
         get() = prefs.getString(KEY_INVITE_CODE, null)
         set(value) {
-            prefs.edit().putString(KEY_INVITE_CODE, value).apply()
+            prefs.edit { putString(KEY_INVITE_CODE, value) }
         }
 
     private companion object {

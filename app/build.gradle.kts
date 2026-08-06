@@ -72,6 +72,23 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    lint {
+        // CI runs lint, and a warning nobody has to answer for is a warning that
+        // accumulates: ten Compose errors sat here unnoticed because nothing ran
+        // this check. Warnings fail the build so the next one is dealt with while
+        // it is one, not thirty.
+        warningsAsErrors = true
+        // Except the ones that fire on the calendar rather than on this code.
+        // Dependency updates are a deliberate act here (versions are pinned in
+        // libs.versions.toml); a build must not start failing because somebody
+        // else published a release.
+        disable += setOf(
+            "GradleDependency",
+            "NewerVersionAvailable",
+            "AndroidGradlePluginVersion",
+            "OldTargetApi",
+        )
+    }
     buildFeatures {
         compose = true
         // Off by default since AGP 8. Wanted for VERSION_NAME/VERSION_CODE,
