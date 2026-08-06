@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -76,7 +77,12 @@ fun ShelfieApp(
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var editedProductId by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // The Context is here for the scanner, which needs a real one. Strings are
+    // read off Resources instead: a Context read is not invalidated when the
+    // Configuration changes, so a message built from it could come out in the
+    // language the screen was composed in rather than the one in force now.
     val context = LocalContext.current
+    val resources = LocalResources.current
     val snackbarHostState = remember { SnackbarHostState() }
     // Ephemeral restock hint being acted on; deliberately not saved across
     // rotation — it's a suggestion, not state.
@@ -88,7 +94,7 @@ fun ShelfieApp(
         val canAdd = viewModel.uiState.value.lists.isNotEmpty()
         val result = snackbarHostState.showSnackbar(
             message = message,
-            actionLabel = if (canAdd) context.getString(R.string.action_add) else null,
+            actionLabel = if (canAdd) resources.getString(R.string.action_add) else null,
             duration = SnackbarDuration.Long,
         )
         if (result == SnackbarResult.ActionPerformed) restockSuggestion = suggestion
@@ -106,13 +112,13 @@ fun ShelfieApp(
                         // ONE snackbar carrying both the outcome and the hint;
                         // the restock action outranks Undo (one action slot).
                         suggestRestock(
-                            context.getString(R.string.use_up_scanned_low, result.productName),
+                            resources.getString(R.string.use_up_scanned_low, result.productName),
                             suggestion,
                         )
                     } else {
                         val shown = snackbarHostState.showSnackbar(
-                            message = context.getString(R.string.use_up_scanned, result.productName),
-                            actionLabel = context.getString(R.string.action_undo),
+                            message = resources.getString(R.string.use_up_scanned, result.productName),
+                            actionLabel = resources.getString(R.string.action_undo),
                             // With an action label M3 defaults to Indefinite —
                             // an undo hint must not linger forever.
                             duration = SnackbarDuration.Long,
@@ -123,10 +129,10 @@ fun ShelfieApp(
                     }
                 }
                 is UseUpScanResult.OutOfStock -> snackbarHostState.showSnackbar(
-                    context.getString(R.string.use_up_scan_out_of_stock, result.productName),
+                    resources.getString(R.string.use_up_scan_out_of_stock, result.productName),
                 )
                 is UseUpScanResult.UnknownCode -> snackbarHostState.showSnackbar(
-                    context.getString(R.string.use_up_scan_unknown, result.code),
+                    resources.getString(R.string.use_up_scan_unknown, result.code),
                 )
             }
         }
@@ -134,7 +140,7 @@ fun ShelfieApp(
 
     LaunchedEffect(Unit) {
         viewModel.messages.collectLatest { messageRes ->
-            snackbarHostState.showSnackbar(context.getString(messageRes))
+            snackbarHostState.showSnackbar(resources.getString(messageRes))
         }
     }
 
@@ -143,8 +149,8 @@ fun ShelfieApp(
         // different tabs, and each stream should replace only its own snackbar.
         viewModel.itemRemovedEvents.collectLatest { removed ->
             val shown = snackbarHostState.showSnackbar(
-                message = context.getString(R.string.shopping_item_removed, removed.productName),
-                actionLabel = context.getString(R.string.action_undo),
+                message = resources.getString(R.string.shopping_item_removed, removed.productName),
+                actionLabel = resources.getString(R.string.action_undo),
                 // With an action label M3 defaults to Indefinite.
                 duration = SnackbarDuration.Long,
             )

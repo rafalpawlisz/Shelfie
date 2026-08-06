@@ -303,7 +303,11 @@ fun SettingsDialog(
  */
 @Composable
 private fun InviteCodeRow(code: String) {
+    // Context only to launch the chooser; the share text is resolved up here as
+    // an ordinary resource read, so it follows the current locale instead of the
+    // one this row was composed in.
     val context = LocalContext.current
+    val shareText = stringResource(R.string.household_invite_share_text, code)
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     Row(
@@ -331,10 +335,7 @@ private fun InviteCodeRow(code: String) {
             onClick = {
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(
-                        Intent.EXTRA_TEXT,
-                        context.getString(R.string.household_invite_share_text, code),
-                    )
+                    putExtra(Intent.EXTRA_TEXT, shareText)
                 }
                 context.startActivity(Intent.createChooser(intent, null))
             },
