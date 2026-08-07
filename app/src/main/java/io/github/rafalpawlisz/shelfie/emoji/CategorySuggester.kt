@@ -79,7 +79,9 @@ object CategorySuggester {
             "brokul", "brokuly", "broccoli", "kalafior",
             "salata", "kapusta", "szpinak", "roszponka", "rukola", "boczniaki",
             "ogorek", "ogorki", "cucumber", "kukurydza", "corn", "papryka", "pepper",
-            "pieczarki", "grzyby", "borowiki", "mushroom",
+            // "kurki" stems to "kurk", the spice shelf's "kurkuma" to "kurkum",
+            // so the two do not contend for one entry.
+            "pieczarki", "grzyby", "borowiki", "mushroom", "kurki", "podgrzybki",
             "baklazan", "cukinia", "eggplant", "dynia", "pumpkin",
             "szczypiorek", "koperek", "koper", "natka", "pietruszka", "mieta", "kolendra",
             "tymianek", "rozmaryn", "lubczyk", "szalwia", "estragon", "majeranek", "szczaw",

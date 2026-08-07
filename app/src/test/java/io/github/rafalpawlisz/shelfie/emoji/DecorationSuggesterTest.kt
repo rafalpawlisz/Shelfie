@@ -59,6 +59,12 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `chanterelles wear a mushroom, turmeric keeps its spice jar`() {
+        assertEquals("🍄", DecorationSuggester.suggest("kurki"))
+        assertEquals("🧂", DecorationSuggester.suggest("kurkuma"))
+    }
+
+    @Test
     fun `an unknown name simply has no decoration`() {
         assertNull(DecorationSuggester.suggest("zgrzeblarka"))
         assertNull(DecorationSuggester.suggest(""))

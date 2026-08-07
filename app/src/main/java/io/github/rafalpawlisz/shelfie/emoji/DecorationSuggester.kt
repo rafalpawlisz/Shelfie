@@ -80,7 +80,7 @@ object DecorationSuggester {
         "🥒" to listOf("ogorek", "ogorki", "cucumber", "korniszony"),
         "🌽" to listOf("kukurydza", "corn"),
         "🫑" to listOf("papryka", "pepper"),
-        "🍄" to listOf("pieczarki", "grzyby", "borowiki", "mushroom"),
+        "🍄" to listOf("pieczarki", "grzyby", "borowiki", "mushroom", "kurki", "podgrzybki"),
         "🍆" to listOf("baklazan", "cukinia", "eggplant"),
         "🎃" to listOf("dynia", "pumpkin"),
         "🫘" to listOf("fasola", "ciecierzyca", "soczewica", "beans", "groch"),

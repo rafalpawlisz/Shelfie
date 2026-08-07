@@ -153,6 +153,19 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `mushrooms picked by name reach the vegetable aisle`() {
+        // Reported from real shopping: "kurki" matched nothing. The stem is
+        // "kurk" — one letter short of the spice shelf's "kurkuma" ("kurkum"),
+        // which is exactly the kind of near-collision worth pinning down.
+        assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("kurki"))
+        assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("kurka"))
+        assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("podgrzybki"))
+        // The spice keeps its own shelf, in every ending it is written in.
+        assertEquals(ProductCategory.SPICES, CategorySuggester.suggest("kurkuma"))
+        assertEquals(ProductCategory.SPICES, CategorySuggester.suggest("kurkumy"))
+    }
+
+    @Test
     fun `electrolytes reach the medicine cabinet in every case ending`() {
         // Reported from real shopping on 2026-08-04: "elektrolity" fell through
         // to no section at all. All three forms ride one entry via the stemmer.
