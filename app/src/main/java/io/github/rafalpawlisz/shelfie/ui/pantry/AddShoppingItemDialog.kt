@@ -488,7 +488,14 @@ private fun OneOffSuggestionRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
-                Text(text = suggestion.name, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    // Read out of the name, like the row this will become on the
+                    // list — a one-off has no stored emoji, and the dictionary
+                    // answers the same way in both places.
+                    text = listOfNotNull(decorationFor(suggestion.name), suggestion.name)
+                        .joinToString(" "),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
                 // The unit comes back with the name because retyping "g" every
                 // time is the tedious half; the amount does not, because how
                 // many you wanted was true of one trip.
