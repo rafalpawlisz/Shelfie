@@ -1,6 +1,7 @@
 package io.github.rafalpawlisz.shelfie.data
 
 import io.github.rafalpawlisz.shelfie.model.ItemSlot
+import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
@@ -45,6 +46,16 @@ interface ShoppingListRepository {
         unit: String? = null,
         note: String? = null,
     )
+
+    /**
+     * Names bought once before, newest first, so the picker can offer them
+     * instead of asking for the same word again. Written by [addOneOffItem];
+     * unlike the lines themselves it survives checkout.
+     */
+    fun observeOneOffSuggestions(): Flow<List<OneOffSuggestion>>
+
+    /** Drops a remembered name — a typo, or something never to be bought again. */
+    suspend fun forgetOneOffSuggestion(name: String)
 
     // True when the product already sits on any active (non-archived) list —
     // used to keep the low-stock suggestion from nagging about planned items.

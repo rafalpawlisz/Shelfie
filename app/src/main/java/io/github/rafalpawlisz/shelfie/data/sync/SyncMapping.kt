@@ -1,5 +1,6 @@
 package io.github.rafalpawlisz.shelfie.data.sync
 
+import io.github.rafalpawlisz.shelfie.data.local.OneOffSuggestionEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductBarcodeEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductListOrderEntity
@@ -28,6 +29,15 @@ fun ShoppingListEntity.toSyncDoc(): Map<String, Any?> = mapOf(
     "sectionOrder" to sectionOrder,
     "archivedAt" to archivedAt,
     "createdAt" to createdAt,
+    "updatedAt" to updatedAt,
+)
+
+fun OneOffSuggestionEntity.toSyncDoc(): Map<String, Any?> = mapOf(
+    // The id is derived from the name, so both phones write the same document
+    // for the same word and the household keeps one entry, not two.
+    "name" to name,
+    "unit" to unit,
+    "lastUsedAt" to lastUsedAt,
     "updatedAt" to updatedAt,
 )
 

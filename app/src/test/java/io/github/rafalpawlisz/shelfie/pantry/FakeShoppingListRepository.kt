@@ -4,6 +4,7 @@ import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.data.local.sectionEmojiFor
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ItemSlot
+import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.SectionOrder
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
@@ -55,6 +56,11 @@ class FakeShoppingListRepository(
     // it survives removeItem/finishShopping and is cleared only when the list is
     // deleted, so re-adding a product restores its slot.
     private val positions = MutableStateFlow<Map<Pair<String, String>, Double>>(emptyMap())
+
+    // Remembered one-off names paired with a sequence, newest first on read —
+    // the fake stand-in for lastUsedAt.
+    private val suggestions = MutableStateFlow<List<Pair<OneOffSuggestion, Long>>>(emptyList())
+    private var suggestionSeq = 0L
 
     private var nextListId = 1
     private var nextId = 1
@@ -221,6 +227,16 @@ class FakeShoppingListRepository(
         }
     }
 
+    override fun observeOneOffSuggestions(): Flow<List<OneOffSuggestion>> =
+        suggestions.map { list ->
+            list.sortedByDescending { it.second }.map { (suggestion, _) -> suggestion }
+        }
+
+    override suspend fun forgetOneOffSuggestion(name: String) {
+        val key = name.trim().lowercase()
+        suggestions.update { list -> list.filterNot { it.first.name.trim().lowercase() == key } }
+    }
+
     override suspend fun addOneOffItem(
         listId: String,
         name: String,
@@ -230,6 +246,15 @@ class FakeShoppingListRepository(
     ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
+        // Mirrors the repository: the word is remembered even though the line
+        // below will not survive checkout. Keyed case-insensitively, so buying
+        // the same thing again moves the entry up rather than duplicating it.
+        val cleanUnit = unit?.trim()?.ifBlank { null }
+        val key = trimmed.lowercase()
+        suggestions.update { list ->
+            list.filterNot { it.first.name.trim().lowercase() == key } +
+                (OneOffSuggestion(name = trimmed, unit = cleanUnit) to ++suggestionSeq)
+        }
         // Mirrors the DAO: a plain insert, never a merge — one-offs occupy no
         // product slot, so repeats of the same name are separate lines.
         items.update {

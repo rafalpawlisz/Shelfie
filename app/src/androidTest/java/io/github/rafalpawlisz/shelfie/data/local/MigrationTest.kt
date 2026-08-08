@@ -237,8 +237,41 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migrate7To8_addsTheOneOffVocabularyEmpty() {
+        helper.createDatabase(TEST_DB, 7).use { db ->
+            db.execSQL(
+                "INSERT INTO shopping_lists (id, name, createdAt, updatedAt, position, archivedAt, " +
+                    "sectionOrder) VALUES ('l1', 'Lidl', 100, 100, 1.0, NULL, NULL)"
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 8, true, *ShelfieDatabase.MIGRATIONS).use { db ->
+            // Nothing to carry over: the history starts empty and fills from the
+            // next one-off onwards. What matters is that the table is there and
+            // the list beside it came through untouched.
+            db.query("SELECT COUNT(*) FROM one_off_suggestions").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(0, c.getInt(0))
+            }
+            db.execSQL(
+                "INSERT INTO one_off_suggestions (id, name, unit, lastUsedAt, updatedAt) " +
+                    "VALUES ('abc', 'znicze', 'sztuki', 100, 100)"
+            )
+            db.query("SELECT name, unit FROM one_off_suggestions WHERE id = 'abc'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("znicze", c.getString(0))
+                assertEquals("sztuki", c.getString(1))
+            }
+            db.query("SELECT name FROM shopping_lists WHERE id = 'l1'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("Lidl", c.getString(0))
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test.db"
-        const val CURRENT_VERSION = 7
+        const val CURRENT_VERSION = 8
     }
 }

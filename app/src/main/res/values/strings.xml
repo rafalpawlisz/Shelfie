@@ -119,6 +119,8 @@
     <!-- Beside a Unit field the long label wraps to two lines; the pair reads
          as one value ("200 g"), so "(optional)" is carried by the unit's twin. -->
     <string name="shopping_amount_label_short">Amount</string>
+    <string name="picker_one_off_section">Bought once before</string>
+    <string name="picker_one_off_forget">Forget %1$s</string>
     <string name="action_section_order">Aisle order</string>
     <string name="section_order_title">Aisle order — %1$s</string>
     <string name="action_restore_default">Default</string>

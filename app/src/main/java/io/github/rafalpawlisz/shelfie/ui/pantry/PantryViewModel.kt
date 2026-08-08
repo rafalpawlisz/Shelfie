@@ -12,6 +12,7 @@ import io.github.rafalpawlisz.shelfie.data.ProductRepository
 import io.github.rafalpawlisz.shelfie.data.ShoppingListRepository
 import io.github.rafalpawlisz.shelfie.data.UiPreferences
 import io.github.rafalpawlisz.shelfie.model.ItemSlot
+import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
@@ -85,6 +86,9 @@ data class PantryUiState(
     val archivedLists: List<ShoppingList> = emptyList(),
     val selectedListId: String? = null,
     val shoppingList: List<ShoppingListItem> = emptyList(),
+    // Names bought once before, newest first — offered by the picker so the
+    // same word need not be typed twice.
+    val oneOffSuggestions: List<OneOffSuggestion> = emptyList(),
     val barcodesByProduct: Map<String, List<String>> = emptyMap(),
     val isLoading: Boolean = true,
 )
@@ -141,8 +145,18 @@ class PantryViewModel(
             shoppingListRepository.observeLists(),
             shoppingListRepository.observeArchivedLists(),
             selectedListId,
-            shoppingItems,
-        ) { (active, archived, barcodes, planned, referenced), lists, archivedLists, selected, items ->
+            // Paired rather than given their own slot: combine's typed overload
+            // stops at five flows, and these two are read by the same screen.
+            combine(
+                shoppingItems,
+                shoppingListRepository.observeOneOffSuggestions(),
+            ) { items, suggestions -> items to suggestions },
+        ) { (active, archived, barcodes, planned, referenced),
+            lists,
+            archivedLists,
+            selected,
+            (items, oneOffSuggestions),
+            ->
             val plannedByProduct = planned
                 .groupBy({ it.productId }, { it.listId })
                 .mapValues { (_, listIds) -> listIds.toSet() }
@@ -159,6 +173,7 @@ class PantryViewModel(
                 archivedLists = archivedLists,
                 selectedListId = selected,
                 shoppingList = items,
+                oneOffSuggestions = oneOffSuggestions,
                 barcodesByProduct = barcodes.groupBy({ it.productId }, { it.barcode }),
                 isLoading = false,
             )
@@ -638,6 +653,11 @@ class PantryViewModel(
         viewModelScope.launch {
             shoppingListRepository.addOneOffItem(listId, name, amount, unit, note)
         }
+    }
+
+    /** Drops a remembered one-off name from the picker's suggestions. */
+    fun forgetOneOffSuggestion(name: String) {
+        viewModelScope.launch { shoppingListRepository.forgetOneOffSuggestion(name) }
     }
 
     fun archive(id: String) {

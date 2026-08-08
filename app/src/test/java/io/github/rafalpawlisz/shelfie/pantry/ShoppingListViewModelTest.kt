@@ -1602,6 +1602,64 @@ class ShoppingListViewModelTest {
     // --- One-off items ---
 
     @Test
+    fun `a one-off name outlives the line it was typed on`() = runTest {
+        // The point of the whole table: the LINE dies at checkout, the WORD
+        // does not, so next November the picker can offer it back.
+        val repository = FakeProductRepository()
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.addOneOffToShoppingList("znicze", amount = 2, unit = "sztuki")
+        val item = viewModel.uiState.value.shoppingList.single()
+
+        viewModel.setShoppingItemChecked(item.id, checked = true)
+        viewModel.finishShopping()
+
+        assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+        val suggestion = viewModel.uiState.value.oneOffSuggestions.single()
+        assertEquals("znicze", suggestion.name)
+        // The unit comes back too — retyping "sztuki" is the tedious half.
+        assertEquals("sztuki", suggestion.unit)
+    }
+
+    @Test
+    fun `buying the same name again moves it up instead of duplicating it`() = runTest {
+        val repository = FakeProductRepository()
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.addOneOffToShoppingList("znicze", amount = 2, unit = "sztuki")
+        viewModel.addOneOffToShoppingList("wiadro", amount = null)
+        // Case and stray spaces are the same word, not a second one.
+        viewModel.addOneOffToShoppingList("  Znicze ", amount = 4, unit = "opakowania")
+
+        val suggestions = viewModel.uiState.value.oneOffSuggestions
+        assertEquals(2, suggestions.size)
+        // Newest first, and the entry carries what it was last bought as.
+        assertEquals("Znicze", suggestions.first().name)
+        assertEquals("opakowania", suggestions.first().unit)
+        assertEquals("wiadro", suggestions[1].name)
+    }
+
+    @Test
+    fun `a forgotten name stops being suggested`() = runTest {
+        val repository = FakeProductRepository()
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        viewModel.addOneOffToShoppingList("zniczee", amount = null)
+        viewModel.addOneOffToShoppingList("wiadro", amount = null)
+
+        // The typo goes; what was meant stays.
+        viewModel.forgetOneOffSuggestion("zniczee")
+
+        assertEquals(
+            listOf("wiadro"),
+            viewModel.uiState.value.oneOffSuggestions.map { it.name },
+        )
+    }
+
+    @Test
     fun `a one-off lands on the list under its own name, after the products`() = runTest {
         val repository = FakeProductRepository()
         // Dairy, so the bulb's own aisle (household) still puts it last.

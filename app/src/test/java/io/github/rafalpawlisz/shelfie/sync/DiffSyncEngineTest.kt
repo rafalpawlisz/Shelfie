@@ -2,6 +2,7 @@ package io.github.rafalpawlisz.shelfie.sync
 
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.data.local.ProductEntity
+import io.github.rafalpawlisz.shelfie.data.local.OneOffSuggestionEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductBarcodeEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductListOrderEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
@@ -41,6 +42,7 @@ class DiffSyncEngineTest {
             items = MutableStateFlow<List<ShoppingListItemEntity>>(emptyList()),
             listOrders = MutableStateFlow<List<ProductListOrderEntity>>(emptyList()),
             barcodes = MutableStateFlow<List<ProductBarcodeEntity>>(emptyList()),
+            oneOffSuggestions = MutableStateFlow<List<OneOffSuggestionEntity>>(emptyList()),
             writer = writer,
             remote = remote,
             applier = SyncApplier(store),
@@ -55,13 +57,21 @@ class DiffSyncEngineTest {
             engine.start()
         }
 
-        /** All five collections report the given remote state (empty by default). */
+        /**
+         * Every collection reports the given remote state (empty by default).
+         *
+         * Driven off the enum rather than a hand-written list: a session only
+         * becomes ready once each collection has delivered a first snapshot, so
+         * a collection added later and forgotten here would hang every test in
+         * this class with no hint as to why.
+         */
         suspend fun emitInitials(products: List<io.github.rafalpawlisz.shelfie.data.sync.RemoteDoc> = emptyList()) {
-            remote.emitInitial(SyncCollection.PRODUCTS, products)
-            remote.emitInitial(SyncCollection.LISTS, emptyList())
-            remote.emitInitial(SyncCollection.ITEMS, emptyList())
-            remote.emitInitial(SyncCollection.LIST_ORDER, emptyList())
-            remote.emitInitial(SyncCollection.BARCODES, emptyList())
+            for (collection in SyncCollection.entries) {
+                remote.emitInitial(
+                    collection,
+                    if (collection == SyncCollection.PRODUCTS) products else emptyList(),
+                )
+            }
         }
     }
 

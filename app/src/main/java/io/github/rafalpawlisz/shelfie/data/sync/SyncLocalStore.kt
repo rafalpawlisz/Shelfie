@@ -2,6 +2,8 @@ package io.github.rafalpawlisz.shelfie.data.sync
 
 import android.database.SQLException
 import android.util.Log
+import io.github.rafalpawlisz.shelfie.data.local.OneOffSuggestionDao
+import io.github.rafalpawlisz.shelfie.data.local.OneOffSuggestionEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductBarcodeDao
 import io.github.rafalpawlisz.shelfie.data.local.ProductBarcodeEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductDao
@@ -50,6 +52,7 @@ class RoomSyncLocalStore(
     private val productDao: ProductDao,
     private val shoppingListDao: ShoppingListDao,
     private val barcodeDao: ProductBarcodeDao,
+    private val suggestionDao: OneOffSuggestionDao,
 ) : SyncLocalStore {
 
     override suspend fun upsert(
@@ -63,6 +66,7 @@ class RoomSyncLocalStore(
             SyncCollection.LISTS -> shoppingListDao.listUpdatedAt(docId)
             SyncCollection.ITEMS -> shoppingListDao.itemUpdatedAt(docId)
             SyncCollection.BARCODES -> barcodeDao.updatedAtOf(docId)
+            SyncCollection.ONE_OFF_SUGGESTIONS -> suggestionDao.updatedAtOf(docId)
             SyncCollection.LIST_ORDER -> {
                 val listId = data.string("listId") ?: return UpsertResult.MALFORMED
                 val productId = data.string("productId") ?: return UpsertResult.MALFORMED
@@ -87,6 +91,11 @@ class RoomSyncLocalStore(
                 }
                 SyncCollection.BARCODES -> {
                     barcodeDao.insert(barcodeFrom(docId, data) ?: return UpsertResult.MALFORMED)
+                }
+                SyncCollection.ONE_OFF_SUGGESTIONS -> {
+                    suggestionDao.upsert(
+                        suggestionFrom(docId, data) ?: return UpsertResult.MALFORMED,
+                    )
                 }
                 SyncCollection.LIST_ORDER -> {
                     shoppingListDao.upsertOrderRow(orderFrom(data) ?: return UpsertResult.MALFORMED)
@@ -141,6 +150,7 @@ class RoomSyncLocalStore(
             SyncCollection.LISTS -> shoppingListDao.deleteList(docId)
             SyncCollection.ITEMS -> shoppingListDao.delete(docId)
             SyncCollection.BARCODES -> barcodeDao.delete(docId)
+            SyncCollection.ONE_OFF_SUGGESTIONS -> suggestionDao.delete(docId)
             SyncCollection.LIST_ORDER -> {
                 val (listId, productId) = splitOrderKey(docId) ?: return
                 shoppingListDao.deleteOrderRow(listId, productId)
@@ -156,8 +166,18 @@ class RoomSyncLocalStore(
         SyncCollection.LISTS -> shoppingListDao.listIdsSyncedUpTo(syncedUpTo)
         SyncCollection.ITEMS -> shoppingListDao.itemIdsSyncedUpTo(syncedUpTo)
         SyncCollection.BARCODES -> barcodeDao.barcodesSyncedUpTo(syncedUpTo)
+        SyncCollection.ONE_OFF_SUGGESTIONS -> suggestionDao.idsSyncedUpTo(syncedUpTo)
         SyncCollection.LIST_ORDER -> shoppingListDao.orderKeysSyncedUpTo(syncedUpTo)
     }
+
+    private fun suggestionFrom(id: String, d: Map<String, Any?>): OneOffSuggestionEntity? =
+        OneOffSuggestionEntity(
+            id = id,
+            name = d.string("name") ?: return null,
+            unit = d.string("unit"),
+            lastUsedAt = d.long("lastUsedAt") ?: return null,
+            updatedAt = d.long("updatedAt") ?: return null,
+        )
 
     private fun productFrom(id: String, d: Map<String, Any?>): ProductEntity? {
         return ProductEntity(

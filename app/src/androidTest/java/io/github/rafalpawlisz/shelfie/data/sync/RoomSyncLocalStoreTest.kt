@@ -36,6 +36,7 @@ class RoomSyncLocalStoreTest {
             productDao = db.productDao(),
             shoppingListDao = db.shoppingListDao(),
             barcodeDao = db.productBarcodeDao(),
+            suggestionDao = db.oneOffSuggestionDao(),
         )
     }
 

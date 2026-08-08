@@ -1,5 +1,8 @@
 package io.github.rafalpawlisz.shelfie.data
 
+import io.github.rafalpawlisz.shelfie.data.local.OneOffSuggestionDao
+import io.github.rafalpawlisz.shelfie.data.local.OneOffSuggestionEntity
+import io.github.rafalpawlisz.shelfie.data.local.oneOffSuggestionId
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListDao
 import io.github.rafalpawlisz.shelfie.data.sync.NoopSyncEngine
 import io.github.rafalpawlisz.shelfie.data.sync.SyncClock
@@ -12,6 +15,7 @@ import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemRow
 import io.github.rafalpawlisz.shelfie.data.local.sectionEmojiFor
 import io.github.rafalpawlisz.shelfie.data.local.toDomain
 import io.github.rafalpawlisz.shelfie.model.ItemSlot
+import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.SectionOrder
@@ -24,6 +28,8 @@ import kotlinx.coroutines.flow.map
 
 class OfflineShoppingListRepository(
     private val dao: ShoppingListDao,
+    // The vocabulary of things bought once, which outlives the lines themselves.
+    private val suggestionDao: OneOffSuggestionDao,
     // Deletions must be reported at mutation time (the sync engine's snapshot
     // diff can't see them across restarts); upserts need no hook.
     private val sync: SyncEngine = NoopSyncEngine,
@@ -163,6 +169,18 @@ class OfflineShoppingListRepository(
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         val now = clock.now()
+        val cleanUnit = unit?.trim()?.ifBlank { null }
+        // Remember the word. The line below will be gone after checkout; this
+        // is what lets the picker offer the name again next November.
+        suggestionDao.upsert(
+            OneOffSuggestionEntity(
+                id = oneOffSuggestionId(trimmed),
+                name = trimmed,
+                unit = cleanUnit,
+                lastUsedAt = now,
+                updatedAt = now,
+            ),
+        )
         // A plain insert, no merge: one-offs occupy no product slot (NULLs are
         // distinct under the unique index), so two bulbs are two lines — which
         // is what a hand-written list would say too.
@@ -173,7 +191,7 @@ class OfflineShoppingListRepository(
                 productId = null,
                 name = trimmed,
                 amount = amount,
-                unit = unit?.trim()?.ifBlank { null },
+                unit = cleanUnit,
                 note = note?.trim()?.ifBlank { null },
                 checkedAt = null,
                 createdAt = now,
@@ -222,6 +240,14 @@ class OfflineShoppingListRepository(
     override suspend fun listExists(id: String): Boolean = dao.listExists(id)
 
     override suspend fun isOnAnyList(productId: String): Boolean = dao.isOnActiveList(productId)
+
+    override fun observeOneOffSuggestions(): Flow<List<OneOffSuggestion>> =
+        suggestionDao.observeAll().map { rows -> rows.map(OneOffSuggestionEntity::toDomain) }
+
+    override suspend fun forgetOneOffSuggestion(name: String) {
+        suggestionDao.delete(oneOffSuggestionId(name))
+        sync.onDeleted(SyncCollection.ONE_OFF_SUGGESTIONS, listOf(oneOffSuggestionId(name)))
+    }
 
     override fun observePlannedEntries(): Flow<List<PlannedEntry>> = dao.observePlannedEntries()
 

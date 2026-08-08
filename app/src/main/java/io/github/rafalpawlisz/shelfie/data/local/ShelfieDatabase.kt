@@ -12,16 +12,18 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ShoppingListItemEntity::class,
         ProductBarcodeEntity::class,
         ProductListOrderEntity::class,
+        OneOffSuggestionEntity::class,
     ],
     // Renumbered from 12 back to 1 before the first release — the development
     // history (schema wipes all along) doesn't need to live in the version.
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class ShelfieDatabase : RoomDatabase() {
     abstract fun productDao(): ProductDao
     abstract fun shoppingListDao(): ShoppingListDao
     abstract fun productBarcodeDao(): ProductBarcodeDao
+    abstract fun oneOffSuggestionDao(): OneOffSuggestionDao
 
     companion object {
         /**
@@ -116,6 +118,22 @@ abstract class ShelfieDatabase : RoomDatabase() {
             }
         }
 
+        // 7 → 8: names bought once are remembered so the picker can offer them
+        // again. A new table, so nothing existing is touched; the history simply
+        // starts empty and fills from the next one-off onwards.
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS one_off_suggestions (" +
+                        "id TEXT NOT NULL PRIMARY KEY, " +
+                        "name TEXT NOT NULL, " +
+                        "unit TEXT, " +
+                        "lastUsedAt INTEGER NOT NULL, " +
+                        "updatedAt INTEGER NOT NULL)"
+                )
+            }
+        }
+
         val MIGRATIONS = arrayOf<Migration>(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -123,6 +141,7 @@ abstract class ShelfieDatabase : RoomDatabase() {
             MIGRATION_4_5,
             MIGRATION_5_6,
             MIGRATION_6_7,
+            MIGRATION_7_8,
         )
     }
 }

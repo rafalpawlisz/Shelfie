@@ -156,9 +156,11 @@ service cloud.firestore {
         && resource.data.members.keys().hasOnly([request.auth.uid])
         && resource.data.members[request.auth.uid] == true;
 
-      // Synced pantry data (products/lists/items/barcodes/listOrder): any
-      // member reads and writes anything under their household; everyone
-      // else is locked out.
+      // Synced pantry data (products/lists/items/barcodes/listOrder/
+      // oneOffSuggestions): any member reads and writes anything under their
+      // household; everyone else is locked out. The wildcard is deliberate —
+      // a new synced table is a schema decision, not a security one, and
+      // needing a rules deploy to ship one would be a trap worth avoiding.
       match /{collection}/{docId} {
         allow read, write: if signedIn()
           && get(/databases/$(database)/documents/households/$(hid))

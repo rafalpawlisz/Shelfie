@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -35,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -47,6 +49,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 
@@ -70,6 +73,8 @@ fun AddShoppingItemDialog(
     // way onwards was a form that offered to "create" it.
     archivedProducts: List<Product>,
     items: List<ShoppingListItem>,
+    // Names bought once before, newest first; see OneOffSuggestion.
+    suggestions: List<OneOffSuggestion>,
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
     // A one-off: a line of text on the list, never a product. Confirmed from
     // the same amount step, under the typed name.
@@ -78,6 +83,8 @@ fun AddShoppingItemDialog(
     // is the one place a product is created. The caller reopens this dialog
     // with the new product in [preselectProductId] once it exists.
     onCreateProduct: (name: String) -> Unit,
+    /** Drops a remembered name — a typo, or something never to be bought again. */
+    onForgetSuggestion: (name: String) -> Unit,
     onDismiss: () -> Unit,
     preselectProductId: String? = null,
 ) {
@@ -86,6 +93,9 @@ fun AddShoppingItemDialog(
     }
     // A one-off in the making: the typed name, promoted to the amount step.
     var oneOffName by rememberSaveable(preselectProductId) { mutableStateOf<String?>(null) }
+    // Set only when that name came from a remembered one, carrying the unit it
+    // was bought with last time; null for a name typed fresh.
+    var suggestedUnit by rememberSaveable(preselectProductId) { mutableStateOf<String?>(null) }
     val selectedProduct = products.firstOrNull { it.id == selectedProductId }
         ?: archivedProducts.firstOrNull { it.id == selectedProductId }
     val selectedIsArchived = archivedProducts.any { it.id == selectedProductId }
@@ -144,9 +154,10 @@ fun AddShoppingItemDialog(
                 mutableStateOf(existing?.note.orEmpty())
             }
             // A one-off's own unit: what its amount counts. A product needs no
-            // field here — its unit is part of the product.
+            // field here — its unit is part of the product. Pre-filled when the
+            // name came from a suggestion.
             var unitText by rememberSaveable(selectedProductId, oneOffName) {
-                mutableStateOf("")
+                mutableStateOf(suggestedUnit.orEmpty())
             }
             val amount = amountText.trim().toIntOrNull()
             val amountValid = amountText.isBlank() || (amount != null && amount > 0)
@@ -223,9 +234,18 @@ fun AddShoppingItemDialog(
                             SearchPhase(
                                 products = products,
                                 archivedProducts = archivedProducts,
+                                suggestions = suggestions,
                                 onSelect = { selectedProductId = it },
                                 onCreateProduct = onCreateProduct,
                                 onBuyOneOff = { oneOffName = it },
+                                onPickSuggestion = { suggestion ->
+                                    // Straight to the amount step under the
+                                    // remembered name, with its unit already in
+                                    // place — the whole point of remembering it.
+                                    oneOffName = suggestion.name
+                                    suggestedUnit = suggestion.unit
+                                },
+                                onForgetSuggestion = onForgetSuggestion,
                             )
                         }
                     } else {
@@ -314,9 +334,12 @@ fun AddShoppingItemDialog(
 private fun SearchPhase(
     products: List<Product>,
     archivedProducts: List<Product>,
+    suggestions: List<OneOffSuggestion>,
     onSelect: (productId: String) -> Unit,
     onCreateProduct: (name: String) -> Unit,
     onBuyOneOff: (name: String) -> Unit,
+    onPickSuggestion: (OneOffSuggestion) -> Unit,
+    onForgetSuggestion: (name: String) -> Unit,
 ) {
     // The search stays even with an empty pantry: typing a name and creating it
     // here is the shortest way out of "no products yet", better than a sign
@@ -375,6 +398,18 @@ private fun SearchPhase(
         it.name.trim().equals(query.trim(), ignoreCase = true)
     }
     val offerOneOff = query.isNotBlank() && !exactMatch
+    // Things bought once before. Filtered like the products; with an empty
+    // search only the head of the list, because this is a memory aid, not an
+    // inventory — a hundred old words would bury the pantry below them.
+    val visibleSuggestions = suggestions
+        .filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
+        // A name that has since become a product belongs to the products: the
+        // pantry is the better answer, and offering both would be offering a
+        // choice with no meaning behind it.
+        .filterNot { suggestion ->
+            (products + archivedProducts).any { it.name.trim().equals(suggestion.name, true) }
+        }
+        .take(if (query.isBlank()) EMPTY_QUERY_SUGGESTIONS else Int.MAX_VALUE)
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -402,6 +437,26 @@ private fun SearchPhase(
                 )
             }
         }
+        // Below the products, above the escape hatch: a thing bought before is
+        // a better guess than a name typed from scratch, and a worse one than
+        // something the pantry actually keeps.
+        if (visibleSuggestions.isNotEmpty()) {
+            item(key = "one-off-header") {
+                Text(
+                    text = stringResource(R.string.picker_one_off_section),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            items(visibleSuggestions, key = { "one-off-${it.name}" }) { suggestion ->
+                OneOffSuggestionRow(
+                    suggestion = suggestion,
+                    onClick = { onPickSuggestion(suggestion) },
+                    onForget = { onForgetSuggestion(suggestion.name) },
+                )
+            }
+        }
         if (offerOneOff) {
             item(key = "one-off") {
                 OutlinedButton(
@@ -414,3 +469,50 @@ private fun SearchPhase(
         }
     }
 }
+
+/**
+ * A name bought once before. Deliberately plainer than a product row — no
+ * quantity, no section emoji — because choosing it does not touch the pantry:
+ * it writes another line that will leave the list at checkout, exactly as the
+ * first one did.
+ */
+@Composable
+private fun OneOffSuggestionRow(
+    suggestion: OneOffSuggestion,
+    onClick: () -> Unit,
+    onForget: () -> Unit,
+) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
+                Text(text = suggestion.name, style = MaterialTheme.typography.bodyLarge)
+                // The unit comes back with the name because retyping "g" every
+                // time is the tedious half; the amount does not, because how
+                // many you wanted was true of one trip.
+                if (suggestion.unit != null) {
+                    Text(
+                        text = suggestion.unit,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            IconButton(onClick = onForget) {
+                Icon(
+                    imageVector = Icons.Default.Clear,
+                    contentDescription = stringResource(
+                        R.string.picker_one_off_forget,
+                        suggestion.name,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+// With no search typed, how many remembered names to show before the list
+// stops being a hint and starts being a second pantry.
+private const val EMPTY_QUERY_SUGGESTIONS = 8

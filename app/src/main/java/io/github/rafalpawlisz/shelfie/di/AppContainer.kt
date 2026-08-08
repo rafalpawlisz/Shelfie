@@ -76,6 +76,7 @@ class AppContainer(private val context: Context) {
             items = database.shoppingListDao().observeAllItemRows(),
             listOrders = database.shoppingListDao().observeAllOrderRows(),
             barcodes = database.productBarcodeDao().observeAll(),
+            oneOffSuggestions = database.oneOffSuggestionDao().observeAll(),
             writer = FirestoreSyncWriter(),
             remote = FirestoreRemoteSource(),
             applier = SyncApplier(
@@ -83,6 +84,7 @@ class AppContainer(private val context: Context) {
                     productDao = database.productDao(),
                     shoppingListDao = database.shoppingListDao(),
                     barcodeDao = database.productBarcodeDao(),
+                    suggestionDao = database.oneOffSuggestionDao(),
                 ),
             ),
             syncState = syncStateStore,
@@ -116,7 +118,12 @@ class AppContainer(private val context: Context) {
     }
 
     val shoppingListRepository: ShoppingListRepository by lazy {
-        OfflineShoppingListRepository(database.shoppingListDao(), syncEngine, syncClock)
+        OfflineShoppingListRepository(
+            database.shoppingListDao(),
+            database.oneOffSuggestionDao(),
+            syncEngine,
+            syncClock,
+        )
     }
 
     val barcodeRepository: BarcodeRepository by lazy {

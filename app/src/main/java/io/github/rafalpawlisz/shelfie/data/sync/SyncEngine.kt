@@ -6,6 +6,10 @@ enum class SyncCollection(val path: String) {
     LISTS("lists"),
     ITEMS("items"),
     BARCODES("barcodes"),
+    // Names bought once before, kept so the picker can offer them again. Shared:
+    // while a one-off sits on a list both phones see it, so a history only one
+    // of them remembered would be an odd half-shared thing.
+    ONE_OFF_SUGGESTIONS("oneOffSuggestions"),
     LIST_ORDER("listOrder"),
 }
 

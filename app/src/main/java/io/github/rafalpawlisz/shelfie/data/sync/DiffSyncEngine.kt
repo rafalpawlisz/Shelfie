@@ -1,5 +1,6 @@
 package io.github.rafalpawlisz.shelfie.data.sync
 
+import io.github.rafalpawlisz.shelfie.data.local.OneOffSuggestionEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductBarcodeEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductListOrderEntity
@@ -53,6 +54,7 @@ class DiffSyncEngine(
     private val items: Flow<List<ShoppingListItemEntity>>,
     private val listOrders: Flow<List<ProductListOrderEntity>>,
     private val barcodes: Flow<List<ProductBarcodeEntity>>,
+    private val oneOffSuggestions: Flow<List<OneOffSuggestionEntity>>,
     private val writer: SyncWriter,
     private val remote: RemoteSource,
     private val applier: SyncApplier,
@@ -201,6 +203,13 @@ class DiffSyncEngine(
             ProductListOrderEntity::toSyncDoc,
         )
         mirror(hid, SyncCollection.BARCODES, barcodes, { it.barcode }, ProductBarcodeEntity::toSyncDoc)
+        mirror(
+            hid,
+            SyncCollection.ONE_OFF_SUGGESTIONS,
+            oneOffSuggestions,
+            { it.id },
+            OneOffSuggestionEntity::toSyncDoc,
+        )
     }
 
     private fun <T> CoroutineScope.mirror(
@@ -250,6 +259,8 @@ class DiffSyncEngine(
             SyncCollection.ITEMS,
             SyncCollection.LIST_ORDER,
             SyncCollection.BARCODES,
+            // No foreign keys of its own, so its place in the order is free.
+            SyncCollection.ONE_OFF_SUGGESTIONS,
         )
     }
 }
