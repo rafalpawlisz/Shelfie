@@ -3,6 +3,8 @@ package io.github.rafalpawlisz.shelfie.sync
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.data.local.ProductEntity
 import io.github.rafalpawlisz.shelfie.data.local.OneOffSuggestionEntity
+import io.github.rafalpawlisz.shelfie.data.sync.RemoteDoc
+import io.github.rafalpawlisz.shelfie.data.sync.toSyncDoc
 import io.github.rafalpawlisz.shelfie.data.local.ProductBarcodeEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductListOrderEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
@@ -31,6 +33,7 @@ class DiffSyncEngineTest {
     private class Harness(scope: TestScope) {
         val householdIds = MutableStateFlow<String?>(null)
         val products = MutableStateFlow<List<ProductEntity>>(emptyList())
+        val items = MutableStateFlow<List<ShoppingListItemEntity>>(emptyList())
         val writer = RecordingSyncWriter()
         val remote = FakeRemoteSource()
         val store = FakeSyncLocalStore()
@@ -39,7 +42,7 @@ class DiffSyncEngineTest {
             householdIds = householdIds,
             products = products,
             lists = MutableStateFlow<List<ShoppingListEntity>>(emptyList()),
-            items = MutableStateFlow<List<ShoppingListItemEntity>>(emptyList()),
+            items = items,
             listOrders = MutableStateFlow<List<ProductListOrderEntity>>(emptyList()),
             barcodes = MutableStateFlow<List<ProductBarcodeEntity>>(emptyList()),
             oneOffSuggestions = MutableStateFlow<List<OneOffSuggestionEntity>>(emptyList()),
@@ -65,11 +68,18 @@ class DiffSyncEngineTest {
          * a collection added later and forgotten here would hang every test in
          * this class with no hint as to why.
          */
-        suspend fun emitInitials(products: List<io.github.rafalpawlisz.shelfie.data.sync.RemoteDoc> = emptyList()) {
+        suspend fun emitInitials(
+            products: List<io.github.rafalpawlisz.shelfie.data.sync.RemoteDoc> = emptyList(),
+            items: List<io.github.rafalpawlisz.shelfie.data.sync.RemoteDoc> = emptyList(),
+        ) {
             for (collection in SyncCollection.entries) {
                 remote.emitInitial(
                     collection,
-                    if (collection == SyncCollection.PRODUCTS) products else emptyList(),
+                    when (collection) {
+                        SyncCollection.PRODUCTS -> products
+                        SyncCollection.ITEMS -> items
+                        else -> emptyList()
+                    },
                 )
             }
         }
@@ -87,6 +97,109 @@ class DiffSyncEngineTest {
         notes = null,
         emoji = null,
     )
+
+    private fun item(id: String, updatedAt: Long) = ShoppingListItemEntity(
+        id = id,
+        listId = "l1",
+        productId = "p1",
+        name = null,
+        amount = 2,
+        unit = null,
+        position = null,
+        note = null,
+        checkedAt = null,
+        createdAt = 0,
+        updatedAt = updatedAt,
+    )
+
+    /**
+     * The entity as the server would hand it back: Firestore has no 32-bit
+     * integer, so every Int returns a Long. A seed built without that detour
+     * would compare equal for the wrong reason and prove nothing.
+     */
+    private fun asServerReturnedIt(id: String, doc: Map<String, Any?>) = RemoteDoc(
+        id,
+        doc.mapValues { (_, value) -> if (value is Int) value.toLong() else value },
+    )
+
+    @Test
+    fun `a session start does not re-push what the server already has`() = runTest {
+        // The resurrection bug, in its smallest form. The push diff started
+        // empty every session, so the first Room emission wrote every local row
+        // back — including rows another device had just deleted.
+        val h = Harness(this)
+        h.items.value = listOf(item("i1", updatedAt = 5))
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(items = listOf(asServerReturnedIt("i1", item("i1", 5).toSyncDoc())))
+        runCurrent()
+
+        assertTrue(
+            "nothing to say: the server has this row already, got ${h.writer.sets}",
+            h.writer.sets.none { it.collection == SyncCollection.ITEMS },
+        )
+    }
+
+    @Test
+    fun `a row deleted on another device stays deleted`() = runTest {
+        // The reported case, end to end. A finishes shopping and closes the app
+        // before the deletions reach the server; B opens the app while the rows
+        // are still there, then the deletion arrives. B must not write them back
+        // — that is what put the finished shopping back on A's phone.
+        val h = Harness(this)
+        h.items.value = listOf(item("i1", updatedAt = 5))
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(items = listOf(asServerReturnedIt("i1", item("i1", 5).toSyncDoc())))
+        runCurrent()
+
+        // A's deletion lands.
+        h.remote.emitChange(SyncCollection.ITEMS, allDocs = emptyList(), removedIds = listOf("i1"))
+        runCurrent()
+        // Room reacts to the applied deletion: the row leaves the local flow.
+        h.items.value = emptyList()
+        runCurrent()
+
+        assertTrue(
+            "the deleted row was written back: ${h.writer.sets}",
+            h.writer.sets.none { it.collection == SyncCollection.ITEMS },
+        )
+    }
+
+    @Test
+    fun `a row the server does not have is still pushed`() = runTest {
+        // The other half of the seeding: it must not turn into "never push".
+        val h = Harness(this)
+        h.items.value = listOf(item("i2", updatedAt = 7))
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(items = listOf(asServerReturnedIt("i1", item("i1", 5).toSyncDoc())))
+        runCurrent()
+
+        assertEquals(
+            listOf("i2"),
+            h.writer.sets.filter { it.collection == SyncCollection.ITEMS }.map { it.docId },
+        )
+    }
+
+    @Test
+    fun `an edit to a row the server has is pushed`() = runTest {
+        // And the seed must not freeze a row: changing it locally still writes.
+        val h = Harness(this)
+        h.items.value = listOf(item("i1", updatedAt = 5))
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(items = listOf(asServerReturnedIt("i1", item("i1", 5).toSyncDoc())))
+        runCurrent()
+
+        h.items.value = listOf(item("i1", updatedAt = 9))
+        runCurrent()
+
+        assertEquals(
+            listOf("i1"),
+            h.writer.sets.filter { it.collection == SyncCollection.ITEMS }.map { it.docId },
+        )
+    }
 
     @Test
     fun `no household means no writes`() = runTest {

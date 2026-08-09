@@ -41,11 +41,12 @@ import kotlinx.coroutines.supervisorScope
  *
  * Echoes terminate but are not free. A pushed document comes back with an
  * equal updatedAt, so the LWW upsert drops it — that side is silent. The other
- * side is not: the push diff compares against what THIS device pushed, so a
- * row applied from a pull looks new and is written straight back, which costs
- * one redundant write per pulled change (plus a full re-push of every row when
- * a session starts). Correctness is unaffected; seeding the diff cache from
- * applied documents is the outstanding fix.
+ * side costs one redundant write per pulled change, because the push diff
+ * compares against what THIS device pushed and a row applied from a pull looks
+ * new. The session-start case of that was not merely a cost: an empty diff
+ * cache re-pushed every local row, which resurrected rows another device had
+ * deleted meanwhile. The cache is now seeded from the first server snapshot
+ * (see [mirror]); the per-change echo is still outstanding.
  */
 class DiffSyncEngine(
     private val householdIds: Flow<String?>,
@@ -191,45 +192,93 @@ class DiffSyncEngine(
             }
         }
 
-        // 3) Push mirrors.
-        mirror(hid, SyncCollection.PRODUCTS, products, { it.id }, ProductEntity::toSyncDoc)
-        mirror(hid, SyncCollection.LISTS, lists, { it.id }, ShoppingListEntity::toSyncDoc)
-        mirror(hid, SyncCollection.ITEMS, items, { it.id }, ShoppingListItemEntity::toSyncDoc)
+        // 3) Push mirrors, each seeded with what the server already holds.
+        fun seedOf(collection: SyncCollection) = initials.getValue(collection).docs
+        mirror(
+            hid,
+            SyncCollection.PRODUCTS,
+            products,
+            seedOf(SyncCollection.PRODUCTS),
+            { it.id },
+            ProductEntity::toSyncDoc,
+        )
+        mirror(
+            hid,
+            SyncCollection.LISTS,
+            lists,
+            seedOf(SyncCollection.LISTS),
+            { it.id },
+            ShoppingListEntity::toSyncDoc,
+        )
+        mirror(
+            hid,
+            SyncCollection.ITEMS,
+            items,
+            seedOf(SyncCollection.ITEMS),
+            { it.id },
+            ShoppingListItemEntity::toSyncDoc,
+        )
         mirror(
             hid,
             SyncCollection.LIST_ORDER,
             listOrders,
+            seedOf(SyncCollection.LIST_ORDER),
             { listOrderDocId(it.listId, it.productId) },
             ProductListOrderEntity::toSyncDoc,
         )
-        mirror(hid, SyncCollection.BARCODES, barcodes, { it.barcode }, ProductBarcodeEntity::toSyncDoc)
+        mirror(
+            hid,
+            SyncCollection.BARCODES,
+            barcodes,
+            seedOf(SyncCollection.BARCODES),
+            { it.barcode },
+            ProductBarcodeEntity::toSyncDoc,
+        )
         mirror(
             hid,
             SyncCollection.ONE_OFF_SUGGESTIONS,
             oneOffSuggestions,
+            seedOf(SyncCollection.ONE_OFF_SUGGESTIONS),
             { it.id },
             OneOffSuggestionEntity::toSyncDoc,
         )
     }
 
+    /**
+     * Mirrors a table to its collection, writing only what the server does not
+     * already have.
+     *
+     * [seed] is the session's first server snapshot, and it is what makes a
+     * deletion stick. Starting from an empty cache, the first Room emission
+     * re-pushed EVERY local row — so a device that still held a row another
+     * device had just deleted wrote it straight back, and the deletion was
+     * undone for everyone. (A deletion here is a document disappearing, not a
+     * recorded fact: nothing tells this device the row was deleted rather than
+     * never known.) Seeded, an unchanged row is recognised as already-present
+     * and left alone; when the removal arrives, the pull deletes it locally and
+     * the mirror has nothing to resurrect.
+     */
     private fun <T> CoroutineScope.mirror(
         hid: String,
         collection: SyncCollection,
         rows: Flow<List<T>>,
+        seed: List<RemoteDoc>,
         docId: (T) -> String,
         toDoc: (T) -> Map<String, Any?>,
     ) {
         launch {
             val lastPushed = mutableMapOf<String, Map<String, Any?>>()
+            for (doc in seed) lastPushed[doc.id] = comparable(doc.data)
             rows.collect { snapshot ->
                 val seen = mutableSetOf<String>()
                 for (row in snapshot) {
                     val id = docId(row)
                     seen += id
                     val doc = toDoc(row)
-                    if (lastPushed[id] != doc) {
+                    val key = comparable(doc)
+                    if (lastPushed[id] != key) {
                         writer.set(hid, collection, id, doc)
-                        lastPushed[id] = doc
+                        lastPushed[id] = key
                     }
                 }
                 // Rows gone from Room (deletions went through onDeleted) must
@@ -239,6 +288,20 @@ class DiffSyncEngine(
             }
         }
     }
+
+    /**
+     * A document in a form that survives the round trip, so a local row can be
+     * compared with what the server returned.
+     *
+     * Firestore has no 32-bit integer: an Int goes up and comes back a Long.
+     * Comparing the raw maps would call every row with an amount or a quantity
+     * "changed" and push it anyway — the seeding above would look like it
+     * worked while doing nothing. Deliberately conservative: only exact matches
+     * of everything else count as equal, because a wrongly-equal document
+     * SKIPS a push (data lost), while a wrongly-different one merely costs one.
+     */
+    private fun comparable(data: Map<String, Any?>): Map<String, Any?> =
+        data.mapValues { (_, value) -> if (value is Int) value.toLong() else value }
 
     /** Skips cache-served snapshots; only the server's view may drive a reconcile. */
     private suspend fun Channel<RemoteSnapshot>.firstFromServer(): RemoteSnapshot {
