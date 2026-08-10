@@ -93,9 +93,12 @@ fun AddShoppingItemDialog(
     }
     // A one-off in the making: the typed name, promoted to the amount step.
     var oneOffName by rememberSaveable(preselectProductId) { mutableStateOf<String?>(null) }
-    // Set only when that name came from a remembered one, carrying the unit it
-    // was bought with last time; null for a name typed fresh.
-    var suggestedUnit by rememberSaveable(preselectProductId) { mutableStateOf<String?>(null) }
+    // Derived, not remembered alongside the name. Held as its own state it was
+    // set when a suggestion was picked and never cleared, so a name typed fresh
+    // afterwards arrived at the amount step wearing the previous suggestion's
+    // unit — "wiadro" measured in grams. Two values that must agree are one
+    // value; asking the history what it knows about THIS name cannot disagree.
+    val rememberedUnit = rememberedUnitFor(oneOffName, suggestions)
     val selectedProduct = products.firstOrNull { it.id == selectedProductId }
         ?: archivedProducts.firstOrNull { it.id == selectedProductId }
     val selectedIsArchived = archivedProducts.any { it.id == selectedProductId }
@@ -157,7 +160,7 @@ fun AddShoppingItemDialog(
             // field here — its unit is part of the product. Pre-filled when the
             // name came from a suggestion.
             var unitText by rememberSaveable(selectedProductId, oneOffName) {
-                mutableStateOf(suggestedUnit.orEmpty())
+                mutableStateOf(rememberedUnit.orEmpty())
             }
             val amount = amountText.trim().toIntOrNull()
             val amountValid = amountText.isBlank() || (amount != null && amount > 0)
@@ -238,13 +241,10 @@ fun AddShoppingItemDialog(
                                 onSelect = { selectedProductId = it },
                                 onCreateProduct = onCreateProduct,
                                 onBuyOneOff = { oneOffName = it },
-                                onPickSuggestion = { suggestion ->
-                                    // Straight to the amount step under the
-                                    // remembered name, with its unit already in
-                                    // place — the whole point of remembering it.
-                                    oneOffName = suggestion.name
-                                    suggestedUnit = suggestion.unit
-                                },
+                                // Straight to the amount step under the
+                                // remembered name; its unit follows from the
+                                // name via [rememberedUnitFor].
+                                onPickSuggestion = { suggestion -> oneOffName = suggestion.name },
                                 onForgetSuggestion = onForgetSuggestion,
                             )
                         }
@@ -523,3 +523,19 @@ private fun OneOffSuggestionRow(
 // With no search typed, how many remembered names to show before the list
 // stops being a hint and starts being a second pantry.
 private const val EMPTY_QUERY_SUGGESTIONS = 8
+
+/**
+ * The unit this name was last bought with, or null if the history has never
+ * seen it.
+ *
+ * A function of the name rather than a decision made when a suggestion was
+ * tapped: the picker offers two routes to the amount step — a remembered name
+ * and a freshly typed one — and a unit carried along the first route used to
+ * survive into the second. Matching is loose in the same way the history's own
+ * identity is, so typing a name it already knows pre-fills the unit too, which
+ * is the same answer picking it would have given.
+ */
+internal fun rememberedUnitFor(name: String?, suggestions: List<OneOffSuggestion>): String? {
+    val wanted = name?.trim() ?: return null
+    return suggestions.firstOrNull { it.name.trim().equals(wanted, ignoreCase = true) }?.unit
+}
