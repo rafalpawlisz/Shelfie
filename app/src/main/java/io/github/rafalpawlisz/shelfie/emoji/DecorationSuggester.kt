@@ -97,7 +97,7 @@ object DecorationSuggester {
         "🧂" to listOf("sol", "salt", "przyprawa", "przyprawy", "pieprz", "papryka slodka", "oregano", "bazylia", "curry", "cynamon"),
         "🫙" to listOf("dzem", "konfitura", "miod", "honey", "nutella", "krem"),
         "🍯" to listOf("syrop", "maple"),
-        "🫗" to listOf("olej", "oliwa", "ocet", "oil"),
+        "🫗" to listOf("olej", "oliwa", "ocet", "oil", "tluszcz"),
         "🥜" to listOf("maslo orzechowe", "peanut"),
         "🍫" to listOf("czekolada", "chocolate", "kakao", "baton", "batony", "sniadaniowa"),
         "🍬" to listOf("cukierki", "zelki", "landrynki", "candy", "guma"),

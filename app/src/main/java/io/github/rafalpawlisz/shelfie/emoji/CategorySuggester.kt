@@ -122,7 +122,11 @@ object CategorySuggester {
             "sol", "salt", "przyprawa", "przyprawy", "pieprz", "papryka slodka",
             "oregano", "bazylia", "curry", "cynamon",
             "kminek", "gorczyca", "liscie laurowe", "ziele angielskie", "kurkuma", "chili",
-            "olej", "oliwa", "ocet", "oil",
+            // "tluszcz" is the head noun of "tłuszcz w sprayu", which had no
+            // known word in it at all. "spray" is deliberately NOT an entry: on
+            // its own it is a can, not a thing — glass cleaner and deodorant are
+            // sprays too, and guessing from it would file them here.
+            "olej", "oliwa", "ocet", "oil", "tluszcz",
             "sos", "ketchup", "keczup", "majonez", "musztarda", "sos sojowy",
         ),
         ProductCategory.SWEETS to listOf(

@@ -166,6 +166,21 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `cooking fat is filed with the oils, however it is packaged`() {
+        // Reported from real shopping: "tłuszcz w sprayu" matched nothing at
+        // all — unlike the other misses this was a plain gap, not a wrong hit;
+        // no word in the name was known.
+        assertEquals(ProductCategory.SPICES, CategorySuggester.suggest("tłuszcz w sprayu"))
+        assertEquals(ProductCategory.SPICES, CategorySuggester.suggest("tłuszcz"))
+        assertEquals(ProductCategory.SPICES, CategorySuggester.suggest("tłuszczu"))
+        // The packaging says nothing on its own: a spray is a can, and glass
+        // cleaner comes in one too. Left unknown on purpose.
+        assertNull(CategorySuggester.suggest("spray do szyb"))
+        // Rendered fat is a cold cut, and keeps its counter.
+        assertEquals(ProductCategory.MEAT, CategorySuggester.suggest("smalec"))
+    }
+
+    @Test
     fun `a ferment is filed by what it is, not by what it is made of`() {
         // Reported from real shopping: "zakwas z buraka" wore a carrot and sat
         // among the fresh vegetables. "zakwas" was unknown, so scanning left to

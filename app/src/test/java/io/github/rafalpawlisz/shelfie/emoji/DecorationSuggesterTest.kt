@@ -59,6 +59,12 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `cooking fat pours like the oils it sits with`() {
+        assertEquals("🫗", DecorationSuggester.suggest("tłuszcz w sprayu"))
+        assertEquals("🥓", DecorationSuggester.suggest("smalec"))
+    }
+
+    @Test
     fun `a beetroot ferment wears a drink, not the vegetable it came from`() {
         assertEquals("🧃", DecorationSuggester.suggest("zakwas z buraka"))
         assertEquals("🥫", DecorationSuggester.suggest("zakwas na żurek"))
