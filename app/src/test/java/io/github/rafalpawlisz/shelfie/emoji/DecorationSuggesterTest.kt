@@ -59,6 +59,13 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `a beetroot ferment wears a drink, not the vegetable it came from`() {
+        assertEquals("🧃", DecorationSuggester.suggest("zakwas z buraka"))
+        assertEquals("🥫", DecorationSuggester.suggest("zakwas na żurek"))
+        assertEquals("🥕", DecorationSuggester.suggest("buraki"))
+    }
+
+    @Test
     fun `chanterelles wear a mushroom, turmeric keeps its spice jar`() {
         assertEquals("🍄", DecorationSuggester.suggest("kurki"))
         assertEquals("🧂", DecorationSuggester.suggest("kurkuma"))

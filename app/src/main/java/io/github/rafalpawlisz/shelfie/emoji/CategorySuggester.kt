@@ -100,6 +100,9 @@ object CategorySuggester {
             "dzem", "konfitura", "miod", "honey", "nutella", "krem",
             "syrop", "maple", "maslo orzechowe", "peanut",
             "gulasz", "rosol", "barszcz", "krem z",
+            // Same word, other shelf: the rye starter is bottled among the
+            // soups, not with the drinks.
+            "zakwas na zurek", "zakwas zytni",
             "ogorki kiszone", "kapusta kiszona", "barszcz bialy", "chrzan", "cwikla",
             "fasolka po bretonsku", "kajmak", "ajvar", "pesto", "tahini",
             "oliwki", "olives", "korniszony", "passata", "koncentrat",
@@ -138,6 +141,11 @@ object CategorySuggester {
             "kawa", "coffee", "espresso", "cappuccino",
             "herbata", "tea", "zielona herbata", "napar", "ziola",
             "sok", "juice", "nektar", "napoj",
+            // The head noun of "zakwas z buraka", which without it handed the
+            // decision to "buraka" and filed a bottled drink with the fresh
+            // vegetables. The soup starter of the same name is a phrase below —
+            // phrases are matched first, so the two do not fight.
+            "zakwas",
             "cola", "pepsi", "lemoniada", "oranzada", "izotonik", "energetyk",
             "woda", "water", "mineralna", "gazowana",
             "kompot", "mus", "mus owocowy", "smoothie", "tonik", "woda kokosowa",

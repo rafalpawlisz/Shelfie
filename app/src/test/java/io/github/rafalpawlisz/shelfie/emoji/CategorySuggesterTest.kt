@@ -166,6 +166,23 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `a ferment is filed by what it is, not by what it is made of`() {
+        // Reported from real shopping: "zakwas z buraka" wore a carrot and sat
+        // among the fresh vegetables. "zakwas" was unknown, so scanning left to
+        // right handed the decision to "buraka" — the same shape as the red
+        // yeast rice supplement.
+        assertEquals(ProductCategory.DRINKS, CategorySuggester.suggest("zakwas z buraka"))
+        assertEquals(ProductCategory.DRINKS, CategorySuggester.suggest("zakwas buraczany"))
+        assertEquals(ProductCategory.DRINKS, CategorySuggester.suggest("zakwas"))
+        // The soup starter is the same word on another shelf; a phrase outranks
+        // a single word, which is what keeps the two apart.
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("zakwas na żurek"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("zakwas żytni"))
+        // The plain vegetable keeps its own aisle.
+        assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("buraki"))
+    }
+
+    @Test
     fun `electrolytes reach the medicine cabinet in every case ending`() {
         // Reported from real shopping on 2026-08-04: "elektrolity" fell through
         // to no section at all. All three forms ride one entry via the stemmer.

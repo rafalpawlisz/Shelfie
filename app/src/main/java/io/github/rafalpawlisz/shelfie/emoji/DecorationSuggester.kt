@@ -88,7 +88,12 @@ object DecorationSuggester {
         // Staples
         "🍚" to listOf("ryz", "rice"),
         "🍝" to listOf("makaron", "spaghetti", "pasta", "penne", "lazania", "kluski", "pierogi"),
-        "🥫" to listOf("konserwa", "puszka", "tunczyk w puszce", "zupa", "sos", "ketchup", "majonez", "musztarda"),
+        "🥫" to listOf(
+            "konserwa", "puszka", "tunczyk w puszce", "zupa", "sos", "ketchup", "majonez",
+            "musztarda",
+            // The soup starter, not the beetroot drink — see CategorySuggester.
+            "zakwas na zurek", "zakwas zytni",
+        ),
         "🧂" to listOf("sol", "salt", "przyprawa", "przyprawy", "pieprz", "papryka slodka", "oregano", "bazylia", "curry", "cynamon"),
         "🫙" to listOf("dzem", "konfitura", "miod", "honey", "nutella", "krem"),
         "🍯" to listOf("syrop", "maple"),
@@ -108,7 +113,7 @@ object DecorationSuggester {
         // Drinks
         "☕" to listOf("kawa", "coffee", "espresso", "cappuccino"),
         "🍵" to listOf("herbata", "tea", "zielona herbata", "napar", "ziola"),
-        "🧃" to listOf("sok", "juice", "nektar", "napoj"),
+        "🧃" to listOf("sok", "juice", "nektar", "napoj", "zakwas"),
         "🥤" to listOf("cola", "pepsi", "lemoniada", "oranzada", "izotonik", "energetyk"),
         "💧" to listOf("woda", "water", "mineralna", "gazowana"),
         "🍺" to listOf("piwo", "beer"),
