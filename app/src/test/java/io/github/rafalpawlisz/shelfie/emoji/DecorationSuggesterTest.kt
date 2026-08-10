@@ -59,6 +59,13 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `a cream you rub in looks nothing like one you spread`() {
+        assertEquals("🧴", DecorationSuggester.suggest("krem z filtrem"))
+        assertEquals("🧴", DecorationSuggester.suggest("krem do rąk"))
+        assertEquals("🫙", DecorationSuggester.suggest("krem czekoladowy"))
+    }
+
+    @Test
     fun `cooking fat pours like the oils it sits with`() {
         assertEquals("🫗", DecorationSuggester.suggest("tłuszcz w sprayu"))
         assertEquals("🥓", DecorationSuggester.suggest("smalec"))

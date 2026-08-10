@@ -125,7 +125,13 @@ object DecorationSuggester {
         "🧻" to listOf("papier toaletowy", "papier", "reczniki papierowe", "chusteczki", "chusteczka"),
         "🧼" to listOf("mydlo", "soap", "zel pod prysznic", "szampon", "odzywka", "balsam"),
         "🪥" to listOf("pasta do zebow", "szczoteczka", "nitka"),
-        "🧴" to listOf("plyn", "detergent", "plyn do naczyn", "kapsulki", "proszek", "ploczka", "krem do rak", "dezodorant"),
+        "🧴" to listOf(
+            "plyn", "detergent", "plyn do naczyn", "kapsulki", "proszek", "ploczka",
+            // The creams you rub in; the ones you spread on bread keep 🫙.
+            "krem do rak", "krem do twarzy", "krem do ciala", "krem pod oczy",
+            "krem nawilzajacy", "krem z filtrem",
+            "dezodorant",
+        ),
         "🧹" to listOf("miotla", "zmiotka", "szufelka"),
         "🧽" to listOf("gabka", "zmywak", "sciereczka", "scierka"),
         "🗑️" to listOf("worki na smieci", "worki", "smieci"),

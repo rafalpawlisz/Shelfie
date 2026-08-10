@@ -99,7 +99,11 @@ object CategorySuggester {
             "konserwa", "puszka", "tunczyk w puszce", "zupa",
             "dzem", "konfitura", "miod", "honey", "nutella", "krem",
             "syrop", "maple", "maslo orzechowe", "peanut",
-            "gulasz", "rosol", "barszcz", "krem z",
+            // No "krem z" here. Phrases match as substrings, so it swallowed
+            // "krem z filtrem" — sunscreen filed with the soups. It also bought
+            // nothing: the plain word "krem" below already sends "krem z
+            // pieczarek" here, and the cosmetic ones are phrases under HYGIENE.
+            "gulasz", "rosol", "barszcz",
             // Same word, other shelf: the rye starter is bottled among the
             // soups, not with the drinks.
             "zakwas na zurek", "zakwas zytni",
@@ -185,7 +189,13 @@ object CategorySuggester {
             // is exactly how it outranks it.
             "plyn dentystyczny", "plyn do plukania ust", "plyn do plukania jamy ustnej",
             "plyn do ust", "listerine",
-            "krem do rak", "dezodorant", "maszynka", "zyletki", "golenie",
+            // A cream is a jar of something to eat or a tube of something to
+            // rub in, and the word alone leans grocery ("krem" sits with the
+            // spreads). The cosmetics come in as phrases, which outrank a word,
+            // so each of these beats the spread without arguing with it.
+            "krem do rak", "krem do twarzy", "krem do ciala", "krem pod oczy",
+            "krem nawilzajacy", "krem z filtrem",
+            "dezodorant", "maszynka", "zyletki", "golenie",
             "podpaski", "tampony", "wkladki",
             "pieluchy", "pieluszki", "butelka dla dziecka",
         ),

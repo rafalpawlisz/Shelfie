@@ -166,6 +166,21 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `a cream is told apart by what follows it, not by a greedy phrase`() {
+        // "krem z" was a phrase, and phrases match as substrings — so sunscreen
+        // went to the jars aisle behind the soups. The word "krem" already sent
+        // the soups there, so the phrase bought nothing and cost this.
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("krem z filtrem"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("krem nawilżający"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("krem do twarzy"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("krem pod oczy"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("krem do rąk"))
+        // The edible ones stay where they were: the soup and the spread.
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("krem z pieczarek"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("krem czekoladowy"))
+    }
+
+    @Test
     fun `cooking fat is filed with the oils, however it is packaged`() {
         // Reported from real shopping: "tłuszcz w sprayu" matched nothing at
         // all — unlike the other misses this was a plain gap, not a wrong hit;
