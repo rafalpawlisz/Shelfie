@@ -70,6 +70,21 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `a paste wears what it is made of, not a bowl of noodles`() {
+        assertEquals("🌰", DecorationSuggester.suggest("pasta z prażonych migdałów"))
+        assertEquals("🪥", DecorationSuggester.suggest("pasta do zębów"))
+        assertEquals("🍝", DecorationSuggester.suggest("makaron"))
+    }
+
+    @Test
+    fun `paper you eat is not paper you clean with`() {
+        assertEquals("🫓", DecorationSuggester.suggest("papier do sajgonek"))
+        assertEquals("🫓", DecorationSuggester.suggest("papier ryżowy"))
+        assertEquals("🧻", DecorationSuggester.suggest("papier toaletowy"))
+        assertEquals("🧻", DecorationSuggester.suggest("papier do pieczenia"))
+    }
+
+    @Test
     fun `a cream you rub in looks nothing like one you spread`() {
         assertEquals("🧴", DecorationSuggester.suggest("krem z filtrem"))
         assertEquals("🧴", DecorationSuggester.suggest("krem do rąk"))

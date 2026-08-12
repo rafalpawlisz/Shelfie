@@ -118,7 +118,17 @@ object CategorySuggester {
         ),
         ProductCategory.DRY_GOODS to listOf(
             "maka", "flour", "kasza", "otreby", "zarno", "grys", "ryz", "rice",
-            "makaron", "spaghetti", "pasta", "penne", "lazania", "kluski",
+            // Rice paper, as phrases only. The bare word "papier" is a good bet
+            // for the cleaning aisle and stays there — unlike "pasta" below, it
+            // is not worth losing. "sajgonki" is not a word entry either: bought
+            // ready-made they are frozen, so the word alone would mislead.
+            "papier ryzowy", "papier do sajgonek",
+            // No "pasta". On a Polish list that word is far more often a spread
+            // than macaroni, and standing first it outranked the word that says
+            // what is actually in the jar: "pasta z prażonych migdałów" came
+            // here instead of following "migdałów" to the nuts. Real macaroni is
+            // still covered by the words below — Polish for it is "makaron".
+            "makaron", "spaghetti", "penne", "lazania", "kluski",
             "platki", "musli", "granola", "owsianka",
             "fasola", "ciecierzyca", "soczewica", "beans", "groch",
             "kuskus", "bulgur", "quinoa", "komosa", "kasza gryczana", "platki owsiane",

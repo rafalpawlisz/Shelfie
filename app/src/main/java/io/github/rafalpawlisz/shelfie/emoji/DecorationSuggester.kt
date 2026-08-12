@@ -38,7 +38,12 @@ object DecorationSuggester {
         "🍞" to listOf("chleb", "bread", "bulka", "bulki", "pieczywo", "tost", "tosty", "chalka"),
         "🥐" to listOf("croissant", "rogal", "rogalik", "drozdzowka"),
         "🥨" to listOf("precel", "paluszki", "krakersy"),
-        "🫓" to listOf("tortilla", "pita", "lawasz", "nalesniki", "placki"),
+        // Rice paper is a flat wrapper like the rest of these. Phrases only, so
+        // the plain "papier" keeps its toilet roll further down.
+        "🫓" to listOf(
+            "tortilla", "pita", "lawasz", "nalesniki", "placki",
+            "papier ryzowy", "papier do sajgonek",
+        ),
         "🌾" to listOf("maka", "flour", "kasza", "otreby", "zarno", "grys"),
         "🍰" to listOf("ciasto", "ciastka", "ciastko", "herbatniki", "cake", "biszkopty", "sernik"),
         "🍪" to listOf("kruche", "cookies", "pierniki"),
@@ -87,7 +92,9 @@ object DecorationSuggester {
         "🌰" to listOf("orzechy", "orzech", "migdaly", "nerkowce", "nuts", "pistacje", "nasiona", "pestki"),
         // Staples
         "🍚" to listOf("ryz", "rice"),
-        "🍝" to listOf("makaron", "spaghetti", "pasta", "penne", "lazania", "kluski", "pierogi"),
+        // No "pasta" — see the section dictionary. It wore a bowl of spaghetti
+        // on almond butter; the toothpaste above is a phrase and is unaffected.
+        "🍝" to listOf("makaron", "spaghetti", "penne", "lazania", "kluski", "pierogi"),
         "🥫" to listOf(
             "konserwa", "puszka", "tunczyk w puszce", "zupa", "sos", "ketchup", "majonez",
             "musztarda",

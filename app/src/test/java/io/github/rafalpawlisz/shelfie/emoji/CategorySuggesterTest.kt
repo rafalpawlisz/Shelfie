@@ -199,6 +199,33 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `a paste follows what it is made of, not the noodles`() {
+        // "pasta" was a word here, so it decided first and sent almond butter to
+        // the noodles. Dropping it hands the name to "migdałów", which is the
+        // one word in it that says anything.
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("pasta z prażonych migdałów"))
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("migdały"))
+        // What the removal costs, and what it does not: bare "pasta" now means
+        // nothing on its own, which is honest — it is three different products.
+        // Toothpaste is a phrase and never depended on the word.
+        assertNull(CategorySuggester.suggest("pasta"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("pasta do zębów"))
+        assertEquals(ProductCategory.DRY_GOODS, CategorySuggester.suggest("makaron świderki"))
+        assertEquals(ProductCategory.DRY_GOODS, CategorySuggester.suggest("penne"))
+    }
+
+    @Test
+    fun `paper you eat is not paper you clean with`() {
+        // Here the general word is worth keeping — "papier" alone really is the
+        // paper aisle — so the exception is a phrase, not a removal.
+        assertEquals(ProductCategory.DRY_GOODS, CategorySuggester.suggest("papier do sajgonek"))
+        assertEquals(ProductCategory.DRY_GOODS, CategorySuggester.suggest("papier ryżowy"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("papier"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("papier toaletowy"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("papier do pieczenia"))
+    }
+
+    @Test
     fun `a cream is told apart by what follows it, not by a greedy phrase`() {
         // "krem z" was a phrase, and phrases match as substrings — so sunscreen
         // went to the jars aisle behind the soups. The word "krem" already sent
