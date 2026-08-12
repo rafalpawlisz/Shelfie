@@ -125,6 +125,7 @@
     <string name="section_order_title">Aisle order — %1$s</string>
     <string name="action_restore_default">Default</string>
     <string name="category_from_name">From the name: %1$s</string>
+    <string name="category_name_unknown">The name suggests nothing — pick a section yourself</string>
     <string name="category_produce">Fruit &amp; vegetables</string>
     <string name="category_bread">Bread &amp; bakery</string>
     <string name="category_dairy">Dairy &amp; eggs</string>

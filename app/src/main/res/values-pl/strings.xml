@@ -118,6 +118,7 @@
     <string name="section_order_title">Kolejność działów — %1$s</string>
     <string name="action_restore_default">Domyślna</string>
     <string name="category_from_name">Z nazwy: %1$s</string>
+    <string name="category_name_unknown">Nazwa nic nie podpowiada — wybierz dział sam</string>
     <string name="category_produce">Owoce i warzywa</string>
     <string name="category_bread">Pieczywo</string>
     <string name="category_dairy">Nabiał i jaja</string>

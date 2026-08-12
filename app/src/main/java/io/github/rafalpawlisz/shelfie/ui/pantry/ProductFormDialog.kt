@@ -260,6 +260,7 @@ fun ProductFormDialog(
                     // whole point is that both phones sort the same aisle the
                     // same way. While untouched it follows the typed name.
                     CategoryPickerField(
+                        name = name,
                         selectedEmoji = shownEmoji,
                         // Below the box, not inside the field: the field carries
                         // the dropdown's anchor, and Material measures a
@@ -427,6 +428,40 @@ fun ProductFormDialog(
     }
 }
 
+/** What the line under the section field says, when it says anything. */
+internal sealed interface SectionNote {
+    /** The name implies a section other than the one shown. */
+    data class FromName(val category: ProductCategory) : SectionNote
+
+    /** The name is typed and the dictionary has never met it. */
+    data object NameUnknown : SectionNote
+}
+
+/**
+ * Which note belongs under the section field.
+ *
+ * A rule small enough to be tempting to inline and easy to break by accident,
+ * so it lives out here where a test can hold it still. `suggestion` is null both
+ * before anything is typed and when the dictionary has nothing to say, which is
+ * why the name is needed to tell those two apart.
+ */
+internal fun sectionNoteFor(
+    name: String,
+    selectedEmoji: String,
+    suggestion: ProductCategory?,
+): SectionNote? = when {
+    // Only when the two disagree: when the field already shows what the name
+    // implies, repeating it is noise.
+    suggestion != null ->
+        SectionNote.FromName(suggestion).takeIf { suggestion.emoji != selectedEmoji.trim() }
+    // Said out loud because nothing else in the form says it: the section stayed
+    // empty because the name means nothing to the dictionary, and it will stay
+    // empty next time and on the other phone too. This is how the gaps get
+    // noticed here rather than in the shop.
+    name.isNotBlank() -> SectionNote.NameUnknown
+    else -> null
+}
+
 /**
  * The store-section picker: a read-only field opening the closed list. A
  * legacy emoji (from before sections) shows as itself with no name; picking
@@ -435,6 +470,9 @@ fun ProductFormDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CategoryPickerField(
+    // Only to tell "nothing typed yet" from "typed, and unrecognised" — the
+    // suggestion is null in both cases.
+    name: String,
     selectedEmoji: String,
     suggestion: ProductCategory?,
     onPick: (ProductCategory?) -> Unit,
@@ -446,9 +484,7 @@ private fun CategoryPickerField(
         selectedEmoji.isNotBlank() -> selectedEmoji
         else -> stringResource(R.string.category_none)
     }
-    // Only when the two disagree: when the field already shows what the name
-    // implies, repeating it is noise.
-    val differingSuggestion = suggestion?.takeIf { it.emoji != selectedEmoji.trim() }
+    val note = sectionNoteFor(name, selectedEmoji, suggestion)
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it },
@@ -486,12 +522,15 @@ private fun CategoryPickerField(
             }
         }
     }
-    if (differingSuggestion != null) {
+    if (note != null) {
         Text(
-            text = stringResource(
-                R.string.category_from_name,
-                "${differingSuggestion.emoji}  ${stringResource(differingSuggestion.nameRes)}",
-            ),
+            text = when (note) {
+                is SectionNote.FromName -> stringResource(
+                    R.string.category_from_name,
+                    "${note.category.emoji}  ${stringResource(note.category.nameRes)}",
+                )
+                SectionNote.NameUnknown -> stringResource(R.string.category_name_unknown)
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 16.dp),
