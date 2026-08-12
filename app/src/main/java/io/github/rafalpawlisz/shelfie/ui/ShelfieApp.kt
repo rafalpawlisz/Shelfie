@@ -359,8 +359,8 @@ fun ShelfieApp(
             },
             suggestions = state.oneOffSuggestions,
             onForgetSuggestion = viewModel::forgetOneOffSuggestion,
-            onConfirmOneOff = { name, amount, unit, note ->
-                viewModel.addOneOffToShoppingList(name, amount, unit, note)
+            onConfirmOneOff = { name, amount, unit, note, sectionEmoji ->
+                viewModel.addOneOffToShoppingList(name, amount, unit, note, sectionEmoji)
                 showAddToListDialog = false
                 newProductForListId = null
             },

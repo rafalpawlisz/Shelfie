@@ -49,6 +49,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.emoji.CategorySuggester
 import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
@@ -78,7 +79,15 @@ fun AddShoppingItemDialog(
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
     // A one-off: a line of text on the list, never a product. Confirmed from
     // the same amount step, under the typed name.
-    onConfirmOneOff: (name: String, amount: Int?, unit: String?, note: String?) -> Unit,
+    // sectionEmoji is null unless the section was picked by hand, which leaves
+    // the line reading its section out of its name as it always did.
+    onConfirmOneOff: (
+        name: String,
+        amount: Int?,
+        unit: String?,
+        note: String?,
+        sectionEmoji: String?,
+    ) -> Unit,
     // A name the pantry does not have yet: hands it to the product form, which
     // is the one place a product is created. The caller reopens this dialog
     // with the new product in [preselectProductId] once it exists.
@@ -162,6 +171,16 @@ fun AddShoppingItemDialog(
             var unitText by rememberSaveable(selectedProductId, oneOffName) {
                 mutableStateOf(rememberedUnit.orEmpty())
             }
+            // What the name implies, and whether anybody has disagreed with it.
+            // Kept apart the way the product form keeps them apart: an untouched
+            // pick is not stored at all, so the line goes on following the
+            // dictionary instead of freezing today's guess.
+            val suggestedSection = remember(oneOffName) {
+                oneOffName?.let { CategorySuggester.suggest(it) }
+            }
+            var sectionTouched by rememberSaveable(oneOffName) { mutableStateOf(false) }
+            var sectionEmoji by rememberSaveable(oneOffName) { mutableStateOf("") }
+            val shownSection = if (sectionTouched) sectionEmoji else suggestedSection?.emoji.orEmpty()
             val amount = amountText.trim().toIntOrNull()
             val amountValid = amountText.isBlank() || (amount != null && amount > 0)
 
@@ -204,6 +223,12 @@ fun AddShoppingItemDialog(
                                                 cleanAmount,
                                                 unitText.trim().ifBlank { null },
                                                 cleanNote,
+                                                // Only a pick is stored. Left
+                                                // alone, the line keeps asking
+                                                // its name, which is how a word
+                                                // added to the dictionary later
+                                                // still reaches it.
+                                                sectionEmoji.takeIf { sectionTouched },
                                             )
                                         }
                                     },
@@ -272,6 +297,22 @@ fun AddShoppingItemDialog(
                                 text = stringResource(R.string.picker_one_off_hint),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (oneOffName != null) {
+                            // The aisle this line will be walked in. Shown
+                            // because a guess nobody can see is a guess nobody
+                            // can correct — and the correcting happens here,
+                            // where the name is still in mind, rather than in
+                            // the shop where the line is already wrong.
+                            SectionPickerField(
+                                name = oneOffName.orEmpty(),
+                                selectedEmoji = shownSection,
+                                suggestion = suggestedSection,
+                                onPick = { category ->
+                                    sectionTouched = true
+                                    sectionEmoji = category?.emoji.orEmpty()
+                                },
                             )
                         }
                         if (oneOffName != null) {

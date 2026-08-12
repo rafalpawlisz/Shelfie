@@ -56,7 +56,14 @@ internal fun ListItems(
     plannedByProduct: Map<String, Set<String>>,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
-    onUpdateItem: (id: String, amount: Int?, unit: String?, note: String?, targetListId: String?) -> Unit,
+    onUpdateItem: (
+        id: String,
+        amount: Int?,
+        unit: String?,
+        note: String?,
+        targetListId: String?,
+        sectionEmoji: String?,
+    ) -> Unit,
     onCheckWithAmount: (id: String, amount: Int) -> Unit,
     // Returns whether the move was accepted and a write dispatched; the drag
     // mirror holds the dropped order only for a move that will echo back.
@@ -280,9 +287,13 @@ internal fun ListItems(
             // brings one in here to edit.
             initialUnit = editingItem.productUnit.takeIf { editingItem.productId == null },
             isOneOff = editingItem.productId == null,
+            name = editingItem.productName,
+            // The raw pick, not the section on show: telling them apart is what
+            // stops an amount edit from freezing a guess.
+            initialSectionEmoji = editingItem.sectionEmoji,
             initialNote = editingItem.note,
-            onConfirm = { amount, unit, note, targetListId ->
-                onUpdateItem(editingItem.id, amount, unit, note, targetListId)
+            onConfirm = { amount, unit, note, targetListId, sectionEmoji ->
+                onUpdateItem(editingItem.id, amount, unit, note, targetListId, sectionEmoji)
                 editingAmountItemId = null
             },
             onDismiss = { editingAmountItemId = null },

@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.emoji.CategorySuggester
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 
 @Composable
@@ -39,14 +40,38 @@ internal fun ItemEditDialog(
     // to the product, and is edited in the product form.
     initialUnit: String?,
     isOneOff: Boolean,
+    // The name, for the section picker: what the dictionary would answer, and
+    // the note under the field when it answers nothing.
+    name: String,
+    // What is actually stored on the row — null where nobody has picked a
+    // section, which is not the same as the section it currently displays.
+    initialSectionEmoji: String?,
     initialNote: String?,
-    onConfirm: (amount: Int?, unit: String?, note: String?, targetListId: String?) -> Unit,
+    onConfirm: (
+        amount: Int?,
+        unit: String?,
+        note: String?,
+        targetListId: String?,
+        sectionEmoji: String?,
+    ) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var amountText by rememberSaveable { mutableStateOf(initialAmount?.toString().orEmpty()) }
     var unitText by rememberSaveable { mutableStateOf(initialUnit.orEmpty()) }
     var noteText by rememberSaveable { mutableStateOf(initialNote.orEmpty()) }
     var targetListId by rememberSaveable { mutableStateOf(currentListId) }
+    // Same three states as everywhere else, and the reason for keeping the
+    // stored value apart from the displayed one: saving an untouched row must
+    // put back exactly what was there, or editing the amount of a line would
+    // silently freeze today's guess at its section into an answer.
+    val suggestedSection = remember(name) { CategorySuggester.suggest(name) }
+    var sectionTouched by rememberSaveable { mutableStateOf(false) }
+    var sectionEmoji by rememberSaveable { mutableStateOf(initialSectionEmoji.orEmpty()) }
+    val shownSection = when {
+        sectionTouched -> sectionEmoji
+        initialSectionEmoji != null -> initialSectionEmoji
+        else -> suggestedSection?.emoji.orEmpty()
+    }
     val amount = amountText.trim().toIntOrNull()
     val isValid = amountText.isBlank() || (amount != null && amount > 0)
 
@@ -70,6 +95,17 @@ internal fun ItemEditDialog(
                     }
                 }
                 if (isOneOff) {
+                    // Only a one-off's section is editable here; a product row
+                    // wears its product's, changed in the product form.
+                    SectionPickerField(
+                        name = name,
+                        selectedEmoji = shownSection,
+                        suggestion = suggestedSection,
+                        onPick = { category ->
+                            sectionTouched = true
+                            sectionEmoji = category?.emoji.orEmpty()
+                        },
+                    )
                     // Amount + unit read as one value ("200 g").
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
@@ -116,6 +152,11 @@ internal fun ItemEditDialog(
                         unitText.trim().ifBlank { null },
                         noteText.trim().ifBlank { null },
                         targetListId?.takeIf { it != currentListId },
+                        // Untouched sends back what was there, guess and all —
+                        // including null, which keeps the line following the
+                        // dictionary rather than being pinned by an edit that
+                        // was about the amount.
+                        if (sectionTouched) sectionEmoji else initialSectionEmoji,
                     )
                 },
             ) {
