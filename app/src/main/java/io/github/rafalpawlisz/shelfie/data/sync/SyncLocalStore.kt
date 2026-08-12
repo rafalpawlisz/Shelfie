@@ -221,6 +221,7 @@ class RoomSyncLocalStore(
             amount = d.int("amount"),
             unit = d.string("unit"),
             position = d.double("position"),
+            sectionEmoji = d.string("sectionEmoji"),
             note = d.string("note"),
             checkedAt = d.long("checkedAt"),
             createdAt = d.long("createdAt") ?: 0,

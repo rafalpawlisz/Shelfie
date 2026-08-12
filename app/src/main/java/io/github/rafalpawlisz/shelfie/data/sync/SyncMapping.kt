@@ -56,6 +56,11 @@ fun ShoppingListItemEntity.toSyncDoc(): Map<String, Any?> = mapOf(
     // A one-off's own slot within its section; absent until it is dragged, and
     // an older app just keeps sorting it by creation time.
     "position" to position,
+    // The section picked for a one-off by hand; absent until somebody picks
+    // one, and an older app goes on reading the section out of the name — the
+    // same answer it always gave, so the disagreement is invisible rather than
+    // broken.
+    "sectionEmoji" to sectionEmoji,
     "note" to note,
     "checkedAt" to checkedAt,
     "createdAt" to createdAt,

@@ -40,6 +40,9 @@ class FakeShoppingListRepository(
         val unit: String? = null,
         // A one-off's own manual slot, once dragged; null until then.
         val position: Double? = null,
+        // A one-off's hand-picked section: null = nobody picked one and the
+        // name answers, "" = somebody picked "no section".
+        val sectionEmoji: String? = null,
         val note: String? = null,
         // null = to buy; increasing value = in cart. Monotonic stand-in for the
         // real checkedAt timestamp, so "most recently checked" sorts highest.
@@ -160,6 +163,7 @@ class FakeShoppingListRepository(
                                     aItem.productId,
                                     aProd?.emoji,
                                     aProd?.name ?: aItem.name.orEmpty(),
+                                    aItem.sectionEmoji,
                                 ),
                             ).compareTo(
                                 order.rankOf(
@@ -167,6 +171,7 @@ class FakeShoppingListRepository(
                                         bItem.productId,
                                         bProd?.emoji,
                                         bProd?.name ?: bItem.name.orEmpty(),
+                                        bItem.sectionEmoji,
                                     ),
                                 ),
                             )
@@ -190,7 +195,9 @@ class FakeShoppingListRepository(
                             item.productId,
                             product?.emoji,
                             product?.name ?: item.name.orEmpty(),
+                            item.sectionEmoji,
                         ),
+                        sectionEmoji = item.sectionEmoji,
                         // Mirrors the DAO's COALESCE: a one-off's own unit
                         // stands in for the product's.
                         productUnit = product?.unit ?: item.unit,
@@ -243,6 +250,7 @@ class FakeShoppingListRepository(
         amount: Int?,
         unit: String?,
         note: String?,
+        sectionEmoji: String?,
     ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
@@ -265,6 +273,8 @@ class FakeShoppingListRepository(
                 name = trimmed,
                 amount = amount,
                 unit = unit?.trim()?.ifBlank { null },
+                // Not blank-collapsed like the rest: "" is a choice here.
+                sectionEmoji = sectionEmoji,
                 note = note?.trim()?.ifBlank { null },
                 checkedAt = null,
                 seq = ++oneOffSeq,
@@ -284,7 +294,13 @@ class FakeShoppingListRepository(
         items.update { list -> list.map { if (it.id == id) it.copy(amount = amount) else it } }
     }
 
-    override suspend fun setItemDetails(id: String, amount: Int?, unit: String?, note: String?) {
+    override suspend fun setItemDetails(
+        id: String,
+        amount: Int?,
+        unit: String?,
+        note: String?,
+        sectionEmoji: String?,
+    ) {
         val cleanNote = note?.trim()?.ifBlank { null }
         val cleanUnit = unit?.trim()?.ifBlank { null }
         items.update { list ->
@@ -292,11 +308,13 @@ class FakeShoppingListRepository(
                 if (it.id != id) {
                     it
                 } else {
-                    // Mirrors the DAO's CASE: only a one-off takes a unit from
-                    // here; a product row keeps its product's.
+                    // Mirrors the DAO's CASE: only a one-off takes a unit or a
+                    // section from here; a product row keeps its product's.
                     it.copy(
                         amount = amount,
                         unit = if (it.productId == null) cleanUnit else it.unit,
+                        sectionEmoji =
+                            if (it.productId == null) sectionEmoji else it.sectionEmoji,
                         note = cleanNote,
                     )
                 }
@@ -393,10 +411,15 @@ class FakeShoppingListRepository(
         // createdAt-in-millis fallback.
         const val ONE_OFF_BASE = 1_000_000.0
 
-        // Resolved the same way the row is shown: a product's own section, or
-        // a one-off's name. The list's order turns it into a rank.
-        fun sectionOf(productId: String?, emoji: String?, name: String): ProductCategory? =
-            ProductCategory.fromEmoji(sectionEmojiFor(productId, emoji, name))
+        // Resolved the same way the row is shown: a product's own section, a
+        // one-off's pick, or its name. The list's order turns it into a rank.
+        fun sectionOf(
+            productId: String?,
+            emoji: String?,
+            name: String,
+            chosen: String?,
+        ): ProductCategory? =
+            ProductCategory.fromEmoji(sectionEmojiFor(productId, emoji, name, chosen))
     }
 
     // Append at the end the first time a product joins a list; keep an existing slot.

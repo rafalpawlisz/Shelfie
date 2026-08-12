@@ -1299,6 +1299,76 @@ class ShoppingListViewModelTest {
     }
 
     @Test
+    fun `a section picked for a one-off outranks its name and sorts it there`() = runTest {
+        val viewModel = makeViewModel(FakeProductRepository())
+        observe(viewModel)
+        viewModel.createList("Sklep")
+        // The dictionary would file this with the drinks; the shopper says it
+        // is on the baking shelf in their shop, and the shopper decides.
+        viewModel.addOneOffToShoppingList("kompot", amount = null)
+        viewModel.addOneOffToShoppingList(
+            "kompot na później",
+            amount = null,
+            sectionEmoji = ProductCategory.DRY_GOODS.emoji,
+        )
+
+        val items = viewModel.uiState.value.shoppingList
+
+        assertEquals(ProductCategory.DRINKS.emoji, items.first { it.productName == "kompot" }.productEmoji)
+        val corrected = items.first { it.productName == "kompot na później" }
+        assertEquals(ProductCategory.DRY_GOODS.emoji, corrected.productEmoji)
+        // Not merely displayed there: dry goods are walked before drinks, so
+        // the corrected line has moved ahead of the one that was not corrected.
+        assertEquals(listOf("kompot na później", "kompot"), items.map { it.productName })
+    }
+
+    @Test
+    fun `only the pick is remembered, so an uncorrected line keeps following the dictionary`() =
+        runTest {
+            val viewModel = makeViewModel(FakeProductRepository())
+            observe(viewModel)
+            viewModel.createList("Sklep")
+            viewModel.addOneOffToShoppingList("kompot", amount = null)
+            viewModel.addOneOffToShoppingList("kompot", amount = null, sectionEmoji = "")
+
+            val items = viewModel.uiState.value.shoppingList
+            val untouched = items.first { it.sectionEmoji == null }
+
+            // Nothing was stored for it, so a word added to the dictionary later
+            // still reaches it. It shows a section all the same.
+            assertEquals(ProductCategory.DRINKS.emoji, untouched.productEmoji)
+            // And "no section" is a thing that can be said, distinct from
+            // having said nothing: same name, no section, sorted to the end.
+            val refused = items.first { it.sectionEmoji == "" }
+            assertEquals(null, refused.productEmoji)
+            assertEquals(items.last().id, refused.id)
+        }
+
+    @Test
+    fun `undo brings back the section that was picked, not the one the name implies`() = runTest {
+        val viewModel = makeViewModel(FakeProductRepository())
+        observe(viewModel)
+        val removals = mutableListOf<RemovedShoppingItem>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.itemRemovedEvents.collect { removals.add(it) }
+        }
+        viewModel.createList("Sklep")
+        viewModel.addOneOffToShoppingList(
+            "kompot",
+            amount = null,
+            sectionEmoji = ProductCategory.DRY_GOODS.emoji,
+        )
+        val id = viewModel.uiState.value.shoppingList.single().id
+
+        viewModel.removeShoppingItem(id)
+        viewModel.undoRemoveItem(removals.single())
+
+        val restored = viewModel.uiState.value.shoppingList.single()
+        assertEquals(ProductCategory.DRY_GOODS.emoji, restored.productEmoji)
+        assertEquals(ProductCategory.DRY_GOODS.emoji, restored.sectionEmoji)
+    }
+
+    @Test
     fun `each list walks its own aisle order`() = runTest {
         val repository = FakeProductRepository()
         repository.addProduct(name = "Mleko", quantity = 0, unit = null, emoji = "🥛")
@@ -1759,6 +1829,7 @@ class ShoppingListViewModelTest {
                 productName = "znicz",
                 amount = 3,
                 unit = "sztuki",
+                sectionEmoji = null,
                 note = "czerwony",
             ),
         )

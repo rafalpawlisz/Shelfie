@@ -61,6 +61,14 @@ data class ShoppingListItemEntity(
     // return it to its place). A one-off has nothing to outlive — it dies at
     // checkout — so its slot belongs on the row.
     val position: Double? = null,
+    // The section a one-off was filed under by hand, as the section's emoji.
+    // Three states, exactly as on a product: null = nobody said, so the name is
+    // asked instead; "" = somebody said "no section"; an emoji = that section.
+    // Only ever set where [productId] is null — a product row's section is the
+    // product's, and answering it from here would let a list contradict the
+    // pantry. Untouched rows stay null on purpose: they keep following the
+    // dictionary, so a word added to it later fixes lines already written.
+    val sectionEmoji: String? = null,
     // null = still to buy; non-null = in the cart (marked bought). The amount
     // is applied to the product's quantity only at checkout(), not when checked.
     val checkedAt: Long?,
@@ -86,6 +94,7 @@ data class ShoppingListItemRow(
     // The owning list's aisle order, straight from shopping_lists; null = the
     // default order.
     val sectionOrder: String? = null,
+    val itemSectionEmoji: String? = null,
 )
 
 fun ShoppingListItemRow.toDomain(): ShoppingListItem = ShoppingListItem(
@@ -95,7 +104,8 @@ fun ShoppingListItemRow.toDomain(): ShoppingListItem = ShoppingListItem(
     note = note,
     isChecked = checkedAt != null,
     productName = productName,
-    productEmoji = sectionEmojiFor(productId, productEmoji, productName),
+    productEmoji = sectionEmojiFor(productId, productEmoji, productName, itemSectionEmoji),
+    sectionEmoji = itemSectionEmoji,
     productUnit = productUnit,
     position = position,
 )
@@ -107,9 +117,21 @@ fun ShoppingListItemRow.toDomain(): ShoppingListItem = ShoppingListItem(
  * one means "no section", not "guess" — that is the promise the product form
  * makes, and reading a section out of the name here would quietly break it.
  *
- * A one-off has no product to ask, so its name answers instead. Nothing is
- * stored: the line is typed once and deleted at checkout, which is too short a
- * life to be worth a column, a sync field and a picker to correct it.
+ * A one-off answers for itself. This used to say the line was too short-lived
+ * to be worth a column, and that a name read by the dictionary was enough —
+ * true until the dictionary was wrong about a line somebody was about to walk
+ * past in the shop, with no way to say so. So [chosen] is what was said by
+ * hand, and it wins; a blank one means "no section" here too. Where nothing was
+ * said it stays null rather than being filled in with the guess, which keeps
+ * such lines following the dictionary as it improves.
  */
-fun sectionEmojiFor(productId: String?, productEmoji: String?, name: String): String? =
-    if (productId != null) productEmoji else CategorySuggester.suggest(name)?.emoji
+fun sectionEmojiFor(
+    productId: String?,
+    productEmoji: String?,
+    name: String,
+    chosen: String?,
+): String? = when {
+    productId != null -> productEmoji
+    chosen != null -> chosen.ifBlank { null }
+    else -> CategorySuggester.suggest(name)?.emoji
+}

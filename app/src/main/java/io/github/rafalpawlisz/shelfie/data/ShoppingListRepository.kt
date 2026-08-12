@@ -45,6 +45,10 @@ interface ShoppingListRepository {
         amount: Int?,
         unit: String? = null,
         note: String? = null,
+        // The section, as its emoji, when one was picked by hand. null leaves
+        // the line reading its section out of its name, which is what it did
+        // before there was anything to pick; "" is an explicit "no section".
+        sectionEmoji: String? = null,
     )
 
     /**
@@ -69,9 +73,15 @@ interface ShoppingListRepository {
     fun observeReferencedProductIds(): Flow<List<String>>
     suspend fun setChecked(id: String, checked: Boolean)
     suspend fun setItemAmount(id: String, amount: Int?)
-    // [unit] only lands on a one-off; a product row keeps its product's unit
-    // whatever is passed here.
-    suspend fun setItemDetails(id: String, amount: Int?, unit: String?, note: String?)
+    // [unit] and [sectionEmoji] only land on a one-off; a product row keeps its
+    // product's unit and section whatever is passed here.
+    suspend fun setItemDetails(
+        id: String,
+        amount: Int?,
+        unit: String?,
+        note: String?,
+        sectionEmoji: String? = null,
+    )
 
     // Move the item (amount + note travel along) to another list; arrives
     // unchecked, in its remembered slot there. No-op for the same list.

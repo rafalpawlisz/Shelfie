@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     ],
     // Renumbered from 12 back to 1 before the first release — the development
     // history (schema wipes all along) doesn't need to live in the version.
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class ShelfieDatabase : RoomDatabase() {
@@ -121,6 +121,15 @@ abstract class ShelfieDatabase : RoomDatabase() {
         // 7 → 8: names bought once are remembered so the picker can offer them
         // again. A new table, so nothing existing is touched; the history simply
         // starts empty and fills from the next one-off onwards.
+        // A one-off's hand-picked section. Nullable and unfilled: null means
+        // nobody said, which is what every existing line means, so the upgrade
+        // leaves them all reading their section out of their name as before.
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE shopping_list_items ADD COLUMN sectionEmoji TEXT")
+            }
+        }
+
         private val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -142,6 +151,7 @@ abstract class ShelfieDatabase : RoomDatabase() {
             MIGRATION_5_6,
             MIGRATION_6_7,
             MIGRATION_7_8,
+            MIGRATION_8_9,
         )
     }
 }

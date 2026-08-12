@@ -270,6 +270,43 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migrate8To9_leavesExistingLinesReadingTheirSectionFromTheirName() {
+        helper.createDatabase(TEST_DB, 8).use { db ->
+            db.execSQL(
+                "INSERT INTO shopping_lists (id, name, createdAt, updatedAt, position, archivedAt, " +
+                    "sectionOrder) VALUES ('l1', 'Lidl', 100, 100, 1.0, NULL, NULL)"
+            )
+            db.execSQL(
+                "INSERT INTO shopping_list_items (id, listId, productId, name, amount, unit, note, " +
+                    "position, checkedAt, createdAt, updatedAt) " +
+                    "VALUES ('i1', 'l1', NULL, 'znicz', NULL, NULL, NULL, NULL, NULL, 100, 100)"
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 9, true, *ShelfieDatabase.MIGRATIONS).use { db ->
+            db.query("SELECT name, sectionEmoji FROM shopping_list_items WHERE id = 'i1'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("znicz", c.getString(0))
+                // Null, which is the only honest answer for a line written
+                // before there was anything to pick: it goes on reading its
+                // section out of its name, exactly as it did yesterday.
+                assertTrue(c.isNull(1))
+            }
+            // And the column can hold both of the things a pick can mean.
+            db.execSQL("UPDATE shopping_list_items SET sectionEmoji = '🏠' WHERE id = 'i1'")
+            db.query("SELECT sectionEmoji FROM shopping_list_items WHERE id = 'i1'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("🏠", c.getString(0))
+            }
+            db.execSQL("UPDATE shopping_list_items SET sectionEmoji = '' WHERE id = 'i1'")
+            db.query("SELECT sectionEmoji FROM shopping_list_items WHERE id = 'i1'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("", c.getString(0))
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test.db"
         const val CURRENT_VERSION = 8

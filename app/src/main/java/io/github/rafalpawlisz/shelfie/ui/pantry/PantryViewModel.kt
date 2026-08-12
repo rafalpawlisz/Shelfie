@@ -68,6 +68,10 @@ data class RemovedShoppingItem(
     // A one-off's own unit ("g", "opakowania"); null for product-backed rows,
     // which read their unit off the product when they come back.
     val unit: String?,
+    // A one-off's hand-picked section, so undo brings back the answer too and
+    // not just the line. Null where nobody picked one, which undo restores as
+    // faithfully as it restores a pick.
+    val sectionEmoji: String?,
     val note: String?,
 )
 
@@ -495,10 +499,11 @@ class PantryViewModel(
         unit: String? = null,
         note: String?,
         targetListId: String? = null,
+        sectionEmoji: String? = null,
     ) {
         if (amount != null && amount <= 0) return
         viewModelScope.launch {
-            shoppingListRepository.setItemDetails(id, amount, unit, note)
+            shoppingListRepository.setItemDetails(id, amount, unit, note, sectionEmoji)
             if (targetListId != null) shoppingListRepository.moveItem(id, targetListId)
         }
     }
@@ -531,6 +536,7 @@ class PantryViewModel(
                         // Only a one-off's own unit is worth carrying: a product
                         // row reads its unit off the product on the way back.
                         unit = item.productUnit.takeIf { item.productId == null },
+                        sectionEmoji = item.sectionEmoji,
                         note = item.note,
                     ),
                 )
@@ -562,6 +568,7 @@ class PantryViewModel(
                     removed.amount,
                     removed.unit,
                     removed.note,
+                    removed.sectionEmoji,
                 )
             } else {
                 shoppingListRepository.addItem(
@@ -647,11 +654,12 @@ class PantryViewModel(
         amount: Int?,
         unit: String? = null,
         note: String? = null,
+        sectionEmoji: String? = null,
     ) {
         val listId = selectedListId.value ?: return
         if (name.isBlank()) return
         viewModelScope.launch {
-            shoppingListRepository.addOneOffItem(listId, name, amount, unit, note)
+            shoppingListRepository.addOneOffItem(listId, name, amount, unit, note, sectionEmoji)
         }
     }
 

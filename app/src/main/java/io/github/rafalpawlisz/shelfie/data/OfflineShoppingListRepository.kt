@@ -143,10 +143,12 @@ class OfflineShoppingListRepository(
             }.map(ShoppingListItemRow::toDomain)
         }
 
-    // Resolved the same way the row is shown, so a one-off lands in the aisle
-    // its name names instead of trailing behind every product.
+    // Resolved the same way the row is shown, so a one-off sorts into the aisle
+    // it displays — whether that was picked by hand or read from its name.
     private fun ShoppingListItemRow.section(): ProductCategory? =
-        ProductCategory.fromEmoji(sectionEmojiFor(productId, productEmoji, productName))
+        ProductCategory.fromEmoji(
+            sectionEmojiFor(productId, productEmoji, productName, itemSectionEmoji),
+        )
 
     override suspend fun addItem(listId: String, productId: String, amount: Int?, note: String?) {
         dao.addOrMerge(
@@ -165,6 +167,7 @@ class OfflineShoppingListRepository(
         amount: Int?,
         unit: String?,
         note: String?,
+        sectionEmoji: String?,
     ) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
@@ -193,6 +196,7 @@ class OfflineShoppingListRepository(
                 amount = amount,
                 unit = cleanUnit,
                 note = note?.trim()?.ifBlank { null },
+                sectionEmoji = sectionEmoji,
                 checkedAt = null,
                 createdAt = now,
                 updatedAt = now,
@@ -209,12 +213,21 @@ class OfflineShoppingListRepository(
         dao.setAmount(id, amount, clock.now())
     }
 
-    override suspend fun setItemDetails(id: String, amount: Int?, unit: String?, note: String?) {
+    override suspend fun setItemDetails(
+        id: String,
+        amount: Int?,
+        unit: String?,
+        note: String?,
+        sectionEmoji: String?,
+    ) {
         dao.setDetails(
             id = id,
             amount = amount,
             unit = unit?.trim()?.ifBlank { null },
             note = note?.trim()?.ifBlank { null },
+            // Not blank-collapsed like the others: "" is a choice here, and
+            // turning it into null would turn "no section" back into "guess".
+            sectionEmoji = sectionEmoji,
             timestamp = clock.now(),
         )
     }

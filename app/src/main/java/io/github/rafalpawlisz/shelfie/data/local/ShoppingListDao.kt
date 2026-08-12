@@ -167,7 +167,11 @@ interface ShoppingListDao {
             // The list's aisle order rides along with every row rather than
             // arriving on a second flow: one query is one consistent snapshot,
             // so rows and the order they sort by cannot be a beat apart.
-            "l.sectionOrder AS sectionOrder " +
+            "l.sectionOrder AS sectionOrder, " +
+            // A one-off's own section, when one was picked for it by hand. Null
+            // on product rows and on one-offs nobody corrected; sectionEmojiFor
+            // decides what that means.
+            "i.sectionEmoji AS itemSectionEmoji " +
             "FROM shopping_list_items i " +
             "JOIN shopping_lists l ON l.id = i.listId " +
             "LEFT JOIN products p ON p.id = i.productId " +
@@ -251,12 +255,24 @@ interface ShoppingListDao {
     // The unit is written only where there is no product: for a product row the
     // product's unit is the unit, and the CASE keeps that invariant here rather
     // than trusting every caller to pass null.
+    // The section is guarded the same way and for the same reason: a product
+    // row's section belongs to the product, so a list must not be able to
+    // contradict the pantry from here.
     @Query(
         "UPDATE shopping_list_items SET amount = :amount, note = :note, " +
-            "unit = CASE WHEN productId IS NULL THEN :unit ELSE unit END, updatedAt = :timestamp " +
+            "unit = CASE WHEN productId IS NULL THEN :unit ELSE unit END, " +
+            "sectionEmoji = CASE WHEN productId IS NULL THEN :sectionEmoji ELSE sectionEmoji END, " +
+            "updatedAt = :timestamp " +
             "WHERE id = :id"
     )
-    suspend fun setDetails(id: String, amount: Int?, unit: String?, note: String?, timestamp: Long)
+    suspend fun setDetails(
+        id: String,
+        amount: Int?,
+        unit: String?,
+        note: String?,
+        sectionEmoji: String?,
+        timestamp: Long,
+    )
 
     @Query("DELETE FROM shopping_list_items WHERE id = :id")
     suspend fun delete(id: String)
@@ -386,7 +402,16 @@ interface ShoppingListDao {
                 // the add dialog pre-fills the current values, so what's confirmed
                 // is what you get (no merge math). A checked entry goes back to
                 // the to-buy state.
-                setDetails(existing.id, amount, unit = null, note = note, timestamp = timestamp)
+                // Unit and section are both the product's here, so both are
+                // passed as null and both are ignored by the CASE guards.
+                setDetails(
+                    existing.id,
+                    amount,
+                    unit = null,
+                    note = note,
+                    sectionEmoji = null,
+                    timestamp = timestamp,
+                )
                 setChecked(existing.id, checkedAt = null, updatedAt = timestamp)
             }
         }
