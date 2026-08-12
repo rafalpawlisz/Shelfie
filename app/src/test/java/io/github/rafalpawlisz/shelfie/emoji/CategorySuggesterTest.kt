@@ -166,6 +166,39 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `the batch of names that had no section at all`() {
+        // Eight reported together. Each is filed beside something already in the
+        // dictionary rather than somewhere new: the pickles for kimchi, the
+        // dried fruit for the freeze-dried, the stock for the bouillon.
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("owoce liofilizowane"))
+        // The limit of the left-to-right rule, recorded rather than papered
+        // over: "owoce" is not a word here, so the adjective decides — but name
+        // an actual fruit and the fruit wins, snack packet or not. Fixing that
+        // would mean letting a modifier outrank a head noun, which is the very
+        // thing that sent red yeast rice to the pasta.
+        assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("truskawki liofilizowane"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("kimchi"))
+        assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("liczi"))
+        assertEquals(ProductCategory.SPICES, CategorySuggester.suggest("mirin"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("pulpa z marakui"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("pulpa z papai"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("specjał mięsny"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("bulion drobiowy"))
+    }
+
+    @Test
+    fun `a head noun keeps the modifier from deciding`() {
+        // The four head nouns above earn their keep on names nobody has bought
+        // yet — which is the whole reason for preferring them to phrases.
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("pulpa z mango"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("specjał drobiowy"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("bulion warzywny"))
+        // Without them the modifier would have won, as it still does for the
+        // plain fruit and vegetables.
+        assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("mango"))
+    }
+
+    @Test
     fun `a cream is told apart by what follows it, not by a greedy phrase`() {
         // "krem z" was a phrase, and phrases match as substrings — so sunscreen
         // went to the jars aisle behind the soups. The word "krem" already sent

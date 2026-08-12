@@ -59,6 +59,17 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `the batch of names that had no emoji either`() {
+        assertEquals("🌰", DecorationSuggester.suggest("owoce liofilizowane"))
+        assertEquals("🥫", DecorationSuggester.suggest("kimchi"))
+        assertEquals("🥭", DecorationSuggester.suggest("liczi"))
+        assertEquals("🥫", DecorationSuggester.suggest("mirin"))
+        assertEquals("🥫", DecorationSuggester.suggest("pulpa z marakui"))
+        assertEquals("🥫", DecorationSuggester.suggest("specjał mięsny"))
+        assertEquals("🍲", DecorationSuggester.suggest("bulion drobiowy"))
+    }
+
+    @Test
     fun `a cream you rub in looks nothing like one you spread`() {
         assertEquals("🧴", DecorationSuggester.suggest("krem z filtrem"))
         assertEquals("🧴", DecorationSuggester.suggest("krem do rąk"))

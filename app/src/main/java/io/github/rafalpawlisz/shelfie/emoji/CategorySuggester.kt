@@ -70,6 +70,7 @@ object CategorySuggester {
             "czeresnie", "wisnie", "wisnia", "cherry",
             "brzoskwinia", "brzoskwinie", "nektarynki", "peach", "gruszka", "gruszki", "pear",
             "arbuz", "watermelon", "ananas", "pineapple", "kiwi", "mango", "awokado", "avocado",
+            "liczi", "lychee",
             "melon", "renety", "szara reneta", "granat", "granaty", "grejpfrut", "grejpfruty",
             "sliwki", "sliwka", "morele", "morela",
             "porzeczki", "agrest", "zurawina", "aronia",
@@ -107,7 +108,11 @@ object CategorySuggester {
             // Same word, other shelf: the rye starter is bottled among the
             // soups, not with the drinks.
             "zakwas na zurek", "zakwas zytni",
-            "ogorki kiszone", "kapusta kiszona", "barszcz bialy", "chrzan", "cwikla",
+            "ogorki kiszone", "kapusta kiszona", "kimchi", "barszcz bialy", "chrzan", "cwikla",
+            // Head nouns, so the modifier never gets to decide: "pulpa" covers
+            // marakuja and papaja alike, "specjal" covers the poultry tin as
+            // well as the meat one, "bulion" joins the stock beside "rosol".
+            "pulpa", "specjal", "bulion",
             "fasolka po bretonsku", "kajmak", "ajvar", "pesto", "tahini",
             "oliwki", "olives", "korniszony", "passata", "koncentrat",
         ),
@@ -131,7 +136,7 @@ object CategorySuggester {
             // its own it is a can, not a thing — glass cleaner and deodorant are
             // sprays too, and guessing from it would file them here.
             "olej", "oliwa", "ocet", "oil", "tluszcz",
-            "sos", "ketchup", "keczup", "majonez", "musztarda", "sos sojowy",
+            "sos", "ketchup", "keczup", "majonez", "musztarda", "sos sojowy", "mirin",
         ),
         ProductCategory.SWEETS to listOf(
             "czekolada", "chocolate", "kakao", "baton", "batony", "sniadaniowa",
@@ -144,6 +149,11 @@ object CategorySuggester {
             "krowki", "michalki", "toffi", "irysy",
             "orzechy", "orzech", "migdaly", "nerkowce", "nuts", "pistacje", "nasiona", "pestki",
             "daktyle", "figi", "suszone owoce", "rodzynki", "sliwki suszone",
+            // The adjective, not "owoce": freeze-dried fruit is a packet on the
+            // snack shelf, and a word for "owoce" would drag it — and every
+            // other fruit compound — to the fresh produce instead. It also
+            // covers "truskawki liofilizowane", which nobody has bought yet.
+            "liofilizowane", "liofilizowany",
         ),
         ProductCategory.DRINKS to listOf(
             "kawa", "coffee", "espresso", "cappuccino",

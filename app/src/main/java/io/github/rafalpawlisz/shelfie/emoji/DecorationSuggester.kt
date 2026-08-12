@@ -64,7 +64,7 @@ object DecorationSuggester {
         "🍉" to listOf("arbuz", "watermelon"),
         "🍍" to listOf("ananas", "pineapple"),
         "🥝" to listOf("kiwi"),
-        "🥭" to listOf("mango"),
+        "🥭" to listOf("mango", "liczi", "lychee"),
         "🫒" to listOf("oliwki", "olives"),
         "🥑" to listOf("awokado", "avocado"),
         "🍈" to listOf("melon"),
@@ -107,7 +107,11 @@ object DecorationSuggester {
         "🍩" to listOf("paczki", "paczek", "donut", "oponki"),
         "🧊" to listOf("lod w kostkach", "kostki lodu"),
         "🥗" to listOf("salatka", "surowka", "mix salat"),
-        "🍲" to listOf("gulasz", "rosol", "barszcz", "krem z"),
+        // "krem z" survives HERE, where it only ever helped: it gives a soup a
+        // pot instead of the jar the bare "krem" would. The named cosmetic
+        // creams are longer phrases, so they still win. It is gone from
+        // CategorySuggester, where it was sending sunscreen to this aisle.
+        "🍲" to listOf("gulasz", "rosol", "bulion", "barszcz", "krem z"),
         "🍕" to listOf("pizza"),
         "🥟" to listOf("uszka", "dumplings"),
         // Drinks
@@ -176,7 +180,7 @@ object DecorationSuggester {
         "🫐" to listOf("porzeczki", "agrest", "zurawina", "aronia"),
         "🍊" to listOf("grejpfrut", "grejpfruty"),
         "🍎" to listOf("granat", "granaty"),
-        "🌰" to listOf("daktyle", "figi", "suszone owoce"),
+        "🌰" to listOf("daktyle", "figi", "suszone owoce", "liofilizowane", "liofilizowany"),
         "🥩" to listOf("mielone", "poledwica", "filet", "watrobka", "gulaszowe", "antrykot"),
         "🥓" to listOf("pasztet", "salami", "poledwica sopocka", "smalec"),
         "🌭" to listOf("kabanosy", "kabanos", "krakowska", "zywiecka"),
@@ -192,8 +196,10 @@ object DecorationSuggester {
         "🧀" to listOf("mascarpone", "ricotta", "twarozek", "camembert", "brie"),
         "🫙" to listOf("kajmak", "ajvar", "pesto", "tahini"),
         "🥫" to listOf(
-            "sos sojowy", "keczup", "ogorki kiszone", "kapusta kiszona", "barszcz bialy",
-            "chrzan", "cwikla", "fasolka po bretonsku",
+            "sos sojowy", "mirin", "keczup", "ogorki kiszone", "kapusta kiszona", "kimchi",
+            "barszcz bialy", "chrzan", "cwikla", "fasolka po bretonsku",
+            // Tinned things named by their head noun; see CategorySuggester.
+            "pulpa", "specjal",
         ),
         "🧂" to listOf("kminek", "gorczyca", "liscie laurowe", "ziele angielskie", "kurkuma", "chili"),
         "🥕" to listOf("buraki", "burak", "seler", "rzodkiewka", "kalarepa", "pasternak"),
