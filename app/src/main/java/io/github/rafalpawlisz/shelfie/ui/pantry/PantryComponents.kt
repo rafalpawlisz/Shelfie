@@ -24,7 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.rafalpawlisz.shelfie.R
@@ -108,6 +110,25 @@ internal fun ProductListItem(
                             status == ExpiryStatus.SOON -> MaterialTheme.colorScheme.warning
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
+                    )
+                }
+                // The note last, under the facts: it is the one line here that
+                // is somebody's own words rather than something the app worked
+                // out, which is what the italic says. Trimmed to nothing counts
+                // as none — a note of spaces should not add an empty line.
+                val note = product.notes?.trim()?.takeIf { it.isNotBlank() }
+                if (note != null) {
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontStyle = FontStyle.Italic,
+                        color = if (dimmed) textColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        // Two lines and then an ellipsis: a long note would
+                        // otherwise make one card tower over its neighbours and
+                        // push the rest of the list off the screen. The whole
+                        // note is a tap away, in the form that holds it.
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
