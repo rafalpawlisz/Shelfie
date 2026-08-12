@@ -2,6 +2,8 @@ package io.github.rafalpawlisz.shelfie.ui.pantry
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.KeyboardOptions
@@ -67,11 +69,8 @@ internal fun ItemEditDialog(
     val suggestedSection = remember(name) { CategorySuggester.suggest(name) }
     var sectionTouched by rememberSaveable { mutableStateOf(false) }
     var sectionEmoji by rememberSaveable { mutableStateOf(initialSectionEmoji.orEmpty()) }
-    val shownSection = when {
-        sectionTouched -> sectionEmoji
-        initialSectionEmoji != null -> initialSectionEmoji
-        else -> suggestedSection?.emoji.orEmpty()
-    }
+    val shownSection =
+        shownSectionEmoji(sectionTouched, sectionEmoji, initialSectionEmoji, suggestedSection)
     val amount = amountText.trim().toIntOrNull()
     val isValid = amountText.isBlank() || (amount != null && amount > 0)
 
@@ -79,7 +78,12 @@ internal fun ItemEditDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.edit_item)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // The section picker made the dialog taller than a small screen
+            // with the keyboard up can hold, so the content scrolls.
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 if (lists.size > 1) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         lists.forEach { list ->
@@ -152,11 +156,10 @@ internal fun ItemEditDialog(
                         unitText.trim().ifBlank { null },
                         noteText.trim().ifBlank { null },
                         targetListId?.takeIf { it != currentListId },
-                        // Untouched sends back what was there, guess and all —
-                        // including null, which keeps the line following the
-                        // dictionary rather than being pinned by an edit that
-                        // was about the amount.
-                        if (sectionTouched) sectionEmoji else initialSectionEmoji,
+                        // The tested rule: untouched sends back what was there,
+                        // guess and all — see storedSectionEmoji for why the
+                        // shown value must never travel this way.
+                        storedSectionEmoji(sectionTouched, sectionEmoji, initialSectionEmoji),
                     )
                 },
             ) {

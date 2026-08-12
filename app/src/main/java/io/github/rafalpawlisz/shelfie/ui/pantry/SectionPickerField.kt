@@ -101,6 +101,34 @@ internal fun SectionPickerField(
     }
 }
 
+/**
+ * What the closed section field displays: the pick once one is made, else
+ * whatever the row already stores ("" is an answered "no section" and shows as
+ * one), else what the dictionary implies. The add dialog passes stored = null —
+ * a line being created stores nothing yet.
+ */
+internal fun shownSectionEmoji(
+    touched: Boolean,
+    picked: String,
+    stored: String?,
+    suggested: ProductCategory?,
+): String = when {
+    touched -> picked
+    stored != null -> stored
+    else -> suggested?.emoji.orEmpty()
+}
+
+/**
+ * What a save writes back: the pick, or — untouched — exactly what was stored
+ * before, null included. Never [shownSectionEmoji]'s answer: the field may show
+ * the dictionary's suggestion, but writing that down because an edit happened
+ * to pass through would freeze the day's guess into an answer, and the line
+ * would stop following the dictionary as it improves. The two being separate
+ * functions, and this one refusing to guess, is the invariant the test holds.
+ */
+internal fun storedSectionEmoji(touched: Boolean, picked: String, stored: String?): String? =
+    if (touched) picked else stored
+
 /** What the line under the section field says, when it says anything. */
 internal sealed interface SectionNote {
     /** The name implies a section other than the one shown. */

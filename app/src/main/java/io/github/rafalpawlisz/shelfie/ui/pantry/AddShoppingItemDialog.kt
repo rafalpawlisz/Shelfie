@@ -48,6 +48,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.verticalScroll
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.emoji.CategorySuggester
 import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
@@ -119,6 +121,14 @@ fun AddShoppingItemDialog(
     val awaitingProduct = selectedProductId != null && selectedProduct == null
     val inAmountStep = selectedProductId != null || oneOffName != null
 
+    // The amount step's fields can outgrow what the keyboard leaves of the
+    // screen — the section picker tipped it over — so the step scrolls, the way
+    // the product form does. Keyed to the step's owner so one item's scroll
+    // offset is not the next one's; applied only in the amount step, because
+    // the search phase is a LazyColumn, which must never sit inside an outer
+    // vertical scroll.
+    val amountStepScroll = remember(selectedProductId, oneOffName) { ScrollState(0) }
+
     // One meaning of "back" for every way of asking: the arrow in the bar, the
     // system gesture, the hardware button. From the amount step it returns to
     // the list; only the list itself closes the picker. Without this the
@@ -180,7 +190,8 @@ fun AddShoppingItemDialog(
             }
             var sectionTouched by rememberSaveable(oneOffName) { mutableStateOf(false) }
             var sectionEmoji by rememberSaveable(oneOffName) { mutableStateOf("") }
-            val shownSection = if (sectionTouched) sectionEmoji else suggestedSection?.emoji.orEmpty()
+            val shownSection =
+                shownSectionEmoji(sectionTouched, sectionEmoji, stored = null, suggestedSection)
             val amount = amountText.trim().toIntOrNull()
             val amountValid = amountText.isBlank() || (amount != null && amount > 0)
 
@@ -223,12 +234,16 @@ fun AddShoppingItemDialog(
                                                 cleanAmount,
                                                 unitText.trim().ifBlank { null },
                                                 cleanNote,
-                                                // Only a pick is stored. Left
-                                                // alone, the line keeps asking
-                                                // its name, which is how a word
-                                                // added to the dictionary later
-                                                // still reaches it.
-                                                sectionEmoji.takeIf { sectionTouched },
+                                                // The tested rule: only a pick
+                                                // is stored — a line created
+                                                // with nothing said stores
+                                                // nothing, and keeps asking
+                                                // its name.
+                                                storedSectionEmoji(
+                                                    sectionTouched,
+                                                    sectionEmoji,
+                                                    stored = null,
+                                                ),
                                             )
                                         }
                                     },
@@ -252,7 +267,14 @@ fun AddShoppingItemDialog(
                     modifier = Modifier
                         .padding(padding)
                         .fillMaxSize()
-                        .padding(horizontal = 24.dp),
+                        .padding(horizontal = 24.dp)
+                        .then(
+                            if (inAmountStep) {
+                                Modifier.verticalScroll(amountStepScroll)
+                            } else {
+                                Modifier
+                            },
+                        ),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (selectedProduct == null && oneOffName == null) {
