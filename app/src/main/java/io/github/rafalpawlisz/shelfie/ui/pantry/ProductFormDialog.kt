@@ -19,6 +19,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -540,9 +541,11 @@ private fun CategoryPickerField(
 
 /**
  * The best-before field: read-only, opened by tapping, cleared by the trailing
- * button. Typing is deliberately impossible — a date typed by hand is a date
- * that can be "30.02" or in the wrong century, and everything downstream sorts
- * this value as text.
+ * button. The field itself still refuses free typing — everything downstream
+ * sorts this value as text, so it must never come to hold "30.02" or a
+ * two-digit year. The dialog opening on its keyboard is not a softening of
+ * that: the picker parses what is typed and answers with a real date or with
+ * nothing, and only a real date can be confirmed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -581,11 +584,22 @@ private fun ExpiryField(value: String, onPick: (String) -> Unit, onClear: () -> 
     if (showPicker) {
         val state = rememberDatePickerState(
             initialSelectedDateMillis = value.toEpochMillisOrNull(),
+            // Opens on the keyboard, not on the calendar. A best-before date is
+            // read off a package and copied, and paging a calendar ten months
+            // forward to arrive at a date already in front of you is the wrong
+            // instrument for that. The mode toggle keeps the calendar one tap
+            // away for the times the date is being guessed instead.
+            initialDisplayMode = DisplayMode.Input,
+            yearRange = expiryYearRange(value),
         )
         DatePickerDialog(
             onDismissRequest = { showPicker = false },
             confirmButton = {
                 TextButton(
+                    // Half a typed date, or an impossible one, leaves the picker
+                    // answering null. Without this the button would look live
+                    // and then quietly do nothing.
+                    enabled = state.selectedDateMillis != null,
                     onClick = {
                         state.selectedDateMillis?.let { onPick(it.toIsoDate()) }
                         showPicker = false
@@ -603,6 +617,19 @@ private fun ExpiryField(value: String, onPick: (String) -> Unit, onClear: () -> 
             DatePicker(state = state)
         }
     }
+}
+
+/**
+ * The years the picker will offer. Short on purpose — a best-before date is
+ * months or a few years out, and the year grid behind the calendar's header is
+ * a scroll worth keeping brief — but always stretched to hold the date already
+ * stored, because a selection outside the range makes the picker throw instead
+ * of clamping.
+ */
+internal fun expiryYearRange(stored: String): IntRange {
+    val thisYear = LocalDate.now().year
+    val storedYear = runCatching { LocalDate.parse(stored).year }.getOrNull() ?: thisYear
+    return minOf(thisYear - 1, storedYear)..maxOf(thisYear + 15, storedYear)
 }
 
 // The picker speaks in UTC-midnight millis; the stored value is a plain date.
