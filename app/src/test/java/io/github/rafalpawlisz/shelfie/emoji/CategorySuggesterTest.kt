@@ -308,6 +308,22 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `the hot shelf and the cold aisle are two different stops`() {
+        assertEquals(ProductCategory.COFFEE_TEA, CategorySuggester.suggest("kawa mielona"))
+        assertEquals(ProductCategory.COFFEE_TEA, CategorySuggester.suggest("herbata czarna"))
+        assertEquals(ProductCategory.COFFEE_TEA, CategorySuggester.suggest("napar z pokrzywy"))
+        assertEquals(ProductCategory.DRINKS, CategorySuggester.suggest("woda mineralna"))
+        assertEquals(ProductCategory.DRINKS, CategorySuggester.suggest("sok pomarańczowy"))
+        // What the split must not drag along with it. Biscuits are not tea,
+        // however alike the two words start; cocoa is as much a baking
+        // ingredient as a drink; and coffee cream was always dairy — a phrase,
+        // so it outranks the word "kawa" wherever that word now lives.
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("herbatniki"))
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("kakao"))
+        assertEquals(ProductCategory.DAIRY, CategorySuggester.suggest("śmietanka do kawy"))
+    }
+
+    @Test
     fun `every category emoji is unique - it is the storage key`() {
         val emoji = ProductCategory.entries.map { it.emoji }
         assertEquals(emoji.size, emoji.toSet().size)

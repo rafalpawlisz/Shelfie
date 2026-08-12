@@ -165,9 +165,15 @@ object CategorySuggester {
             // covers "truskawki liofilizowane", which nobody has bought yet.
             "liofilizowane", "liofilizowany",
         ),
-        ProductCategory.DRINKS to listOf(
+        // Split off the drinks: nobody picks up coffee and bottled water at the
+        // same moment. "herbata" and the sweets' "herbatniki" stem apart, so the
+        // two shelves never contended for a word — and "kakao" deliberately
+        // stays with the sweets, being as much a baking ingredient as a drink.
+        ProductCategory.COFFEE_TEA to listOf(
             "kawa", "coffee", "espresso", "cappuccino",
             "herbata", "tea", "zielona herbata", "napar", "ziola",
+        ),
+        ProductCategory.DRINKS to listOf(
             "sok", "juice", "nektar", "napoj",
             // The head noun of "zakwas z buraka", which without it handed the
             // decision to "buraka" and filed a bottled drink with the fresh

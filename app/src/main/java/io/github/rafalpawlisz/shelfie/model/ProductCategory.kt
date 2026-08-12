@@ -23,6 +23,11 @@ enum class ProductCategory(val emoji: String, @param:StringRes val nameRes: Int)
     DRY_GOODS("🍝", R.string.category_dry_goods),
     SPICES("🧂", R.string.category_spices),
     SWEETS("🍫", R.string.category_sweets),
+    // Before the drinks and after the sweets, which is where the shop puts it:
+    // coffee and tea are a dry shelf you pass on the way, the bottles are a
+    // heavy aisle of their own. They were one section until the walk order made
+    // the difference cost something.
+    COFFEE_TEA("☕", R.string.category_coffee_tea),
     DRINKS("🧃", R.string.category_drinks),
     ALCOHOL("🍷", R.string.category_alcohol),
     CLEANING("🧴", R.string.category_cleaning),
