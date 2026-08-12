@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -81,14 +82,48 @@ class OneOffItemDaoTest {
         assertEquals("l", rows.getValue("i1").productUnit)
         assertEquals("g", rows.getValue("i2").productUnit)
 
-        // An edit cannot smuggle a unit onto a product row — its unit lives on
-        // the product, and the UPDATE guards that rather than trusting callers.
-        dao.setDetails("i1", amount = 2, unit = "beczki", note = null, timestamp = 300)
-        dao.setDetails("i2", amount = 3, unit = "plastry", note = null, timestamp = 300)
+        // An edit cannot smuggle a unit or a section onto a product row — both
+        // live on the product, and the UPDATE guards that rather than trusting
+        // callers.
+        dao.setDetails(
+            "i1",
+            amount = 2,
+            unit = "beczki",
+            note = null,
+            sectionEmoji = "🏠",
+            timestamp = 300,
+        )
+        dao.setDetails(
+            "i2",
+            amount = 3,
+            unit = "plastry",
+            note = null,
+            sectionEmoji = "🏠",
+            timestamp = 300,
+        )
 
         val after = dao.observeItems("l1").first().associateBy { it.id }
         assertEquals("l", after.getValue("i1").productUnit)
         assertEquals("plastry", after.getValue("i2").productUnit)
+        assertNull(after.getValue("i1").itemSectionEmoji)
+        assertEquals("🏠", after.getValue("i2").itemSectionEmoji)
+    }
+
+    @Test
+    fun aPickedSectionOutlivesTheRowsOwnNameAndTravelsWithTheRow() = runTest {
+        seedList()
+        dao.insert(oneOff("i1", "kompot", createdAt = 100))
+        dao.insert(oneOff("i2", "kompot", createdAt = 200).copy(sectionEmoji = "🍝"))
+        // Somebody said "nowhere", which is not the same as having said nothing.
+        dao.insert(oneOff("i3", "kompot", createdAt = 300).copy(sectionEmoji = ""))
+
+        val rows = dao.observeItems("l1").first().associateBy { it.id }
+
+        // Only what was actually stored comes back; resolving it is the caller's
+        // job, and the three answers have to survive the round trip distinctly.
+        assertNull(rows.getValue("i1").itemSectionEmoji)
+        assertEquals("🍝", rows.getValue("i2").itemSectionEmoji)
+        assertEquals("", rows.getValue("i3").itemSectionEmoji)
     }
 
     @Test
