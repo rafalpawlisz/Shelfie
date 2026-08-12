@@ -85,6 +85,20 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `tinned things wear the tin, fresh ones wear themselves`() {
+        assertEquals("🥫", DecorationSuggester.suggest("krojone pomidory w puszce"))
+        assertEquals("🍅", DecorationSuggester.suggest("pomidory"))
+        assertEquals("🥫", DecorationSuggester.suggest("mleko zagęszczone"))
+        assertEquals("🥛", DecorationSuggester.suggest("mleko"))
+    }
+
+    @Test
+    fun `a pistachio paste wears the nut it is made of`() {
+        assertEquals("🌰", DecorationSuggester.suggest("pasta pistacjowa"))
+        assertEquals("🌰", DecorationSuggester.suggest("pistacje"))
+    }
+
+    @Test
     fun `a cream you rub in looks nothing like one you spread`() {
         assertEquals("🧴", DecorationSuggester.suggest("krem z filtrem"))
         assertEquals("🧴", DecorationSuggester.suggest("krem do rąk"))

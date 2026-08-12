@@ -89,15 +89,28 @@ object DecorationSuggester {
         "🍆" to listOf("baklazan", "cukinia", "eggplant"),
         "🎃" to listOf("dynia", "pumpkin"),
         "🫘" to listOf("fasola", "ciecierzyca", "soczewica", "beans", "groch"),
-        "🌰" to listOf("orzechy", "orzech", "migdaly", "nerkowce", "nuts", "pistacje", "nasiona", "pestki"),
+        // "pistacjowa" is here as well as in the section dictionary: the
+        // adjective cannot reach "pistacje" through the stemmer, so a paste
+        // named only by its flavour wore nothing at all.
+        "🌰" to listOf(
+            "orzechy", "orzech", "migdaly", "nerkowce", "nuts", "pistacje", "nasiona", "pestki",
+            "pistacjowa",
+        ),
         // Staples
         "🍚" to listOf("ryz", "rice"),
         // No "pasta" — see the section dictionary. It wore a bowl of spaghetti
         // on almond butter; the toothpaste above is a phrase and is unaffected.
         "🍝" to listOf("makaron", "spaghetti", "penne", "lazania", "kluski", "pierogi"),
         "🥫" to listOf(
-            "konserwa", "puszka", "tunczyk w puszce", "zupa", "sos", "ketchup", "majonez",
+            "konserwa", "puszka", "zupa", "sos", "ketchup", "majonez",
             "musztarda",
+            // The tin outranks what is in it, here for the same reason as in
+            // the section dictionary: on a list, "tinned" is the useful thing
+            // to see about tomatoes, since the fresh ones are a different
+            // errand. Replaces "tunczyk w puszce", which it covers.
+            "w puszce",
+            // Milk that comes in a tin, told apart from the milk that does not.
+            "mleko zageszczone", "mleko skondensowane",
             // The soup starter, not the beetroot drink — see CategorySuggester.
             "zakwas na zurek", "zakwas zytni",
         ),

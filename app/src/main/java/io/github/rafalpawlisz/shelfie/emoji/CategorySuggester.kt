@@ -97,7 +97,20 @@ object CategorySuggester {
             "lod w kostkach", "kostki lodu", "paluszki rybne mrozone",
         ),
         ProductCategory.CANNED to listOf(
-            "konserwa", "puszka", "tunczyk w puszce", "zupa",
+            "konserwa", "puszka", "zupa",
+            // This is the one section defined by packaging rather than by what
+            // a thing is, so the tin itself can answer for everything inside
+            // one — and it has to outrank the contents, which is exactly what
+            // went wrong: "krojone pomidory w puszce" followed "pomidory" to
+            // the fresh vegetables. As a phrase it beats any word in the name.
+            // It replaces "tunczyk w puszce", which it covers exactly.
+            // "puszce" alone would not do: the stemmer reduces it to "puszc"
+            // and the nominative "puszka" to "puszk", so the two never meet.
+            "w puszce",
+            // Condensed milk is a tin, but "mleko" leads the name and the first
+            // known word wins — so this must be a phrase. A word for the
+            // adjective would never get its turn.
+            "mleko zageszczone", "mleko skondensowane",
             "dzem", "konfitura", "miod", "honey", "nutella", "krem",
             "syrop", "maple", "maslo orzechowe", "peanut",
             // No "krem z" here. Phrases match as substrings, so it swallowed
@@ -158,6 +171,12 @@ object CategorySuggester {
             "sucharki", "wafle", "wafelki", "andruty",
             "krowki", "michalki", "toffi", "irysy",
             "orzechy", "orzech", "migdaly", "nerkowce", "nuts", "pistacje", "nasiona", "pestki",
+            // The adjective, because it cannot reach the noun: "pistacjowa"
+            // stems to "pistacjow" and "pistacje" to "pistacj", so the shelf
+            // was unreachable from any name that only mentioned the flavour —
+            // "pasta pistacjowa" had no section at all. One form covers the
+            // masculine and neuter too; all three reduce to the same stem.
+            "pistacjowa",
             "daktyle", "figi", "suszone owoce", "rodzynki", "sliwki suszone",
             // The adjective, not "owoce": freeze-dried fruit is a packet on the
             // snack shelf, and a word for "owoce" would drag it — and every

@@ -2,6 +2,7 @@ package io.github.rafalpawlisz.shelfie.emoji
 
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -305,6 +306,44 @@ class CategorySuggesterTest {
         assertEquals(ProductCategory.DRINKS, CategorySuggester.suggest("sok"))
         assertEquals(ProductCategory.DAIRY, CategorySuggester.suggest("ser"))
         assertEquals(ProductCategory.SPICES, CategorySuggester.suggest("sól"))
+    }
+
+    @Test
+    fun `a tin is filed by the tin, whatever is inside it`() {
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("krojone pomidory w puszce"))
+        // Earns its keep on tins nobody has bought yet — that is why it went in
+        // as the packaging rather than as this one name.
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("kukurydza w puszce"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("tuńczyk w puszce"))
+        // The fresh ones are still fresh: only the tin moves a name here.
+        assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("pomidory"))
+        assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("kukurydza"))
+    }
+
+    @Test
+    fun `condensed milk is a tin, and only a phrase can say so`() {
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("mleko zagęszczone"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("mleko skondensowane"))
+        // Why a phrase and not a word for the adjective: "mleko" leads the name
+        // and the first known word wins, so a word would never get its turn.
+        assertEquals(ProductCategory.DAIRY, CategorySuggester.suggest("mleko"))
+        assertEquals(ProductCategory.DAIRY, CategorySuggester.suggest("mleko owsiane"))
+    }
+
+    @Test
+    fun `a pistachio paste reaches the nuts through its adjective`() {
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("pasta pistacjowa"))
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("pistacje"))
+        // The stemmer is why the adjective had to go in on its own: these two
+        // words never meet, however alike they look.
+        assertNotEquals(
+            CategorySuggester.suggest("pistacjowa"),
+            CategorySuggester.suggest("pistacjowego"),
+        )
+        // And a head noun still leads, so the adjective decides only when
+        // nothing better has spoken: ice cream is frozen, a spread is a jar.
+        assertEquals(ProductCategory.FROZEN, CategorySuggester.suggest("lody pistacjowe"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("krem pistacjowy"))
     }
 
     @Test
