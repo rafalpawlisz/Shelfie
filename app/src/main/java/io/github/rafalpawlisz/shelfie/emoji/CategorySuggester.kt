@@ -223,6 +223,13 @@ object CategorySuggester {
         ),
         ProductCategory.HYGIENE to listOf(
             "mydlo", "soap", "zel pod prysznic", "szampon", "odzywka", "balsam",
+            // The shelf, not one bottle on it: this answers for the żel, the
+            // emulsja and the chusteczki as well as the płyn. A phrase because
+            // it has to be one — "płyn" leads the name and means the cleaning
+            // cupboard, which is right everywhere else, so a word for
+            // "intymnej" would never get its turn. Both forms because phrases
+            // are matched literally, without the stemmer.
+            "higieny intymnej", "higiena intymna",
             // "nitka" never answered for the way floss is actually written:
             // "nić" is too short for the stemmer to reach it, so the word goes
             // in as itself. The adjective is here for names that lead with it.

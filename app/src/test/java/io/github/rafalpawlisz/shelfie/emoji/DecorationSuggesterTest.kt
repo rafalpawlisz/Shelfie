@@ -85,6 +85,12 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `an intimate wash is soap, not a cleaning bottle`() {
+        assertEquals("🧼", DecorationSuggester.suggest("płyn do higieny intymnej"))
+        assertEquals("🧴", DecorationSuggester.suggest("płyn do naczyń"))
+    }
+
+    @Test
     fun `tinned things wear the tin, fresh ones wear themselves`() {
         assertEquals("🥫", DecorationSuggester.suggest("krojone pomidory w puszce"))
         assertEquals("🍅", DecorationSuggester.suggest("pomidory"))

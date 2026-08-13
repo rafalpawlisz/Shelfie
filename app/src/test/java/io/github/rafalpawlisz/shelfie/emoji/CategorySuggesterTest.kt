@@ -309,6 +309,22 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `intimate hygiene is a bathroom shelf, not the cleaning cupboard`() {
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("płyn do higieny intymnej"))
+        // The phrase names the shelf rather than one bottle on it, so it
+        // answers for the rest of it too.
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("żel do higieny intymnej"))
+        assertEquals(
+            ProductCategory.HYGIENE,
+            CategorySuggester.suggest("chusteczki do higieny intymnej"),
+        )
+        // And why it could only be a phrase: both names lead with a word that
+        // means the cleaning cupboard, and the first known word wins.
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("płyn do naczyń"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("chusteczki"))
+    }
+
+    @Test
     fun `a tin is filed by the tin, whatever is inside it`() {
         assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("krojone pomidory w puszce"))
         // Earns its keep on tins nobody has bought yet — that is why it went in

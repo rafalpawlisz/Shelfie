@@ -147,7 +147,12 @@ object DecorationSuggester {
         "🍹" to listOf("drink", "cydr", "koktajl"),
         // Household and hygiene
         "🧻" to listOf("papier toaletowy", "papier", "reczniki papierowe", "chusteczki", "chusteczka"),
-        "🧼" to listOf("mydlo", "soap", "zel pod prysznic", "szampon", "odzywka", "balsam"),
+        // The intimate wash belongs with the soap it is: without the phrase the
+        // word "plyn" below dressed it as a bottle of cleaning product.
+        "🧼" to listOf(
+            "mydlo", "soap", "zel pod prysznic", "szampon", "odzywka", "balsam",
+            "higieny intymnej", "higiena intymna",
+        ),
         "🪥" to listOf("pasta do zebow", "szczoteczka", "nitka"),
         "🧴" to listOf(
             "plyn", "detergent", "plyn do naczyn", "kapsulki", "proszek", "ploczka",
