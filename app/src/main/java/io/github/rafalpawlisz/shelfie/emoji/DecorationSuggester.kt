@@ -169,7 +169,9 @@ object DecorationSuggester {
         "🔋" to listOf("baterie", "bateria", "akumulator"),
         "💡" to listOf("zarowka", "zarowki"),
         "🕯️" to listOf("swieczka", "swieczki", "swiece"),
-        "🪒" to listOf("maszynka", "zyletki", "golenie"),
+        // The phrases carry the whole shelf, foam and aftershave included; see
+        // CategorySuggester for why "golenie" cannot reach "do golenia".
+        "🪒" to listOf("maszynka", "zyletki", "golenie", "do golenia", "po goleniu"),
         "🩹" to listOf("plaster", "plastry", "bandaz", "opatrunek"),
         "💊" to listOf(
             "tabletki", "witaminy", "magnez", "lek", "leki", "ibuprom", "apap",

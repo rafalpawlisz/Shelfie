@@ -248,6 +248,15 @@ object CategorySuggester {
             "krem do rak", "krem do twarzy", "krem do ciala", "krem pod oczy",
             "krem nawilzajacy", "krem z filtrem",
             "dezodorant", "maszynka", "zyletki", "golenie",
+            // "golenie" cannot answer for "do golenia": the stemmer leaves
+            // "golen" against "goleni", so the two never meet and "pianka do
+            // golenia" matched nothing at all. Phrases rather than the missing
+            // word form, because the word would lose anyway wherever it
+            // matters — "krem do golenia" and "płyn po goleniu" both lead with
+            // a word that means somewhere else entirely, and the first known
+            // word wins. "pianka" is deliberately not an entry: on its own it
+            // is as likely to be a marshmallow as a shaving foam.
+            "do golenia", "po goleniu",
             "podpaski", "tampony", "wkladki",
             "pieluchy", "pieluszki", "butelka dla dziecka",
         ),

@@ -85,6 +85,13 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `shaving things wear the razor, foam and aftershave included`() {
+        assertEquals("🪒", DecorationSuggester.suggest("pianka do golenia"))
+        assertEquals("🪒", DecorationSuggester.suggest("płyn po goleniu"))
+        assertEquals("🪒", DecorationSuggester.suggest("maszynka"))
+    }
+
+    @Test
     fun `an intimate wash is soap, not a cleaning bottle`() {
         assertEquals("🧼", DecorationSuggester.suggest("płyn do higieny intymnej"))
         assertEquals("🧴", DecorationSuggester.suggest("płyn do naczyń"))

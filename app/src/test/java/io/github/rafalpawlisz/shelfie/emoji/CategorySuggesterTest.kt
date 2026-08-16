@@ -309,6 +309,20 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `the shaving shelf answers for everything used on it`() {
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("pianka do golenia"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("żel do golenia"))
+        // Where the phrase earns its keep over the word form that was missing:
+        // these two lead with words that mean somewhere else entirely.
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("krem do golenia"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("płyn po goleniu"))
+        // Which is where those same words still take a name without the
+        // shaving in it.
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("krem czekoladowy"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("płyn do naczyń"))
+    }
+
+    @Test
     fun `intimate hygiene is a bathroom shelf, not the cleaning cupboard`() {
         assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("płyn do higieny intymnej"))
         // The phrase names the shelf rather than one bottle on it, so it
