@@ -309,6 +309,23 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `disposable tableware is filed beside the napkins`() {
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("talerzyki na grilla"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("kubeczki"))
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("serwetki"))
+        // The family word answers for the rest of the picnic.
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("sztućce jednorazowe"))
+        // The diminutives are what went in, and only they: real crockery is a
+        // cupboard rather than an aisle, and the stemmer keeps the pairs apart.
+        assertNull(CategorySuggester.suggest("talerze"))
+        assertNull(CategorySuggester.suggest("kubek"))
+        // And where "jednorazowe" would be wrong, the head noun leads and the
+        // first known word wins before it is ever reached.
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("pieluchy jednorazowe"))
+        assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("maszynki jednorazowe"))
+    }
+
+    @Test
     fun `the shaving shelf answers for everything used on it`() {
         assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("pianka do golenia"))
         assertEquals(ProductCategory.HYGIENE, CategorySuggester.suggest("żel do golenia"))

@@ -211,6 +211,15 @@ object CategorySuggester {
             "papier toaletowy", "papier", "reczniki papierowe", "chusteczki", "chusteczka",
             "reczniki", "folia", "papier do pieczenia", "papier sniadaniowy",
             "serwetki", "serwetka",
+            // Beside the napkins, which is where the shop keeps them too. The
+            // diminutives are the entries on purpose: "talerzyki" and
+            // "kubeczki" are a picnic, while "talerze" and "kubek" are the
+            // crockery cupboard and no errand at all — and the stemmer keeps
+            // the pairs apart on its own ("talerzyk" against "talerz").
+            // "jednorazowe" is the family word, for the sztućce and the tacki
+            // nobody has bought yet; where it would be wrong the head noun
+            // leads and wins first, as in "pieluchy jednorazowe".
+            "talerzyki", "kubeczki", "jednorazowe",
             "plyn", "detergent", "plyn do naczyn", "kapsulki", "proszek", "ploczka",
             "odplamiacz", "wybielacz", "odswiezacz", "plyn do szyb", "mleczko",
             "miotla", "zmiotka", "szufelka", "gabka", "zmywak", "sciereczka", "scierka",

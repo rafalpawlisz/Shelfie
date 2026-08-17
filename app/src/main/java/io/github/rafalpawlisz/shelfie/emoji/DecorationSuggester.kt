@@ -247,6 +247,9 @@ object DecorationSuggester {
         // get a face as well.
         "🧤" to listOf("rekawiczki", "rekawiczka", "rekawiczek", "rekawice", "gloves"),
         "🧻" to listOf("serwetki", "serwetka"),
+        // A place setting rather than the drink emoji a paper cup resembles:
+        // 🥤 is already the cola, and two aisles apart should not look alike.
+        "🍽️" to listOf("talerzyki", "kubeczki", "jednorazowe"),
         "🪥" to listOf(
             "nic", "nici", "dentystyczna", "dentystyczne", "dentystyczny", "floss",
             "plyn dentystyczny", "plyn do plukania ust", "plyn do plukania jamy ustnej",

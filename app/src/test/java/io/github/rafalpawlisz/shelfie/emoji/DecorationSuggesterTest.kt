@@ -85,6 +85,15 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `disposable tableware wears a place setting, not a drink`() {
+        assertEquals("🍽️", DecorationSuggester.suggest("talerzyki na grilla"))
+        assertEquals("🍽️", DecorationSuggester.suggest("kubeczki"))
+        // The cup a paper cup resembles belongs to something two aisles away.
+        assertEquals("🥤", DecorationSuggester.suggest("cola"))
+        assertEquals("🧻", DecorationSuggester.suggest("serwetki"))
+    }
+
+    @Test
     fun `shaving things wear the razor, foam and aftershave included`() {
         assertEquals("🪒", DecorationSuggester.suggest("pianka do golenia"))
         assertEquals("🪒", DecorationSuggester.suggest("płyn po goleniu"))
