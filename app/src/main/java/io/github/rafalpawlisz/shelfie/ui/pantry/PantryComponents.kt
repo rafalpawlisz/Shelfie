@@ -91,7 +91,7 @@ internal fun ProductListItem(
                 val isLow = !dimmed && minQuantity != null && product.quantity < minQuantity
                 Text(
                     text = if (isLow) {
-                        stringResource(R.string.quantity_below_min, baseQuantity, minQuantity!!)
+                        stringResource(R.string.quantity_below_min, baseQuantity, minQuantity)
                     } else {
                         baseQuantity
                     },

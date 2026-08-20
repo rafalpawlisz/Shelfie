@@ -129,7 +129,7 @@ class OfflineShoppingListRepository(
                 when {
                     aChecked != bChecked -> if (aChecked) 1 else -1
                     aChecked -> {
-                        val byTime = b.checkedAt!!.compareTo(a.checkedAt!!)
+                        val byTime = b.checkedAt!!.compareTo(a.checkedAt)
                         if (byTime != 0) byTime else collator.compare(a.productName, b.productName)
                     }
                     else -> {
