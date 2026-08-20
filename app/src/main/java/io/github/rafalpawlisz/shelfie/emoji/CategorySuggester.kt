@@ -200,7 +200,7 @@ object CategorySuggester {
             // phrases are matched first, so the two do not fight.
             "zakwas",
             "cola", "pepsi", "lemoniada", "oranzada", "izotonik", "energetyk",
-            "woda", "water", "mineralna", "gazowana",
+            "woda", "water", "mineralna", "gazowana", "muszynianka",
             "kompot", "mus", "mus owocowy", "smoothie", "tonik", "woda kokosowa",
         ),
         ProductCategory.ALCOHOL to listOf(

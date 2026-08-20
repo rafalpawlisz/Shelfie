@@ -139,7 +139,7 @@ object DecorationSuggester {
         "🍵" to listOf("herbata", "tea", "zielona herbata", "napar", "ziola"),
         "🧃" to listOf("sok", "juice", "nektar", "napoj", "zakwas"),
         "🥤" to listOf("cola", "pepsi", "lemoniada", "oranzada", "izotonik", "energetyk"),
-        "💧" to listOf("woda", "water", "mineralna", "gazowana"),
+        "💧" to listOf("woda", "water", "mineralna", "gazowana", "muszynianka"),
         "🍺" to listOf("piwo", "beer"),
         "🍷" to listOf("wino", "wine"),
         "🥂" to listOf("prosecco", "szampan"),
