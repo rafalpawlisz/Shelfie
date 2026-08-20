@@ -46,7 +46,7 @@ object DecorationSuggester {
         ),
         "🌾" to listOf("maka", "flour", "kasza", "otreby", "zarno", "grys"),
         "🍰" to listOf("ciasto", "ciastka", "ciastko", "herbatniki", "cake", "biszkopty", "sernik"),
-        "🍪" to listOf("kruche", "cookies", "pierniki"),
+        "🍪" to listOf("kruche", "cookies", "pierniki", "oreo"),
         // Meat and fish
         "🍗" to listOf("kurczak", "kura", "drob", "udka", "skrzydelka", "chicken", "indyk"),
         "🥓" to listOf("boczek", "bacon", "wedzonka", "szynka", "ham"),

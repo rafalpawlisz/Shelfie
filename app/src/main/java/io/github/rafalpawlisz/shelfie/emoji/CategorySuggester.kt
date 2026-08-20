@@ -167,7 +167,7 @@ object CategorySuggester {
             "muffinki", "babeczki", "cupcake",
             "popcorn", "chipsy", "chrupki", "prazynki", "paluszki", "krakersy",
             "ciasto", "ciastka", "ciastko", "herbatniki", "cake", "biszkopty", "sernik",
-            "kruche", "cookies", "pierniki",
+            "kruche", "cookies", "pierniki", "oreo",
             "sucharki", "wafle", "wafelki", "andruty",
             "krowki", "michalki", "toffi", "irysy",
             "orzechy", "orzech", "migdaly", "nerkowce", "nuts", "pistacje", "nasiona", "pestki",
