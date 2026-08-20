@@ -1,7 +1,7 @@
 # Shelfie
 
-An Android pantry app for a household of two: what you have at home, what you
-need to buy, and what you are using up — kept in step between two phones.
+An Android pantry app for your household: what you have at home, what you
+need to buy, and what you are using up — kept in step between your phones.
 
 Built for actual daily use rather than as a demo, so the awkward parts are the
 point: it works offline first, it never asks anyone to make an account, and
@@ -37,7 +37,7 @@ point: it works offline first, it never asks anyone to make an account, and
   Finishing a shop moves what you bought into the pantry in one step.
 - **Use up** — tap a product to spend one, or scan its barcode. Dropping below
   the minimum offers to put it on a list, with undo.
-- **Households** — one household is shared by both phones. Creating one hands
+- **Households** — one household is shared by every phone in it. Creating one hands
   you an invite code; entering that code on the other phone joins it. There is
   no sign-in: the app signs itself in anonymously the first time you create or
   join, and the code is the whole capability. Leaving is offered with or without
