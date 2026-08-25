@@ -73,6 +73,7 @@ internal fun ItemEditDialog(
         shownSectionEmoji(sectionTouched, sectionEmoji, initialSectionEmoji, suggestedSection)
     val amount = amountText.trim().toIntOrNull()
     val isValid = amountText.isBlank() || (amount != null && amount > 0)
+    val amountFocus = remember { FocusRequester() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -120,7 +121,9 @@ internal fun ItemEditDialog(
                             },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(0.4f),
+                            modifier = Modifier
+                                .weight(0.4f)
+                                .focusRequester(amountFocus),
                         )
                         OutlinedTextField(
                             value = unitText,
@@ -137,6 +140,7 @@ internal fun ItemEditDialog(
                         label = { Text(stringResource(R.string.shopping_amount_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.focusRequester(amountFocus),
                     )
                 }
                 OutlinedTextField(
@@ -145,6 +149,9 @@ internal fun ItemEditDialog(
                     label = { Text(stringResource(R.string.product_notes_label)) },
                     maxLines = 3,
                 )
+                // The amount is what an edit is usually about — focus it right
+                // away, keyboard and all, like the check-off dialog does.
+                LaunchedEffect(Unit) { amountFocus.requestFocus() }
             }
         },
         confirmButton = {
