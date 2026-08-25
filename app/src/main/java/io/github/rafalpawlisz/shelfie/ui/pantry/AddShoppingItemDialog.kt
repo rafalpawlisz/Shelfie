@@ -61,8 +61,9 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
  * it's asked for at check-off). Picking a product that is already on the list
  * pre-fills its current amount and note, and confirming REPLACES them.
  *
- * A one-off needs no second phase: it joins the list in one tap, bare — amount,
- * unit, note and section stay empty and are edited on the list if wanted.
+ * A one-off needs no second phase: it joins the list in one tap — bare, or
+ * with an amount and unit typed into the search ("marchew 200 g"). Note and
+ * section stay empty and are edited on the list if wanted.
  *
  * Full-screen like the product form: searching a pantry is browsing, and a card
  * capped at a few hundred dp fought both the list and the keyboard. It also
@@ -82,8 +83,9 @@ fun AddShoppingItemDialog(
     suggestions: List<OneOffSuggestion>,
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
     // A one-off: a line of text on the list, never a product. Added in one tap
-    // from the search — amount, unit, note and section stay empty and are
-    // edited on the list. Only the unit remembered from history rides along.
+    // from the search. Amount and unit ride along when the text holds them
+    // ("marchew 200 g"), or the unit the history remembers fills in alone;
+    // note and section stay empty and are edited on the list.
     onConfirmOneOff: (
         name: String,
         amount: Int?,
@@ -241,15 +243,20 @@ fun AddShoppingItemDialog(
                                 suggestions = suggestions,
                                 onSelect = { selectedProductId = it },
                                 onCreateProduct = onCreateProduct,
-                                // A one-off joins the list in the same tap:
-                                // bare, with only the unit the history
-                                // remembers. Everything else is edited on the
+                                // A one-off joins the list in the same tap.
+                                // A quantity typed into the search ("marchew
+                                // 200 g") rides along as amount and unit; the
+                                // note and section are still edited on the
                                 // list, where the line already is.
-                                onAddOneOff = { name ->
+                                onAddOneOff = { typed ->
+                                    val split = splitOneOffQuery(typed)
                                     onConfirmOneOff(
-                                        name,
-                                        null,
-                                        rememberedUnitFor(name, suggestions),
+                                        split.name,
+                                        split.amount,
+                                        // What the user typed is the measure;
+                                        // the remembered unit only steps in
+                                        // when they did not type one.
+                                        split.unit ?: rememberedUnitFor(split.name, suggestions),
                                         null,
                                         null,
                                     )
@@ -506,4 +513,30 @@ private const val EMPTY_QUERY_SUGGESTIONS = 8
 internal fun rememberedUnitFor(name: String?, suggestions: List<OneOffSuggestion>): String? {
     val wanted = name?.trim() ?: return null
     return suggestions.firstOrNull { it.name.trim().equals(wanted, ignoreCase = true) }?.unit
+}
+
+/** Name, amount and unit a one-off query splits into; name alone when nothing split off. */
+internal data class OneOffSplit(val name: String, val amount: Int?, val unit: String?)
+
+// "marchew 200 g", "marchew 200g", "marchew 200". Letters only for the unit
+// (g, kg, szt…), so "3,2%" or "00" never read as a quantity, and the name must
+// not be empty — a bare "200" is a name, not an amount of nothing.
+private val ONE_OFF_AMOUNT = Regex("^(.+?)\\s+(\\d+)\\s*(\\p{L}+)?$")
+
+/**
+ * Splits a one-off typed in one go — "marchew 200 g" — so the quantity lands on
+ * the row instead of hiding in the name. The unit is what the amount counts;
+ * "g" here, nothing when the amount was typed bare.
+ */
+internal fun splitOneOffQuery(query: String): OneOffSplit {
+    val trimmed = query.trim()
+    val match = ONE_OFF_AMOUNT.matchEntire(trimmed)
+    if (match == null) return OneOffSplit(trimmed, null, null)
+    val amount = match.groupValues[2].toIntOrNull()
+    if (amount == null || amount <= 0) return OneOffSplit(trimmed, null, null)
+    return OneOffSplit(
+        name = match.groupValues[1].trim(),
+        amount = amount,
+        unit = match.groupValues[3].takeIf { it.isNotBlank() },
+    )
 }
