@@ -51,7 +51,6 @@ import androidx.core.view.WindowCompat
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.verticalScroll
 import io.github.rafalpawlisz.shelfie.R
-import io.github.rafalpawlisz.shelfie.emoji.CategorySuggester
 import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
@@ -61,6 +60,9 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
  * buy. For a new item the fields start empty (blank amount = the bare need —
  * it's asked for at check-off). Picking a product that is already on the list
  * pre-fills its current amount and note, and confirming REPLACES them.
+ *
+ * A one-off needs no second phase: it joins the list in one tap, bare — amount,
+ * unit, note and section stay empty and are edited on the list if wanted.
  *
  * Full-screen like the product form: searching a pantry is browsing, and a card
  * capped at a few hundred dp fought both the list and the keyboard. It also
@@ -79,10 +81,9 @@ fun AddShoppingItemDialog(
     // Names bought once before, newest first; see OneOffSuggestion.
     suggestions: List<OneOffSuggestion>,
     onConfirm: (productId: String, amount: Int?, note: String?) -> Unit,
-    // A one-off: a line of text on the list, never a product. Confirmed from
-    // the same amount step, under the typed name.
-    // sectionEmoji is null unless the section was picked by hand, which leaves
-    // the line reading its section out of its name as it always did.
+    // A one-off: a line of text on the list, never a product. Added in one tap
+    // from the search — amount, unit, note and section stay empty and are
+    // edited on the list. Only the unit remembered from history rides along.
     onConfirmOneOff: (
         name: String,
         amount: Int?,
@@ -102,14 +103,6 @@ fun AddShoppingItemDialog(
     var selectedProductId by rememberSaveable(preselectProductId) {
         mutableStateOf(preselectProductId)
     }
-    // A one-off in the making: the typed name, promoted to the amount step.
-    var oneOffName by rememberSaveable(preselectProductId) { mutableStateOf<String?>(null) }
-    // Derived, not remembered alongside the name. Held as its own state it was
-    // set when a suggestion was picked and never cleared, so a name typed fresh
-    // afterwards arrived at the amount step wearing the previous suggestion's
-    // unit — "wiadro" measured in grams. Two values that must agree are one
-    // value; asking the history what it knows about THIS name cannot disagree.
-    val rememberedUnit = rememberedUnitFor(oneOffName, suggestions)
     val selectedProduct = products.firstOrNull { it.id == selectedProductId }
         ?: archivedProducts.firstOrNull { it.id == selectedProductId }
     val selectedIsArchived = archivedProducts.any { it.id == selectedProductId }
@@ -119,15 +112,14 @@ fun AddShoppingItemDialog(
     // the search meant a flash of it — keyboard, stolen focus and all — every
     // time the picker reopened around a freshly created product.
     val awaitingProduct = selectedProductId != null && selectedProduct == null
-    val inAmountStep = selectedProductId != null || oneOffName != null
+    val inAmountStep = selectedProductId != null
 
-    // The amount step's fields can outgrow what the keyboard leaves of the
-    // screen — the section picker tipped it over — so the step scrolls, the way
-    // the product form does. Keyed to the step's owner so one item's scroll
-    // offset is not the next one's; applied only in the amount step, because
-    // the search phase is a LazyColumn, which must never sit inside an outer
-    // vertical scroll.
-    val amountStepScroll = remember(selectedProductId, oneOffName) { ScrollState(0) }
+    // The amount step scrolls like the product form — the fields can outgrow
+    // what the keyboard leaves of the screen. Keyed to the step's owner so one
+    // item's scroll offset is not the next one's; applied only in the amount
+    // step, because the search phase is a LazyColumn, which must never sit
+    // inside an outer vertical scroll.
+    val amountStepScroll = remember(selectedProductId) { ScrollState(0) }
 
     // One meaning of "back" for every way of asking: the arrow in the bar, the
     // system gesture, the hardware button. From the amount step it returns to
@@ -138,7 +130,6 @@ fun AddShoppingItemDialog(
             onDismiss()
         } else {
             selectedProductId = null
-            oneOffName = null
         }
     }
 
@@ -167,31 +158,14 @@ fun AddShoppingItemDialog(
             }
             // Amount and note live here rather than in the phase below, so the
             // confirm action can sit in the top bar — reachable with the
-            // keyboard up, like the product form's Save. Keyed on both step
-            // owners so a one-off starts from blank fields too.
-            var amountText by rememberSaveable(selectedProductId, oneOffName) {
+            // keyboard up, like the product form's Save. Keyed on the step's
+            // owner so one item's draft is not the next one's.
+            var amountText by rememberSaveable(selectedProductId) {
                 mutableStateOf(existing?.amount?.toString().orEmpty())
             }
-            var noteText by rememberSaveable(selectedProductId, oneOffName) {
+            var noteText by rememberSaveable(selectedProductId) {
                 mutableStateOf(existing?.note.orEmpty())
             }
-            // A one-off's own unit: what its amount counts. A product needs no
-            // field here — its unit is part of the product. Pre-filled when the
-            // name came from a suggestion.
-            var unitText by rememberSaveable(selectedProductId, oneOffName) {
-                mutableStateOf(rememberedUnit.orEmpty())
-            }
-            // What the name implies, and whether anybody has disagreed with it.
-            // Kept apart the way the product form keeps them apart: an untouched
-            // pick is not stored at all, so the line goes on following the
-            // dictionary instead of freezing today's guess.
-            val suggestedSection = remember(oneOffName) {
-                oneOffName?.let { CategorySuggester.suggest(it) }
-            }
-            var sectionTouched by rememberSaveable(oneOffName) { mutableStateOf(false) }
-            var sectionEmoji by rememberSaveable(oneOffName) { mutableStateOf("") }
-            val shownSection =
-                shownSectionEmoji(sectionTouched, sectionEmoji, stored = null, suggestedSection)
             val amount = amountText.trim().toIntOrNull()
             val amountValid = amountText.isBlank() || (amount != null && amount > 0)
 
@@ -219,33 +193,13 @@ fun AddShoppingItemDialog(
                         },
                         title = { Text(stringResource(R.string.add_to_shopping_list)) },
                         actions = {
-                            val confirmedOneOff = oneOffName
-                            if (selectedProduct != null || confirmedOneOff != null) {
+                            if (selectedProduct != null) {
                                 TextButton(
                                     enabled = amountValid,
                                     onClick = {
                                         val cleanAmount = if (amountText.isBlank()) null else amount
                                         val cleanNote = noteText.trim().ifBlank { null }
-                                        if (selectedProduct != null) {
-                                            onConfirm(selectedProduct.id, cleanAmount, cleanNote)
-                                        } else {
-                                            onConfirmOneOff(
-                                                confirmedOneOff!!,
-                                                cleanAmount,
-                                                unitText.trim().ifBlank { null },
-                                                cleanNote,
-                                                // The tested rule: only a pick
-                                                // is stored — a line created
-                                                // with nothing said stores
-                                                // nothing, and keeps asking
-                                                // its name.
-                                                storedSectionEmoji(
-                                                    sectionTouched,
-                                                    sectionEmoji,
-                                                    stored = null,
-                                                ),
-                                            )
-                                        }
+                                        onConfirm(selectedProduct.id, cleanAmount, cleanNote)
                                     },
                                 ) {
                                     Text(
@@ -277,7 +231,7 @@ fun AddShoppingItemDialog(
                         ),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (selectedProduct == null && oneOffName == null) {
+                    if (selectedProduct == null) {
                         // Nothing but the bar while the picked product is still
                         // on its way; back leaves for the search as usual.
                         if (!awaitingProduct) {
@@ -287,19 +241,28 @@ fun AddShoppingItemDialog(
                                 suggestions = suggestions,
                                 onSelect = { selectedProductId = it },
                                 onCreateProduct = onCreateProduct,
-                                onBuyOneOff = { oneOffName = it },
-                                // Straight to the amount step under the
-                                // remembered name; its unit follows from the
-                                // name via [rememberedUnitFor].
-                                onPickSuggestion = { suggestion -> oneOffName = suggestion.name },
+                                // A one-off joins the list in the same tap:
+                                // bare, with only the unit the history
+                                // remembers. Everything else is edited on the
+                                // list, where the line already is.
+                                onAddOneOff = { name ->
+                                    onConfirmOneOff(
+                                        name,
+                                        null,
+                                        rememberedUnitFor(name, suggestions),
+                                        null,
+                                        null,
+                                    )
+                                },
                                 onForgetSuggestion = onForgetSuggestion,
                             )
                         }
                     } else {
                         Text(
-                            text = selectedProduct
-                                ?.let { listOfNotNull(decorationFor(it.name), it.name).joinToString(" ") }
-                                ?: oneOffName.orEmpty(),
+                            text = listOfNotNull(
+                                decorationFor(selectedProduct.name),
+                                selectedProduct.name,
+                            ).joinToString(" "),
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(top = 8.dp),
                         )
@@ -312,73 +275,16 @@ fun AddShoppingItemDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        // Said before adding, not discovered at checkout: this
-                        // line is not becoming a product.
-                        if (oneOffName != null) {
-                            Text(
-                                text = stringResource(R.string.picker_one_off_hint),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (oneOffName != null) {
-                            // The aisle this line will be walked in. Shown
-                            // because a guess nobody can see is a guess nobody
-                            // can correct — and the correcting happens here,
-                            // where the name is still in mind, rather than in
-                            // the shop where the line is already wrong.
-                            SectionPickerField(
-                                name = oneOffName.orEmpty(),
-                                selectedEmoji = shownSection,
-                                suggestion = suggestedSection,
-                                onPick = { category ->
-                                    sectionTouched = true
-                                    sectionEmoji = category?.emoji.orEmpty()
-                                },
-                            )
-                        }
-                        if (oneOffName != null) {
-                            // Amount + unit read as one value ("200 g",
-                            // "3 opakowania"), paired the way the product form
-                            // pairs quantity and unit.
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                OutlinedTextField(
-                                    value = amountText,
-                                    onValueChange = { amountText = it },
-                                    label = {
-                                        Text(
-                                            stringResource(R.string.shopping_amount_label_short),
-                                        )
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Number,
-                                    ),
-                                    modifier = Modifier.weight(0.4f),
-                                )
-                                OutlinedTextField(
-                                    value = unitText,
-                                    onValueChange = { unitText = it },
-                                    label = { Text(stringResource(R.string.product_unit_label)) },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(0.6f),
-                                )
-                            }
-                        } else {
-                            OutlinedTextField(
-                                value = amountText,
-                                onValueChange = { amountText = it },
-                                label = { Text(stringResource(R.string.shopping_amount_label)) },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number,
-                                ),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
+                        OutlinedTextField(
+                            value = amountText,
+                            onValueChange = { amountText = it },
+                            label = { Text(stringResource(R.string.shopping_amount_label)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                         OutlinedTextField(
                             value = noteText,
                             onValueChange = { noteText = it },
@@ -400,8 +306,7 @@ private fun SearchPhase(
     suggestions: List<OneOffSuggestion>,
     onSelect: (productId: String) -> Unit,
     onCreateProduct: (name: String) -> Unit,
-    onBuyOneOff: (name: String) -> Unit,
-    onPickSuggestion: (OneOffSuggestion) -> Unit,
+    onAddOneOff: (name: String) -> Unit,
     onForgetSuggestion: (name: String) -> Unit,
 ) {
     // The search stays even with an empty pantry: typing a name and creating it
@@ -515,7 +420,7 @@ private fun SearchPhase(
             items(visibleSuggestions, key = { "one-off-${it.name}" }) { suggestion ->
                 OneOffSuggestionRow(
                     suggestion = suggestion,
-                    onClick = { onPickSuggestion(suggestion) },
+                    onClick = { onAddOneOff(suggestion.name) },
                     onForget = { onForgetSuggestion(suggestion.name) },
                 )
             }
@@ -523,7 +428,7 @@ private fun SearchPhase(
         if (offerOneOff) {
             item(key = "one-off") {
                 OutlinedButton(
-                    onClick = { onBuyOneOff(query.trim()) },
+                    onClick = { onAddOneOff(query.trim()) },
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 ) {
                     Text(stringResource(R.string.picker_one_off, query.trim()))
@@ -592,11 +497,11 @@ private const val EMPTY_QUERY_SUGGESTIONS = 8
  * seen it.
  *
  * A function of the name rather than a decision made when a suggestion was
- * tapped: the picker offers two routes to the amount step — a remembered name
- * and a freshly typed one — and a unit carried along the first route used to
- * survive into the second. Matching is loose in the same way the history's own
- * identity is, so typing a name it already knows pre-fills the unit too, which
- * is the same answer picking it would have given.
+ * tapped: the picker offers two routes to the same one-tap addition — a
+ * remembered name and a freshly typed one — and a unit carried along the first
+ * route used to survive into the second. Matching is loose in the same way the
+ * history's own identity is, so typing a name it already knows brings its unit
+ * too, which is the same answer picking it would have given.
  */
 internal fun rememberedUnitFor(name: String?, suggestions: List<OneOffSuggestion>): String? {
     val wanted = name?.trim() ?: return null
