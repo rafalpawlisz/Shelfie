@@ -141,6 +141,17 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `the mountain water wears the drop`() {
+        assertEquals("💧", DecorationSuggester.suggest("muszynianka"))
+        assertEquals("💧", DecorationSuggester.suggest("woda muszynianka"))
+    }
+
+    @Test
+    fun `a branded biscuit wears the cookie it is`() {
+        assertEquals("🍪", DecorationSuggester.suggest("oreo"))
+    }
+
+    @Test
     fun `chanterelles wear a mushroom, turmeric keeps its spice jar`() {
         assertEquals("🍄", DecorationSuggester.suggest("kurki"))
         assertEquals("🧂", DecorationSuggester.suggest("kurkuma"))

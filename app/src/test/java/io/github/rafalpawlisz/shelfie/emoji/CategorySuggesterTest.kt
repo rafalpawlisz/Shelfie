@@ -410,6 +410,19 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `the mountain water names the drinks aisle on its own`() {
+        // The brand went in as a word, so the brand alone must reach the aisle;
+        // "woda" was already there to carry the full name.
+        assertEquals(ProductCategory.DRINKS, CategorySuggester.suggest("muszynianka"))
+        assertEquals(ProductCategory.DRINKS, CategorySuggester.suggest("woda muszynianka"))
+    }
+
+    @Test
+    fun `a branded biscuit keeps the sweets shelf by name alone`() {
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("oreo"))
+    }
+
+    @Test
     fun `every category emoji is unique - it is the storage key`() {
         val emoji = ProductCategory.entries.map { it.emoji }
         assertEquals(emoji.size, emoji.toSet().size)
