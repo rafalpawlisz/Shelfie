@@ -123,7 +123,7 @@ object DecorationSuggester {
         "🍬" to listOf("cukierki", "zelki", "landrynki", "candy", "guma"),
         "🍭" to listOf("lizak", "lizaki"),
         "🧁" to listOf("muffinki", "babeczki", "cupcake"),
-        "🍿" to listOf("popcorn", "chipsy", "chrupki", "prazynki"),
+        "🍿" to listOf("popcorn", "chipsy", "chrupki", "prazynki", "przekaski"),
         "🍩" to listOf("paczki", "paczek", "donut", "oponki"),
         "🧊" to listOf("lod w kostkach", "kostki lodu"),
         "🥗" to listOf("salatka", "surowka", "mix salat"),
@@ -186,7 +186,7 @@ object DecorationSuggester {
         "🐈" to listOf("karma dla kota", "zwirek", "karma kota"),
         "🌱" to listOf("nasiona kwiatow", "ziemia do kwiatow", "nawoz"),
         "📦" to listOf("paczka", "przesylka"),
-        "✏️" to listOf("zeszyt", "olowek", "pisak", "kartki"),
+        "✏️" to listOf("zeszyt", "olowek", "pisak", "kartki", "krzyzowki"),
 
         // Second pass, driven by a coverage probe over ~125 plausible names:
         // the first draft missed most of them. Appended rather than merged so

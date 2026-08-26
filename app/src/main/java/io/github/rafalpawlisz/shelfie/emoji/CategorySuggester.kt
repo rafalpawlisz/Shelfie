@@ -165,7 +165,7 @@ object CategorySuggester {
             "czekolada", "chocolate", "kakao", "baton", "batony", "sniadaniowa",
             "cukierki", "zelki", "landrynki", "candy", "guma", "lizak", "lizaki",
             "muffinki", "babeczki", "cupcake",
-            "popcorn", "chipsy", "chrupki", "prazynki", "paluszki", "krakersy",
+            "popcorn", "chipsy", "chrupki", "prazynki", "paluszki", "krakersy", "przekaski",
             "ciasto", "ciastka", "ciastko", "herbatniki", "cake", "biszkopty", "sernik",
             "kruche", "cookies", "pierniki", "oreo",
             "sucharki", "wafle", "wafelki", "andruty",
@@ -288,7 +288,7 @@ object CategorySuggester {
             // Not "paczka": it stems to the same shape as the bakery's
             // "paczki", which claims it first — a dead entry that answered
             // "bread" for a parcel.
-            "przesylka", "zeszyt", "olowek", "pisak", "kartki",
+            "przesylka", "zeszyt", "olowek", "pisak", "kartki", "krzyzowki",
             "nozyczki", "nozyk", "ladowarka", "przedluzacz", "kabel", "parasol", "parasolka",
         ),
     )

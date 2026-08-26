@@ -158,6 +158,14 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `snacks wear the popcorn and crosswords the pencil`() {
+        assertEquals("🍿", DecorationSuggester.suggest("przekąski"))
+        assertEquals("🍿", DecorationSuggester.suggest("przekąska"))
+        assertEquals("✏️", DecorationSuggester.suggest("krzyżówki"))
+        assertEquals("✏️", DecorationSuggester.suggest("krzyżówka"))
+    }
+
+    @Test
     fun `an unknown name simply has no decoration`() {
         assertNull(DecorationSuggester.suggest("zgrzeblarka"))
         assertNull(DecorationSuggester.suggest(""))

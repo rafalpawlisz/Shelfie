@@ -286,6 +286,16 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `snacks reach the sweets shelf and crosswords the stationery corner`() {
+        // Reported from real shopping: both matched nothing at all. The singular
+        // rides the same stem as the plural.
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("przekąski"))
+        assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("przekąska"))
+        assertEquals(ProductCategory.HOME, CategorySuggester.suggest("krzyżówki"))
+        assertEquals(ProductCategory.HOME, CategorySuggester.suggest("krzyżówka"))
+    }
+
+    @Test
     fun `an unknown name suggests nothing`() {
         assertNull(CategorySuggester.suggest("zgrzeblarka"))
         assertNull(CategorySuggester.suggest(""))
