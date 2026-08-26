@@ -363,7 +363,7 @@ class ShoppingListViewModelTest {
     @Test
     fun `use-up below the minimum emits a suggestion whose amount grows`() = runTest {
         val repository = FakeProductRepository()
-        repository.addProduct(name = "Milk", quantity = 3, unit = "l", minQuantity = 3)
+        repository.addProduct(name = "Milk", quantity = 3, unit = null, minQuantity = 3)
         val viewModel = makeViewModel(repository)
         observe(viewModel)
         val events = collectLowStock(viewModel)
@@ -380,7 +380,7 @@ class ShoppingListViewModelTest {
     @Test
     fun `no suggestion without a minimum quantity`() = runTest {
         val repository = FakeProductRepository()
-        repository.addProduct(name = "Milk", quantity = 1, unit = "l")
+        repository.addProduct(name = "Milk", quantity = 1, unit = null)
         val viewModel = makeViewModel(repository)
         observe(viewModel)
         val events = collectLowStock(viewModel)
@@ -395,7 +395,7 @@ class ShoppingListViewModelTest {
     @Test
     fun `no suggestion when the product is already on a list`() = runTest {
         val repository = FakeProductRepository()
-        repository.addProduct(name = "Milk", quantity = 2, unit = "l", minQuantity = 3)
+        repository.addProduct(name = "Milk", quantity = 2, unit = null, minQuantity = 3)
         val viewModel = makeViewModel(repository)
         observe(viewModel)
         val events = collectLowStock(viewModel)
@@ -411,7 +411,7 @@ class ShoppingListViewModelTest {
     @Test
     fun `suggestion still emitted when there are no lists`() = runTest {
         val repository = FakeProductRepository()
-        repository.addProduct(name = "Milk", quantity = 2, unit = "l", minQuantity = 3)
+        repository.addProduct(name = "Milk", quantity = 2, unit = null, minQuantity = 3)
         val viewModel = makeViewModel(repository)
         observe(viewModel)
         val events = collectLowStock(viewModel)
@@ -433,7 +433,7 @@ class ShoppingListViewModelTest {
             viewModel.useUpEvents.collect { scans.add(it) }
         }
         viewModel.addProduct(
-            name = "Milk", quantity = 2, unit = "l", minQuantity = 3,
+            name = "Milk", quantity = 2, unit = null, minQuantity = 3,
             barcodes = listOf("5901234123457"),
         )
         viewModel.createList("Lidl")
@@ -449,7 +449,7 @@ class ShoppingListViewModelTest {
     @Test
     fun `undoUseUp puts the unit back`() = runTest {
         val repository = FakeProductRepository()
-        repository.addProduct(name = "Milk", quantity = 2, unit = "l")
+        repository.addProduct(name = "Milk", quantity = 2, unit = null)
         val viewModel = makeViewModel(repository)
         observe(viewModel)
         val productId = viewModel.uiState.value.products.single().id

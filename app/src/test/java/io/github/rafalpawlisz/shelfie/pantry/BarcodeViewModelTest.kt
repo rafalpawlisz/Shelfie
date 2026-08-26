@@ -81,7 +81,7 @@ class BarcodeViewModelTest {
     }
 
     @Test
-    fun `scanning a known code on use-up decrements the product and reports Used`() = runTest {
+    fun `scanning a code of a measured product asks for the amount instead of subtracting`() = runTest {
         val products = FakeProductRepository()
         products.addProduct(name = "Milk", quantity = 2, unit = "l")
         val viewModel = makeViewModel(products)
@@ -97,8 +97,29 @@ class BarcodeViewModelTest {
 
         viewModel.useUpByBarcode("5901234123457")
 
-        assertEquals(1, viewModel.uiState.value.products.first { it.name == "Milk" }.quantity)
-        assertEquals(UseUpScanResult.Used(id, "Milk"), events.last())
+        assertEquals(2, viewModel.uiState.value.products.first { it.name == "Milk" }.quantity)
+        assertTrue(events.isEmpty())
+        assertEquals(id, viewModel.pendingUseUp.value?.id)
+    }
+
+    @Test
+    fun `scanning a code of a countable product subtracts one and reports Used`() = runTest {
+        val products = FakeProductRepository()
+        products.addProduct(name = "Butter", quantity = 2, unit = null)
+        val viewModel = makeViewModel(products)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val events = mutableListOf<UseUpScanResult>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.useUpEvents.collect { events += it } }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.updateProduct(
+            id = id, name = "Butter", quantity = 2, unit = null,
+            addedBarcodes = listOf("5901234123457"),
+        )
+
+        viewModel.useUpByBarcode("5901234123457")
+
+        assertEquals(1, viewModel.uiState.value.products.single().quantity)
+        assertEquals(UseUpScanResult.Used(id, "Butter"), events.last())
     }
 
     @Test

@@ -19,6 +19,7 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +48,8 @@ sealed interface UseUpScanResult {
     data class Used(
         val productId: String,
         val productName: String,
+        // How much was taken off, so Undo can put exactly that back.
+        val amount: Int = 1,
         val suggestion: LowStockSuggestion? = null,
     ) : UseUpScanResult
 
@@ -117,6 +120,11 @@ class PantryViewModel(
     // One-shot feedback for use-ups (tap or scan) on the Use up tab.
     private val useUpChannel = Channel<UseUpScanResult>(Channel.BUFFERED)
     val useUpEvents = useUpChannel.receiveAsFlow()
+
+    // A product whose unit makes "one tap = one unit" meaningless (500 g of
+    // carrots): the UI asks how much was used before subtracting anything.
+    private val pendingUseUpFlow = MutableStateFlow<Product?>(null)
+    val pendingUseUp = pendingUseUpFlow.asStateFlow()
 
     // One-shot "item removed" events so the UI can offer Undo.
     private val itemRemovedChannel = Channel<RemovedShoppingItem>(Channel.BUFFERED)
@@ -246,9 +254,17 @@ class PantryViewModel(
         viewModelScope.launch {
             val product = repository.getActiveProduct(id) ?: return@launch
             if (product.quantity <= 0) return@launch
-            useUpChannel.send(
-                UseUpScanResult.Used(product.id, product.name, useUpProduct(product)),
-            )
+            if (product.unit != null) {
+                pendingUseUpFlow.value = product
+            } else {
+                useUpChannel.send(
+                    UseUpScanResult.Used(
+                        productId = product.id,
+                        productName = product.name,
+                        suggestion = useUpProduct(product, amount = 1),
+                    ),
+                )
+            }
         }
     }
 
@@ -259,32 +275,64 @@ class PantryViewModel(
             // scanner's own activity can leave the WhileSubscribed uiState stale.
             // Only active products can be used up; archived/unknown → UnknownCode.
             val product = productId?.let { repository.getActiveProduct(it) }
-            val result = when {
-                product == null -> UseUpScanResult.UnknownCode(code)
-                product.quantity > 0 ->
-                    UseUpScanResult.Used(product.id, product.name, useUpProduct(product))
-                else -> UseUpScanResult.OutOfStock(product.name)
+            when {
+                product == null -> useUpChannel.send(UseUpScanResult.UnknownCode(code))
+                product.quantity <= 0 ->
+                    useUpChannel.send(UseUpScanResult.OutOfStock(product.name))
+                // A unit makes the amount the user's call, same as a tap.
+                product.unit != null -> pendingUseUpFlow.value = product
+                else -> useUpChannel.send(
+                    UseUpScanResult.Used(
+                        productId = product.id,
+                        productName = product.name,
+                        suggestion = useUpProduct(product, amount = 1),
+                    ),
+                )
             }
-            useUpChannel.send(result)
         }
     }
 
-    /** Undo of the last use-up snackbar: put the unit back. */
-    fun undoUseUp(productId: String) {
-        viewModelScope.launch { repository.adjustQuantity(productId, delta = +1) }
+    /** The amount dialog's OK: subtract the typed amount and clear the prompt. */
+    fun confirmUseUp(amount: Int) {
+        val product = pendingUseUpFlow.value ?: return
+        pendingUseUpFlow.value = null
+        if (amount <= 0) return
+        viewModelScope.launch {
+            // The dialog refuses more than is in stock; this keeps a stale or
+            // out-of-band amount from driving the stock negative.
+            val used = minOf(amount, product.quantity)
+            if (used <= 0) return@launch
+            useUpChannel.send(
+                UseUpScanResult.Used(
+                    productId = product.id,
+                    productName = product.name,
+                    amount = used,
+                    suggestion = useUpProduct(product, amount = used),
+                ),
+            )
+        }
+    }
+
+    fun cancelUseUp() {
+        pendingUseUpFlow.value = null
+    }
+
+    /** Undo of the last use-up snackbar: put the used amount back. */
+    fun undoUseUp(productId: String, amount: Int = 1) {
+        viewModelScope.launch { repository.adjustQuantity(productId, delta = +amount) }
     }
 
     /**
-     * Consume one unit and return a restock suggestion when the stock lands
-     * below the product's minimum. Fires on every such use-up (the amount grows
-     * as the stock shrinks); the "already on a list" check is what keeps it from
-     * nagging. Whether the UI offers an Add action (there may be no lists) is
-     * the UI's call.
+     * Consume [amount] units and return a restock suggestion when the stock
+     * lands below the product's minimum. Fires on every such use-up (the amount
+     * grows as the stock shrinks); the "already on a list" check is what keeps
+     * it from nagging. Whether the UI offers an Add action (there may be no
+     * lists) is the UI's call.
      */
-    private suspend fun useUpProduct(product: Product): LowStockSuggestion? {
-        repository.adjustQuantity(product.id, delta = -1)
+    private suspend fun useUpProduct(product: Product, amount: Int): LowStockSuggestion? {
+        repository.adjustQuantity(product.id, delta = -amount)
         val min = product.minQuantity ?: return null
-        val newQuantity = product.quantity - 1
+        val newQuantity = product.quantity - amount
         if (newQuantity >= min) return null
         if (shoppingListRepository.isOnAnyList(product.id)) return null
         return LowStockSuggestion(

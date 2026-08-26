@@ -48,6 +48,7 @@ import io.github.rafalpawlisz.shelfie.ui.pantry.ProductsScreen
 import io.github.rafalpawlisz.shelfie.ui.pantry.productNameConflict
 import io.github.rafalpawlisz.shelfie.ui.pantry.RestockDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.ShoppingScreen
+import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpAmountDialog
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScanResult
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScreen
 import io.github.rafalpawlisz.shelfie.ui.settings.AuthViewModel
@@ -67,6 +68,7 @@ fun ShelfieApp(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val household by authViewModel.household.collectAsStateWithLifecycle()
+    val pendingUseUp by viewModel.pendingUseUp.collectAsStateWithLifecycle()
     var currentTab by rememberSaveable { mutableStateOf(ShelfieTab.PRODUCTS) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var showAddToListDialog by rememberSaveable { mutableStateOf(false) }
@@ -124,7 +126,7 @@ fun ShelfieApp(
                             duration = SnackbarDuration.Long,
                         )
                         if (shown == SnackbarResult.ActionPerformed) {
-                            viewModel.undoUseUp(result.productId)
+                            viewModel.undoUseUp(result.productId, result.amount)
                         }
                     }
                 }
@@ -269,6 +271,15 @@ fun ShelfieApp(
                 }
             }
         }
+    }
+
+    val pending = pendingUseUp
+    if (pending != null) {
+        UseUpAmountDialog(
+            product = pending,
+            onConfirm = viewModel::confirmUseUp,
+            onDismiss = viewModel::cancelUseUp,
+        )
     }
 
     if (showSettings) {

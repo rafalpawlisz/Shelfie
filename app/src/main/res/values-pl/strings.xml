@@ -36,7 +36,10 @@
     <string name="archived_short">Archiwum (%1$d)</string>
     <string name="action_close">Zamknij</string>
     <string name="action_back">Wstecz</string>
-    <string name="use_up_hint">Dotknij produktu, aby odjąć 1</string>
+    <string name="use_up_hint">Dotknij produktu, aby go zużyć — produkty z jednostką zapytają o ilość</string>
+    <string name="use_up_amount_title">Ile zużyto?</string>
+    <string name="use_up_amount_label">Ilość (%1$s)</string>
+    <string name="use_up_amount_confirm">Odejmij</string>
     <string name="use_up_empty_title">Nie ma czego zużyć</string>
     <string name="use_up_empty_message">Produkty, które masz w zapasie, pojawią się tutaj</string>
     <string name="use_up_scanned">Zużyto: %1$s</string>

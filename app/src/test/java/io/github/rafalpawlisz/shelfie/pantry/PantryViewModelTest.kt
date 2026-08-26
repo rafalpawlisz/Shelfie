@@ -3,6 +3,7 @@
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
+import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScanResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -144,6 +145,97 @@ class PantryViewModelTest {
         viewModel.decrement(id)
 
         assertEquals(0, viewModel.uiState.value.products.single().quantity)
+    }
+
+    @Test
+    fun `decrement on a measured product asks for the amount instead of subtracting`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Carrot", quantity = 500, unit = "g")
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val events = mutableListOf<UseUpScanResult>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.useUpEvents.collect { events += it } }
+        val id = viewModel.uiState.value.products.single().id
+
+        viewModel.decrement(id)
+
+        assertEquals(500, viewModel.uiState.value.products.single().quantity)
+        assertTrue(events.isEmpty())
+        assertEquals(id, viewModel.pendingUseUp.value?.id)
+    }
+
+    @Test
+    fun `confirming the dialog subtracts the typed amount and reports Used with it`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Carrot", quantity = 500, unit = "g")
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val events = mutableListOf<UseUpScanResult>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.useUpEvents.collect { events += it } }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.decrement(id)
+
+        viewModel.confirmUseUp(150)
+
+        assertEquals(350, viewModel.uiState.value.products.single().quantity)
+        assertNull(viewModel.pendingUseUp.value)
+        assertEquals(
+            UseUpScanResult.Used(productId = id, productName = "Carrot", amount = 150),
+            events.last(),
+        )
+    }
+
+    @Test
+    fun `confirming more than in stock clamps at zero`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Carrot", quantity = 500, unit = "g")
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val events = mutableListOf<UseUpScanResult>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.useUpEvents.collect { events += it } }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.decrement(id)
+
+        viewModel.confirmUseUp(999)
+
+        assertEquals(0, viewModel.uiState.value.products.single().quantity)
+        assertEquals(
+            UseUpScanResult.Used(productId = id, productName = "Carrot", amount = 500),
+            events.last(),
+        )
+    }
+
+    @Test
+    fun `cancelling the dialog changes nothing`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Carrot", quantity = 500, unit = "g")
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val events = mutableListOf<UseUpScanResult>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.useUpEvents.collect { events += it } }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.decrement(id)
+
+        viewModel.cancelUseUp()
+
+        assertEquals(500, viewModel.uiState.value.products.single().quantity)
+        assertNull(viewModel.pendingUseUp.value)
+        assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun `undo restores the amount the dialog subtracted`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Carrot", quantity = 500, unit = "g")
+        val viewModel = makeViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.decrement(id)
+        viewModel.confirmUseUp(150)
+
+        viewModel.undoUseUp(id, amount = 150)
+
+        assertEquals(500, viewModel.uiState.value.products.single().quantity)
     }
 
     @Test
