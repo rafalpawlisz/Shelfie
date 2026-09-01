@@ -58,7 +58,13 @@ internal fun ItemEditDialog(
     ) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var amountText by rememberSaveable { mutableStateOf(initialAmount?.toString().orEmpty()) }
+    // TextFieldValue instead of a plain String so the cursor can start after
+    // the prefilled amount — one backspace clears it.
+    var amountField by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        val text = initialAmount?.toString().orEmpty()
+        mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
+    }
+    val amountText = amountField.text
     var unitText by rememberSaveable { mutableStateOf(initialUnit.orEmpty()) }
     var noteText by rememberSaveable { mutableStateOf(initialNote.orEmpty()) }
     var targetListId by rememberSaveable { mutableStateOf(currentListId) }
@@ -114,8 +120,8 @@ internal fun ItemEditDialog(
                     // Amount + unit read as one value ("200 g").
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
-                            value = amountText,
-                            onValueChange = { amountText = it },
+                            value = amountField,
+                            onValueChange = { amountField = it },
                             label = {
                                 Text(stringResource(R.string.shopping_amount_label_short))
                             },
@@ -135,8 +141,8 @@ internal fun ItemEditDialog(
                     }
                 } else {
                     OutlinedTextField(
-                        value = amountText,
-                        onValueChange = { amountText = it },
+                        value = amountField,
+                        onValueChange = { amountField = it },
                         label = { Text(stringResource(R.string.shopping_amount_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
