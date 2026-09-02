@@ -38,6 +38,7 @@
     <string name="cd_list_menu">Options for %1$s</string>
     <string name="archived_lists">Archived lists</string>
     <string name="archived_short">Archive (%1$d)</string>
+    <string name="hide_empty_lists">Hide empty</string>
     <string name="action_close">Close</string>
     <string name="action_back">Back</string>
     <string name="use_up_hint">Tap a product to use it up — measured products ask how much</string>

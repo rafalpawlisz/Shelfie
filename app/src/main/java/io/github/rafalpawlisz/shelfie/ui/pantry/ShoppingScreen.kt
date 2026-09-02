@@ -24,6 +24,7 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 fun ShoppingScreen(
     lists: List<ShoppingList>,
     archivedLists: List<ShoppingList>,
+    emptyListIds: Set<String>,
     selectedListId: String?,
     items: List<ShoppingListItem>,
     lowStockProducts: List<Product>,
@@ -35,7 +36,7 @@ fun ShoppingScreen(
     onArchiveList: (id: String) -> Unit,
     onRestoreList: (id: String) -> Unit,
     onDeleteList: (id: String) -> Unit,
-    onMoveList: (fromIndex: Int, toIndex: Int) -> Unit,
+    onMoveList: (draggedId: String, beforeId: String?) -> Unit,
     onToggle: (id: String, checked: Boolean) -> Unit,
     onRemove: (id: String) -> Unit,
     onUpdateItem: (
@@ -59,13 +60,26 @@ fun ShoppingScreen(
         if (lowStockProducts.isEmpty()) lowStockSelected = false
     }
 
+    // Session-scoped, on by default: empty lists leave the chips row until they
+    // hold something again. The list being viewed stays put — the chip is the
+    // "you are here" marker, and a just-created empty list must not vanish the
+    // moment it is created; it hides once the user leaves it.
+    var hideEmptyLists by rememberSaveable { mutableStateOf(true) }
+    val visibleLists = if (hideEmptyLists) {
+        lists.filterNot { it.id in emptyListIds && it.id != selectedListId }
+    } else {
+        lists
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         ListChipsRow(
-            lists = lists,
+            lists = visibleLists,
             archivedLists = archivedLists,
             selectedListId = if (lowStockSelected) null else selectedListId,
             lowStockCount = lowStockProducts.size,
             lowStockSelected = lowStockSelected,
+            hideEmptyLists = hideEmptyLists,
+            onToggleHideEmpty = { hideEmptyLists = !hideEmptyLists },
             onSelectLowStock = { lowStockSelected = true },
             onSelectList = {
                 lowStockSelected = false
@@ -82,6 +96,8 @@ fun ShoppingScreen(
         when {
             lowStockSelected -> LowStockView(
                 products = lowStockProducts,
+                // All lists, hidden ones included: "add all" lands on an empty
+                // list as happily as on a full one, and revives it.
                 lists = lists,
                 onRestockProduct = onRestockProduct,
                 onAddAll = onAddAllLowStock,
@@ -104,6 +120,8 @@ fun ShoppingScreen(
             }
             else -> ListItems(
                 items = items,
+                // All lists, hidden ones included: the move picker may target a
+                // list the chips row hides — moving an item there revives it.
                 lists = lists,
                 currentListId = selectedListId,
                 plannedByProduct = plannedByProduct,

@@ -122,6 +122,78 @@ class ShoppingListViewModelTest {
         assertTrue(state.shoppingList.isEmpty())
     }
 
+    // --- Empty-list detection (feeds the "hide empty" filter) ---
+
+    @Test
+    fun `a list with no items is empty`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Auchan")
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        val auchan = viewModel.uiState.value.lists.first { it.name == "Auchan" }.id
+        viewModel.addToShoppingList(productId, 1)
+
+        assertEquals(
+            setOf(auchan),
+            viewModel.uiState.value.emptyListIds,
+        )
+        assertFalse(lidl in viewModel.uiState.value.emptyListIds)
+    }
+
+    @Test
+    fun `a list with only checked items is not empty`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        viewModel.addToShoppingList(productId, amount = 2)
+        val itemId = viewModel.uiState.value.shoppingList.single().id
+
+        viewModel.setShoppingItemChecked(itemId, checked = true)
+
+        assertTrue(viewModel.uiState.value.emptyListIds.isEmpty())
+    }
+
+    @Test
+    fun `removing the last item makes the list empty`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.addToShoppingList(productId, 1)
+
+        viewModel.removeShoppingItem(viewModel.uiState.value.shoppingList.single().id)
+
+        assertEquals(setOf(lidl), viewModel.uiState.value.emptyListIds)
+    }
+
+    @Test
+    fun `an empty list stops being empty when an item arrives`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        val lidl = viewModel.uiState.value.selectedListId!!
+        viewModel.addToShoppingList(productId, 1)
+        viewModel.removeShoppingItem(viewModel.uiState.value.shoppingList.single().id)
+        assertEquals(setOf(lidl), viewModel.uiState.value.emptyListIds)
+
+        viewModel.addToShoppingList(productId, 1)
+
+        assertTrue(viewModel.uiState.value.emptyListIds.isEmpty())
+    }
+
     @Test
     fun `deleting the last list clears selection and empties items`() = runTest {
         val repository = FakeProductRepository()
@@ -240,8 +312,10 @@ class ShoppingListViewModelTest {
             viewModel.uiState.value.lists.map { it.name },
         )
 
-        // Drag Biedronka (index 2) to the front.
-        viewModel.moveList(fromIndex = 2, toIndex = 0)
+        // Drag Biedronka to the front (before Lidl).
+        val biedronka = viewModel.uiState.value.lists.first { it.name == "Biedronka" }.id
+        val lidl = viewModel.uiState.value.lists.first { it.name == "Lidl" }.id
+        viewModel.moveList(draggedId = biedronka, beforeId = lidl)
 
         assertEquals(
             listOf("Biedronka", "Lidl", "Auchan"),
@@ -272,8 +346,9 @@ class ShoppingListViewModelTest {
         viewModel.createList("Lidl")
         viewModel.createList("Auchan")
         viewModel.createList("Biedronka")
-        viewModel.moveList(fromIndex = 2, toIndex = 0) // [Biedronka, Lidl, Auchan]
+        val biedronka = viewModel.uiState.value.lists.first { it.name == "Biedronka" }.id
         val lidl = viewModel.uiState.value.lists.first { it.name == "Lidl" }.id
+        viewModel.moveList(draggedId = biedronka, beforeId = lidl) // [Biedronka, Lidl, Auchan]
 
         viewModel.archiveList(lidl)
         assertEquals(

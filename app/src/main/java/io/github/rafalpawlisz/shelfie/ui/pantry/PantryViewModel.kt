@@ -91,6 +91,9 @@ data class PantryUiState(
     val referencedProductIds: Set<String> = emptySet(),
     val lists: List<ShoppingList> = emptyList(),
     val archivedLists: List<ShoppingList> = emptyList(),
+    // Active lists the user sees as empty (no visible items); the UI can hide
+    // them from the chips row without touching the data.
+    val emptyListIds: Set<String> = emptySet(),
     val selectedListId: String? = null,
     val shoppingList: List<ShoppingListItem> = emptyList(),
     // Names bought once before, newest first — offered by the picker so the
@@ -158,16 +161,17 @@ class PantryViewModel(
             shoppingListRepository.observeArchivedLists(),
             selectedListId,
             // Paired rather than given their own slot: combine's typed overload
-            // stops at five flows, and these two are read by the same screen.
+            // stops at five flows, and these are read by the same screen.
             combine(
                 shoppingItems,
                 shoppingListRepository.observeOneOffSuggestions(),
-            ) { items, suggestions -> items to suggestions },
+                shoppingListRepository.observeListItemCounts(),
+            ) { items, suggestions, counts -> Triple(items, suggestions, counts) },
         ) { (active, archived, barcodes, planned, referenced),
             lists,
             archivedLists,
             selected,
-            (items, oneOffSuggestions),
+            (items, oneOffSuggestions, itemCounts),
             ->
             val plannedByProduct = planned
                 .groupBy({ it.productId }, { it.listId })
@@ -183,6 +187,10 @@ class PantryViewModel(
                 referencedProductIds = referenced.toSet(),
                 lists = lists,
                 archivedLists = archivedLists,
+                emptyListIds = lists
+                    .filter { (itemCounts[it.id] ?: 0) == 0 }
+                    .map { it.id }
+                    .toSet(),
                 selectedListId = selected,
                 shoppingList = items,
                 oneOffSuggestions = oneOffSuggestions,
@@ -363,17 +371,24 @@ class PantryViewModel(
     }
 
     /**
-     * Persist a manual reorder of the lists: move the list at [fromIndex] to
-     * [toIndex]. Only the moved list's position changes — it's set to the midpoint
-     * between its new neighbours (fractional indexing).
+     * Persist a manual reorder of the lists: place [draggedId] right before
+     * [beforeId] (null = to the end). Id-based rather than index-based, because
+     * the chips row may show a subset (empty lists hidden), so the drag target
+     * arrives as "the chip now following the dragged one". Only the moved
+     * list's position changes — the midpoint between its new neighbours
+     * (fractional indexing); the neighbours' ids are what pins that spot.
      */
-    fun moveList(fromIndex: Int, toIndex: Int) {
+    fun moveList(draggedId: String, beforeId: String?) {
         val lists = uiState.value.lists
-        if (fromIndex !in lists.indices || toIndex !in lists.indices || fromIndex == toIndex) return
-        val moved = lists[fromIndex]
-        val without = lists.toMutableList().apply { removeAt(fromIndex) }
-        val prev = without.getOrNull(toIndex - 1)?.position
-        val next = without.getOrNull(toIndex)?.position
+        val moved = lists.firstOrNull { it.id == draggedId } ?: return
+        val without = lists.filterNot { it.id == draggedId }
+        // null = "to the end" (reinsert after the last list); -1 is a target
+        // that vanished mid-drag, which leaves the order untouched.
+        val beforeIndex = if (beforeId == null) without.size
+        else without.indexOfFirst { it.id == beforeId }
+        if (beforeIndex == -1) return
+        val prev = without.getOrNull(beforeIndex - 1)?.position
+        val next = without.getOrNull(beforeIndex)?.position
         val newPosition = when {
             prev == null && next == null -> moved.position
             prev == null -> next!! - 1.0

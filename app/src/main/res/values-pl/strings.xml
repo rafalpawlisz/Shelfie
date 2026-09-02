@@ -34,6 +34,7 @@
     <string name="cd_list_menu">Opcje listy %1$s</string>
     <string name="archived_lists">Zarchiwizowane listy</string>
     <string name="archived_short">Archiwum (%1$d)</string>
+    <string name="hide_empty_lists">Ukryj puste</string>
     <string name="action_close">Zamknij</string>
     <string name="action_back">Wstecz</string>
     <string name="use_up_hint">Dotknij produktu, aby go zużyć — produkty z jednostką zapytają o ilość</string>

@@ -126,6 +126,21 @@ class FakeShoppingListRepository(
         lists.update { list -> list.map { if (it.id == id) it.copy(position = position) else it } }
     }
 
+    override fun observeListItemCounts(): Flow<Map<String, Int>> =
+        combine(items, lists, products.observeProducts()) { allItems, allLists, active ->
+            // Mirrors the DAO: visible items on active lists only — dormant
+            // items of archived products don't count, and neither do archived
+            // lists. Lists with zero visible items get no entry.
+            val activeListIds = allLists.filter { it.archivedAt == null }.map { it.id }.toSet()
+            allItems
+                .filter {
+                    it.listId in activeListIds &&
+                        (it.productId == null || active.any { product -> product.id == it.productId })
+                }
+                .groupingBy { it.listId }
+                .eachCount()
+        }
+
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
         combine(items, products.observeProducts(), positions, lists) { list, active, pos, allLists ->
             // Mirrors the DAO's COALESCE: the product's slot, or a one-off's own

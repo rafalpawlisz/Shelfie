@@ -66,7 +66,9 @@ internal fun ListChipsRow(
     onArchiveList: (id: String) -> Unit,
     onRestoreList: (id: String) -> Unit,
     onDeleteList: (id: String) -> Unit,
-    onMoveList: (fromIndex: Int, toIndex: Int) -> Unit,
+    onMoveList: (draggedId: String, beforeId: String?) -> Unit,
+    hideEmptyLists: Boolean,
+    onToggleHideEmpty: () -> Unit,
 ) {
     var menuListId by rememberSaveable { mutableStateOf<String?>(null) }
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
@@ -136,9 +138,15 @@ internal fun ListChipsRow(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     },
                     onDragStopped = {
+                        // The chips row may show a subset (empty lists hidden),
+                        // so the drop is reported as "the chip now following
+                        // the dragged one" — never by index, which would mean
+                        // a different list once some are filtered out.
                         val from = lists.indexOfFirst { it.id == list.id }
                         val to = orderedLists.indexOfFirst { it.id == list.id }
-                        if (from != -1 && to != -1 && from != to) onMoveList(from, to)
+                        if (from != -1 && to != -1 && from != to) {
+                            onMoveList(list.id, orderedLists.getOrNull(to + 1)?.id)
+                        }
                         draggingChip = false
                     },
                 )
@@ -198,6 +206,13 @@ internal fun ListChipsRow(
                     label = { Text(stringResource(R.string.archived_short, archivedLists.size)) },
                 )
             }
+        }
+        item {
+            FilterChip(
+                selected = hideEmptyLists,
+                onClick = onToggleHideEmpty,
+                label = { Text(stringResource(R.string.hide_empty_lists)) },
+            )
         }
     }
 

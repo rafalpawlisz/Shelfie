@@ -231,6 +231,7 @@ fun ShelfieApp(
                         ShelfieTab.SHOPPING -> ShoppingScreen(
                             lists = state.lists,
                             archivedLists = state.archivedLists,
+                            emptyListIds = state.emptyListIds,
                             selectedListId = state.selectedListId,
                             items = state.shoppingList,
                             lowStockProducts = state.lowStockProducts,

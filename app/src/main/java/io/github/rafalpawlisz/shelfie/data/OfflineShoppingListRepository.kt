@@ -42,6 +42,9 @@ class OfflineShoppingListRepository(
     override fun observeArchivedLists(): Flow<List<ShoppingList>> =
         dao.observeArchivedLists().map { it.toSortedDomain() }
 
+    override fun observeListItemCounts(): Flow<Map<String, Int>> =
+        dao.observeListItemCounts().map { rows -> rows.associate { it.listId to it.itemCount } }
+
     private fun List<ShoppingListEntity>.toSortedDomain(): List<ShoppingList> {
         val collator = nameCollator()
         return map {

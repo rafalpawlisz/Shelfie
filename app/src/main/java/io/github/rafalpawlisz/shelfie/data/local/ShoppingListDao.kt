@@ -15,6 +15,12 @@ data class DeletedListRows(
     val orderProductIds: List<String>,
 )
 
+/** How many visible items an active list holds; 0 = the list is empty. */
+data class ListItemCount(
+    val listId: String,
+    val itemCount: Int,
+)
+
 @Dao
 interface ShoppingListDao {
 
@@ -54,6 +60,20 @@ interface ShoppingListDao {
     // Archived lists count as existing: they still hold their items.
     @Query("SELECT EXISTS(SELECT 1 FROM shopping_lists WHERE id = :id)")
     suspend fun listExists(id: String): Boolean
+
+    // Active lists -> how many items they hold, with the same visibility filter
+    // as observeItems (dormant items of archived products don't count): a list
+    // the user sees as empty is empty. Lists with zero items emit no row, so
+    // "missing" means "empty".
+    @Query(
+        "SELECT i.listId AS listId, COUNT(*) AS itemCount FROM shopping_list_items i " +
+            "JOIN shopping_lists l ON l.id = i.listId " +
+            "WHERE l.archivedAt IS NULL " +
+            "AND (i.productId IS NULL OR i.productId IN " +
+            "(SELECT id FROM products WHERE archivedAt IS NULL)) " +
+            "GROUP BY i.listId"
+    )
+    fun observeListItemCounts(): Flow<List<ListItemCount>>
 
     // --- Sync mirror: full-content flows (archived included) ---
 

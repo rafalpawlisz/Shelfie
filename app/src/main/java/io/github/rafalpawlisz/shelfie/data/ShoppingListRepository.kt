@@ -13,6 +13,9 @@ interface ShoppingListRepository {
     // Lists
     fun observeLists(): Flow<List<ShoppingList>>
     fun observeArchivedLists(): Flow<List<ShoppingList>>
+
+    // Active list id -> number of visible items; absent = the list is empty.
+    fun observeListItemCounts(): Flow<Map<String, Int>>
     suspend fun createList(name: String): String
     suspend fun renameList(id: String, name: String)
 
