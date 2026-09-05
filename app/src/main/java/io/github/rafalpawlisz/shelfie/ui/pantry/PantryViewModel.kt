@@ -78,6 +78,17 @@ data class RemovedShoppingItem(
     val note: String?,
 )
 
+/**
+ * A row the picker just wrote to [listId] (a product, merged into its row when
+ * it was already there; or a fresh one-off line). The UI scrolls it into view
+ * once Room hands the list back — the sort may park the row anywhere, and an
+ * add answered by nothing looks lost.
+ */
+data class AddedShoppingItem(
+    val listId: String,
+    val itemId: String,
+)
+
 data class PantryUiState(
     val products: List<Product> = emptyList(),
     val archivedProducts: List<Product> = emptyList(),
@@ -132,6 +143,10 @@ class PantryViewModel(
     // One-shot "item removed" events so the UI can offer Undo.
     private val itemRemovedChannel = Channel<RemovedShoppingItem>(Channel.BUFFERED)
     val itemRemovedEvents = itemRemovedChannel.receiveAsFlow()
+
+    // One-shot "item added from the picker" events so the UI can reveal the row.
+    private val itemAddedChannel = Channel<AddedShoppingItem>(Channel.BUFFERED)
+    val itemAddedEvents = itemAddedChannel.receiveAsFlow()
 
     // One-shot plain messages (string resource ids) for things the user should
     // hear about but cannot act on.
@@ -417,12 +432,18 @@ class PantryViewModel(
 
     fun addToShoppingList(productId: String, amount: Int?, note: String? = null) {
         val listId = selectedListId.value ?: return
-        viewModelScope.launch { planOnList(listId, productId, amount, note) }
+        viewModelScope.launch {
+            val itemId = planOnList(listId, productId, amount, note)
+            itemAddedChannel.send(AddedShoppingItem(listId, itemId))
+        }
     }
 
     /** Add to an explicitly chosen list (restock dialog) and remember the choice. */
     fun addToList(listId: String, productId: String, amount: Int?) {
         uiPreferences.lastRestockListId = listId
+        // No added-item event: the restock dialog names its own list, which may
+        // not be the one on screen — a reveal there would scroll a list nobody
+        // is looking at.
         viewModelScope.launch { planOnList(listId, productId, amount, note = null) }
     }
 
@@ -435,12 +456,19 @@ class PantryViewModel(
      * invisible — planning one would add a row nobody can see. Wanting to buy
      * something is also the plainest possible statement that it belongs in the
      * pantry again.
+     *
+     * Returns the row the item landed on (see [ShoppingListRepository.addItem]).
      */
-    private suspend fun planOnList(listId: String, productId: String, amount: Int?, note: String?) {
+    private suspend fun planOnList(
+        listId: String,
+        productId: String,
+        amount: Int?,
+        note: String?,
+    ): String {
         if (repository.getActiveProduct(productId) == null) {
             repository.restoreProduct(productId)
         }
-        shoppingListRepository.addItem(listId, productId, amount, note)
+        return shoppingListRepository.addItem(listId, productId, amount, note)
     }
 
     /**
@@ -722,7 +750,12 @@ class PantryViewModel(
         val listId = selectedListId.value ?: return
         if (name.isBlank()) return
         viewModelScope.launch {
-            shoppingListRepository.addOneOffItem(listId, name, amount, unit, note, sectionEmoji)
+            val itemId = shoppingListRepository.addOneOffItem(
+                listId, name, amount, unit, note, sectionEmoji,
+            )
+            if (itemId.isNotEmpty()) {
+                itemAddedChannel.send(AddedShoppingItem(listId, itemId))
+            }
         }
     }
 

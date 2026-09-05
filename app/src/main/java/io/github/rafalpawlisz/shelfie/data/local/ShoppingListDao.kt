@@ -390,6 +390,8 @@ interface ShoppingListDao {
         }
     }
 
+    // Returns the id of the row the add landed on: the new row, or the
+    // existing row when the product was already on the list.
     @Transaction
     suspend fun addOrMerge(
         listId: String,
@@ -398,25 +400,28 @@ interface ShoppingListDao {
         note: String?,
         newId: String,
         timestamp: Long,
-    ) {
+    ): String {
         ensurePosition(listId, productId, timestamp)
         val existing = findByProduct(listId, productId)
-        when {
-            existing == null -> insert(
-                ShoppingListItemEntity(
-                    id = newId,
-                    listId = listId,
-                    productId = productId,
-                    name = null,
-                    amount = amount,
-                    // The product's unit is the unit.
-                    unit = null,
-                    note = note,
-                    checkedAt = null,
-                    createdAt = timestamp,
-                    updatedAt = timestamp,
+        return when {
+            existing == null -> {
+                insert(
+                    ShoppingListItemEntity(
+                        id = newId,
+                        listId = listId,
+                        productId = productId,
+                        name = null,
+                        amount = amount,
+                        // The product's unit is the unit.
+                        unit = null,
+                        note = note,
+                        checkedAt = null,
+                        createdAt = timestamp,
+                        updatedAt = timestamp,
+                    )
                 )
-            )
+                newId
+            }
             else -> {
                 // Adding an already-listed product REPLACES its amount and note —
                 // the add dialog pre-fills the current values, so what's confirmed
@@ -433,6 +438,7 @@ interface ShoppingListDao {
                     timestamp = timestamp,
                 )
                 setChecked(existing.id, checkedAt = null, updatedAt = timestamp)
+                existing.id
             }
         }
     }

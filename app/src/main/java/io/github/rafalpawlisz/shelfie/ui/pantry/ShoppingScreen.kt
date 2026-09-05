@@ -52,6 +52,10 @@ fun ShoppingScreen(
     onRestockProduct: (Product) -> Unit,
     onAddAllLowStock: (listId: String) -> Unit,
     onFinishShopping: () -> Unit,
+    // The picker just added this row on the list being shown; scroll it into
+    // view once it appears. One-shot, see ListItems.
+    revealItemId: String?,
+    onItemRevealed: (String) -> Unit,
 ) {
     // Viewing the derived "low stock" pseudo-list; purely presentational, the
     // real list selection in the ViewModel stays untouched.
@@ -131,6 +135,8 @@ fun ShoppingScreen(
                 onCheckWithAmount = onCheckWithAmount,
                 onMove = onMove,
                 onFinishShopping = onFinishShopping,
+                revealItemId = revealItemId,
+                onItemRevealed = onItemRevealed,
             )
         }
     }

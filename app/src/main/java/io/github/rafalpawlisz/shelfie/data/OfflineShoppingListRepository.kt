@@ -153,16 +153,19 @@ class OfflineShoppingListRepository(
             sectionEmojiFor(productId, productEmoji, productName, itemSectionEmoji),
         )
 
-    override suspend fun addItem(listId: String, productId: String, amount: Int?, note: String?) {
-        dao.addOrMerge(
-            listId = listId,
-            productId = productId,
-            amount = amount,
-            note = note?.trim()?.ifBlank { null },
-            newId = UUID.randomUUID().toString(),
-            timestamp = clock.now(),
-        )
-    }
+    override suspend fun addItem(
+        listId: String,
+        productId: String,
+        amount: Int?,
+        note: String?,
+    ): String = dao.addOrMerge(
+        listId = listId,
+        productId = productId,
+        amount = amount,
+        note = note?.trim()?.ifBlank { null },
+        newId = UUID.randomUUID().toString(),
+        timestamp = clock.now(),
+    )
 
     override suspend fun addOneOffItem(
         listId: String,
@@ -171,10 +174,11 @@ class OfflineShoppingListRepository(
         unit: String?,
         note: String?,
         sectionEmoji: String?,
-    ) {
+    ): String {
         val trimmed = name.trim()
-        if (trimmed.isEmpty()) return
+        if (trimmed.isEmpty()) return ""
         val now = clock.now()
+        val id = UUID.randomUUID().toString()
         val cleanUnit = unit?.trim()?.ifBlank { null }
         // Remember the word. The line below will be gone after checkout; this
         // is what lets the picker offer the name again next November.
@@ -192,7 +196,7 @@ class OfflineShoppingListRepository(
         // is what a hand-written list would say too.
         dao.insert(
             ShoppingListItemEntity(
-                id = UUID.randomUUID().toString(),
+                id = id,
                 listId = listId,
                 productId = null,
                 name = trimmed,
@@ -205,6 +209,7 @@ class OfflineShoppingListRepository(
                 updatedAt = now,
             ),
         )
+        return id
     }
 
     override suspend fun setChecked(id: String, checked: Boolean) {

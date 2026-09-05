@@ -2,6 +2,7 @@
 
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.ui.pantry.AddedShoppingItem
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
 import io.github.rafalpawlisz.shelfie.ui.pantry.UseUpScanResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -315,6 +316,76 @@ class PantryViewModelTest {
         assertEquals(id, viewModel.uiState.value.shoppingList.single().productId)
         // And it keeps what it had — planning is not editing.
         assertEquals("puszka", viewModel.uiState.value.products.single().unit)
+    }
+
+    @Test
+    fun `an add from the picker reports the row it landed on`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Groszek", quantity = 0, unit = null)
+        val lists = FakeShoppingListRepository(repository)
+        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val added = mutableListOf<AddedShoppingItem>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.itemAddedEvents.collect { added += it }
+        }
+        lists.createList("Sklep")
+        val id = viewModel.uiState.value.products.single().id
+
+        viewModel.addToShoppingList(id, amount = 2)
+
+        // The row id the list shows is the one the reveal must scroll to.
+        val itemId = viewModel.uiState.value.shoppingList.single().id
+        assertEquals(listOf(AddedShoppingItem(listId = "list-1", itemId = itemId)), added)
+    }
+
+    @Test
+    fun `a one-off added from the picker reports its new line`() = runTest {
+        val repository = FakeProductRepository()
+        val lists = FakeShoppingListRepository(repository)
+        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val added = mutableListOf<AddedShoppingItem>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.itemAddedEvents.collect { added += it }
+        }
+        lists.createList("Sklep")
+
+        viewModel.addOneOffToShoppingList(name = "żarówka", amount = 2, unit = "szt")
+
+        val itemId = viewModel.uiState.value.shoppingList.single().id
+        assertEquals(listOf(AddedShoppingItem(listId = "list-1", itemId = itemId)), added)
+    }
+
+    @Test
+    fun `re-adding an already listed product reports its existing row`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Groszek", quantity = 0, unit = null)
+        val lists = FakeShoppingListRepository(repository)
+        val viewModel = PantryViewModel(repository, lists, FakeBarcodeRepository(), FakeUiPreferences())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        val added = mutableListOf<AddedShoppingItem>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.itemAddedEvents.collect { added += it }
+        }
+        lists.createList("Sklep")
+        val id = viewModel.uiState.value.products.single().id
+        viewModel.addToShoppingList(id, amount = 1)
+        val rowId = viewModel.uiState.value.shoppingList.single().id
+
+        viewModel.addToShoppingList(id, amount = 3, note = "duża puszka")
+
+        // The add dialog pre-fills the current amount and note, so confirming
+        // replaces them in place — one row still, and the reveal follows it.
+        assertEquals(1, viewModel.uiState.value.shoppingList.size)
+        assertEquals(3, viewModel.uiState.value.shoppingList.single().amount)
+        assertEquals(
+            listOf(
+                AddedShoppingItem(listId = "list-1", itemId = rowId),
+                AddedShoppingItem(listId = "list-1", itemId = rowId),
+            ),
+            added,
+        )
     }
 
     @Test

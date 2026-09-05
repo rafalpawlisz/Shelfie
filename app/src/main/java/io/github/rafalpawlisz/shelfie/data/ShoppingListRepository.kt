@@ -32,7 +32,9 @@ interface ShoppingListRepository {
     // amount = null records the bare need ("just buy it"); the actual amount is
     // asked for when the item is checked off. note is a one-off shopping note
     // that dies with the item at checkout/removal.
-    suspend fun addItem(listId: String, productId: String, amount: Int?, note: String? = null)
+    // Returns the id of the row the add landed on: the new row, or the existing
+    // row when the product was already on the list (amount and note replaced).
+    suspend fun addItem(listId: String, productId: String, amount: Int?, note: String? = null): String
 
     /**
      * A one-off item: a line of text on the list, bought once, never part of
@@ -41,6 +43,9 @@ interface ShoppingListRepository {
      *
      * [unit] is what the amount counts ("g", "opakowania"): a one-off has no
      * product to inherit a unit from, so it carries its own.
+     *
+     * Returns the new row's id; "" when the name was blank and nothing was
+     * added (callers guard blank names before this is reached).
      */
     suspend fun addOneOffItem(
         listId: String,
@@ -52,7 +57,7 @@ interface ShoppingListRepository {
         // the line reading its section out of its name, which is what it did
         // before there was anything to pick; "" is an explicit "no section".
         sectionEmoji: String? = null,
-    )
+    ): String
 
     /**
      * Names bought once before, newest first, so the picker can offer them

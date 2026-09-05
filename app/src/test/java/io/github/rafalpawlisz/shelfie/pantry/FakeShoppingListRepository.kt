@@ -221,30 +221,42 @@ class FakeShoppingListRepository(
                 }
         }
 
-    override suspend fun addItem(listId: String, productId: String, amount: Int?, note: String?) {
+    override suspend fun addItem(
+        listId: String,
+        productId: String,
+        amount: Int?,
+        note: String?,
+    ): String {
         ensurePosition(listId, productId)
         val cleanNote = note?.trim()?.ifBlank { null }
         val existing = items.value.firstOrNull { it.listId == listId && it.productId == productId }
-        when {
-            existing == null -> items.update {
-                it + Item(
-                    id = "item-${nextId++}",
-                    listId = listId,
-                    productId = productId,
-                    amount = amount,
-                    note = cleanNote,
-                    checkedAt = null,
-                )
+        return when {
+            existing == null -> {
+                val id = "item-${nextId++}"
+                items.update {
+                    it + Item(
+                        id = id,
+                        listId = listId,
+                        productId = productId,
+                        amount = amount,
+                        note = cleanNote,
+                        checkedAt = null,
+                    )
+                }
+                id
             }
-            else -> items.update { list ->
+            else -> {
                 // Mirror the DAO: re-adding replaces amount + note and unchecks.
-                list.map { item ->
-                    if (item.id == existing.id) {
-                        item.copy(amount = amount, note = cleanNote, checkedAt = null)
-                    } else {
-                        item
+                items.update { list ->
+                    list.map { item ->
+                        if (item.id == existing.id) {
+                            item.copy(amount = amount, note = cleanNote, checkedAt = null)
+                        } else {
+                            item
+                        }
                     }
                 }
+                existing.id
             }
         }
     }
@@ -266,9 +278,9 @@ class FakeShoppingListRepository(
         unit: String?,
         note: String?,
         sectionEmoji: String?,
-    ) {
+    ): String {
         val trimmed = name.trim()
-        if (trimmed.isEmpty()) return
+        if (trimmed.isEmpty()) return ""
         // Mirrors the repository: the word is remembered even though the line
         // below will not survive checkout. Keyed case-insensitively, so buying
         // the same thing again moves the entry up rather than duplicating it.
@@ -280,9 +292,10 @@ class FakeShoppingListRepository(
         }
         // Mirrors the DAO: a plain insert, never a merge — one-offs occupy no
         // product slot, so repeats of the same name are separate lines.
+        val id = "item-${nextId++}"
         items.update {
             it + Item(
-                id = "item-${nextId++}",
+                id = id,
                 listId = listId,
                 productId = null,
                 name = trimmed,
@@ -295,6 +308,7 @@ class FakeShoppingListRepository(
                 seq = ++oneOffSeq,
             )
         }
+        return id
     }
 
     override suspend fun setChecked(id: String, checked: Boolean) {

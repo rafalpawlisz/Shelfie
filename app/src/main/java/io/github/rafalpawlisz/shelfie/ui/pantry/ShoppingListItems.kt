@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -45,6 +46,7 @@ import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import io.github.rafalpawlisz.shelfie.ui.DragHandleIcon
+import kotlinx.coroutines.flow.first
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -69,6 +71,11 @@ internal fun ListItems(
     // mirror holds the dropped order only for a move that will echo back.
     onMove: (fromIndex: Int, toIndex: Int) -> Boolean,
     onFinishShopping: () -> Unit,
+    // A row the picker just added on this list: scroll it into view once Room
+    // hands it back. One-shot — [onItemRevealed] tells the caller the reveal
+    // was claimed, so a stale target cannot fire twice.
+    revealItemId: String?,
+    onItemRevealed: (String) -> Unit,
 ) {
     val checkedCount = items.count { it.isChecked }
     var showFinishDialog by rememberSaveable { mutableStateOf(false) }
@@ -142,6 +149,38 @@ internal fun ListItems(
         ordered.add(toIndex, ordered.removeAt(fromIndex))
     }
 
+    // One flat list feeds both headers and rows, so the reorderable state sees
+    // stable keys; built here (not inside the LazyColumn) so the reveal below
+    // walks the same grouping the list shows.
+    val headed = sectionedEntries(ordered)
+
+    // Reveal a row the picker just added: wait until the mirror holds it
+    // (Room's emission and the re-sync are a beat apart), then anchor the
+    // viewport to it. The anchor is the row, or its section header when the
+    // row opens the group — the reveal then lands with the aisle label above
+    // it, not a bare row under a cut-off header. Fires once per target; the
+    // caller clears the target when it fires.
+    LaunchedEffect(revealItemId) {
+        val target = revealItemId ?: return@LaunchedEffect
+        snapshotFlow { ordered.indexOfFirst { it.id == target } }
+            .first { it != -1 }
+        val entries = sectionedEntries(ordered)
+        val rowEntry = entries.indexOfFirst {
+            it is HeaderOrItem.Row && it.item.id == target
+        }
+        if (rowEntry == -1) return@LaunchedEffect
+        val anchor = if (rowEntry > 0 && entries[rowEntry - 1] is HeaderOrItem.Header) {
+            rowEntry - 1
+        } else {
+            rowEntry
+        }
+        // Consumed only after the scroll: the caller clears the target on
+        // [onItemRevealed], which would restart this effect (its key changed)
+        // and cancel the animation before it moved anything.
+        lazyListState.animateScrollToItem(anchor)
+        onItemRevealed(target)
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Hint and the (conditional) finish action share one fixed-height row so
         // the button appearing/disappearing never shifts the list below.
@@ -169,29 +208,6 @@ internal fun ListItems(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // The unchecked block walks the store section by section with a
-            // small header over each group; sectionless rows (one-offs, old
-            // emoji, none) trail as their own group. The checked block keeps
-            // its own single header: the cart is not an aisle, but without a
-            // label of its own it butted straight against "No section" and
-            // read as more of it.
-            val headed = buildList {
-                var previousKey: Any? = Unit // never equals a section, null or Cart
-                for (item in ordered) {
-                    val key = if (item.isChecked) Cart else sectionOf(item)
-                    if (key != previousKey) {
-                        add(
-                            if (key == Cart) {
-                                HeaderOrItem.CartHeader
-                            } else {
-                                HeaderOrItem.Header(key as ProductCategory?)
-                            },
-                        )
-                    }
-                    previousKey = key
-                    add(HeaderOrItem.Row(item))
-                }
-            }
             items(
                 headed,
                 key = { entry ->
@@ -445,3 +461,31 @@ private data object Cart
 // null covers one-offs, pre-section emoji and "no section" alike.
 private fun sectionOf(item: ShoppingListItem): ProductCategory? =
     ProductCategory.fromEmoji(item.productEmoji)
+
+/**
+ * The list's rows with the small header that opens each group, flattened in
+ * display order. The unchecked block walks the store section by section with
+ * a header over every group — sectionless rows (one-offs, old emoji, none)
+ * get their own; the checked block keeps one header of its own, because the
+ * cart is not an aisle, but without a label of its own it butted straight
+ * against "No section" and read as more of it. Shared by the LazyColumn and
+ * the reveal lookup, so a scroll index always means what the list shows.
+ */
+private fun sectionedEntries(ordered: List<ShoppingListItem>): List<HeaderOrItem> =
+    buildList {
+        var previousKey: Any? = Unit // never equals a section, null or Cart
+        for (item in ordered) {
+            val key = if (item.isChecked) Cart else sectionOf(item)
+            if (key != previousKey) {
+                add(
+                    if (key == Cart) {
+                        HeaderOrItem.CartHeader
+                    } else {
+                        HeaderOrItem.Header(key as ProductCategory?)
+                    },
+                )
+            }
+            previousKey = key
+            add(HeaderOrItem.Row(item))
+        }
+    }
