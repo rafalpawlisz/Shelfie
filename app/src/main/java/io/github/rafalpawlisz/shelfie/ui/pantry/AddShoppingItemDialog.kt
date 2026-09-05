@@ -51,6 +51,7 @@ import androidx.core.view.WindowCompat
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.verticalScroll
 import io.github.rafalpawlisz.shelfie.R
+import io.github.rafalpawlisz.shelfie.data.nameCollator
 import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
@@ -341,6 +342,14 @@ private fun SearchPhase(
     // Archived matches only while searching: the archive is something to find
     // by name here, not to browse through on the way to the shopping list.
     val visibleArchived = if (query.isBlank()) emptyList() else archivedProducts.filterByName(query)
+    // A name that has since become a product belongs to the products: the
+    // pantry is the better answer, and offering both would be offering a
+    // choice with no meaning behind it.
+    val visibleSuggestions = suggestions
+        .filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
+        .filterNot { suggestion ->
+            (products + archivedProducts).any { it.name.trim().equals(suggestion.name, true) }
+        }
 
     // Focus and keyboard up front: this screen exists to be typed into, and
     // coming back from the amount step lands here to search again. Scoped to
@@ -362,9 +371,11 @@ private fun SearchPhase(
         )
     }
     // Offering to create is only honest when the name is unknown everywhere —
-    // archive included, or the button proposes to make a second product with a
-    // name the pantry already has.
-    if (query.isNotBlank() && visibleProducts.isEmpty() && visibleArchived.isEmpty()) {
+    // archive and remembered one-offs included, or the button proposes to make
+    // a second product with a name the app already answers.
+    if (query.isNotBlank() && visibleProducts.isEmpty() && visibleArchived.isEmpty() &&
+        visibleSuggestions.isEmpty()
+    ) {
         Text(
             text = stringResource(R.string.search_no_results),
             style = MaterialTheme.typography.bodyMedium,
@@ -390,29 +401,37 @@ private fun SearchPhase(
         it.name.trim().equals(query.trim(), ignoreCase = true)
     }
     val offerOneOff = query.isNotBlank() && !exactMatch
-    // Things bought once before. Filtered like the products; with an empty
-    // search only the head of the list, because this is a memory aid, not an
-    // inventory — a hundred old words would bury the pantry below them.
-    val visibleSuggestions = suggestions
-        .filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
-        // A name that has since become a product belongs to the products: the
-        // pantry is the better answer, and offering both would be offering a
-        // choice with no meaning behind it.
-        .filterNot { suggestion ->
-            (products + archivedProducts).any { it.name.trim().equals(suggestion.name, true) }
-        }
-        .take(if (query.isBlank()) EMPTY_QUERY_SUGGESTIONS else Int.MAX_VALUE)
+    // One answer list, not two sections: pantry products and remembered
+    // one-offs sorted together by name — the forget X on a one-off's row is
+    // what tells the kinds apart.
+    val collator = nameCollator()
+    val results = buildList {
+        notOnThisList.forEach { add(SearchEntry.Pantry(it)) }
+        visibleSuggestions.forEach { add(SearchEntry.OneOff(it)) }
+    }.sortedWith { a, b -> collator.compare(a.sortName, b.sortName) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
-        items(notOnThisList, key = { it.id }) { product ->
-            ProductListItem(
-                product = product,
-                showQuantity = false,
-                onClick = { onSelect(product.id) },
-            )
+        items(results, key = { entry ->
+            when (entry) {
+                is SearchEntry.Pantry -> "pantry-${entry.product.id}"
+                is SearchEntry.OneOff -> "one-off-${entry.suggestion.name}"
+            }
+        }) { entry ->
+            when (entry) {
+                is SearchEntry.Pantry -> ProductListItem(
+                    product = entry.product,
+                    showQuantity = false,
+                    onClick = { onSelect(entry.product.id) },
+                )
+                is SearchEntry.OneOff -> OneOffSuggestionRow(
+                    suggestion = entry.suggestion,
+                    onClick = { onAddOneOff(entry.suggestion.name) },
+                    onForget = { onForgetSuggestion(entry.suggestion.name) },
+                )
+            }
         }
         if (visibleArchived.isNotEmpty()) {
             item(key = "archived-header") {
@@ -431,26 +450,6 @@ private fun SearchPhase(
                     dimmed = true,
                     showQuantity = false,
                     onClick = { onSelect(product.id) },
-                )
-            }
-        }
-        // Below the products, above the escape hatch: a thing bought before is
-        // a better guess than a name typed from scratch, and a worse one than
-        // something the pantry actually keeps.
-        if (visibleSuggestions.isNotEmpty()) {
-            item(key = "one-off-header") {
-                Text(
-                    text = stringResource(R.string.picker_one_off_section),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-            items(visibleSuggestions, key = { "one-off-${it.name}" }) { suggestion ->
-                OneOffSuggestionRow(
-                    suggestion = suggestion,
-                    onClick = { onAddOneOff(suggestion.name) },
-                    onForget = { onForgetSuggestion(suggestion.name) },
                 )
             }
         }
@@ -538,9 +537,22 @@ private fun OneOffSuggestionRow(
     }
 }
 
-// With no search typed, how many remembered names to show before the list
-// stops being a hint and starts being a second pantry.
-private const val EMPTY_QUERY_SUGGESTIONS = 8
+/**
+ * One row of the picker's mixed results: a pantry product or a remembered
+ * one-off. Sorting the two kinds by name is what mixes them; the forget X on
+ * a one-off's row is what tells them apart.
+ */
+private sealed interface SearchEntry {
+    val sortName: String
+
+    data class Pantry(val product: Product) : SearchEntry {
+        override val sortName: String get() = product.name
+    }
+
+    data class OneOff(val suggestion: OneOffSuggestion) : SearchEntry {
+        override val sortName: String get() = suggestion.name
+    }
+}
 
 /**
  * The unit this name was last bought with, or null if the history has never

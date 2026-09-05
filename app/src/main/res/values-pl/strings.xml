@@ -115,7 +115,6 @@
     <string name="expires_on">Termin %1$s</string>
     <string name="expiring_filter">Kończy się termin (%1$d)</string>
     <string name="shopping_amount_label_short">Ile</string>
-    <string name="picker_one_off_section">Kupowane raz</string>
     <string name="picker_on_this_list_section">Już na tej liście</string>
     <string name="picker_one_off_forget">Zapomnij %1$s</string>
     <string name="action_section_order">Kolejność działów</string>
