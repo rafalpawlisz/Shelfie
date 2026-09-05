@@ -65,6 +65,7 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
  * The pantry list shows only products that are NOT on the chosen list yet;
  * the ones that already are gather under their own header at the bottom,
  * where tapping one still pre-fills its current values and REPLACES them.
+ * One-off words already on the list join that section as plain notes.
  *
  * A one-off needs no second phase: it joins the list in one tap — bare, or
  * with an amount and unit typed into the search ("marchew 200 g"). Note and
@@ -144,6 +145,21 @@ fun AddShoppingItemDialog(
     // from their row, and the search phase groups them under their own header
     // instead of offering them a second time among the pantry products.
     val onListProductIds = items.mapNotNull { it.productId }.toSet()
+    // One-off lines already on the list, normalized name -> the display name.
+    // Their words leave the suggestions and sit with the products under the
+    // same header — as plain notes, because a one-off row has no amount step
+    // to pre-fill.
+    val onListOneOffNotes = items
+        .filter { it.productId == null }
+        .groupBy { it.productName.trim().lowercase() }
+        // A product row already answers for its name; a one-off line under the
+        // same name is not worth a second note below the product.
+        .filterKeys { name -> items.none {
+            it.productId != null && it.productName.trim().lowercase() == name
+        } }
+        .mapValues { (_, lines) ->
+            PlannedOneOff(name = lines.first().productName.trim())
+        }
 
     Dialog(
         onDismissRequest = goBack,
@@ -251,6 +267,7 @@ fun AddShoppingItemDialog(
                                 products = products,
                                 archivedProducts = archivedProducts,
                                 onListProductIds = onListProductIds,
+                                onListOneOffNotes = onListOneOffNotes,
                                 suggestions = suggestions,
                                 onSelect = { selectedProductId = it },
                                 onCreateProduct = onCreateProduct,
@@ -324,6 +341,10 @@ private fun SearchPhase(
     // Products that already sit on the chosen list; they leave the pantry
     // list and gather at the bottom under their own header.
     onListProductIds: Set<String>,
+    // One-off lines already on the chosen list (normalized name -> note):
+    // their words leave the suggestions too, and answer in the same bottom
+    // section as plain notes.
+    onListOneOffNotes: Map<String, PlannedOneOff>,
     suggestions: List<OneOffSuggestion>,
     onSelect: (productId: String) -> Unit,
     onCreateProduct: (name: String) -> Unit,
@@ -342,6 +363,11 @@ private fun SearchPhase(
     // Archived matches only while searching: the archive is something to find
     // by name here, not to browse through on the way to the shopping list.
     val visibleArchived = if (query.isBlank()) emptyList() else archivedProducts.filterByName(query)
+    // A typed word that is already a one-off line on the list is known too:
+    // it answers in the bottom section, so no create button and no one-off
+    // offer for it either.
+    val typedNameOnList =
+        query.isNotBlank() && onListOneOffNotes.containsKey(query.trim().lowercase())
     // A name that has since become a product belongs to the products: the
     // pantry is the better answer, and offering both would be offering a
     // choice with no meaning behind it.
@@ -350,6 +376,8 @@ private fun SearchPhase(
         .filterNot { suggestion ->
             (products + archivedProducts).any { it.name.trim().equals(suggestion.name, true) }
         }
+        // Already a line on this list: the bottom section answers for it now.
+        .filterNot { it.name.trim().lowercase() in onListOneOffNotes }
 
     // Focus and keyboard up front: this screen exists to be typed into, and
     // coming back from the amount step lands here to search again. Scoped to
@@ -371,10 +399,10 @@ private fun SearchPhase(
         )
     }
     // Offering to create is only honest when the name is unknown everywhere —
-    // archive and remembered one-offs included, or the button proposes to make
-    // a second product with a name the app already answers.
+    // archive, remembered one-offs and the list's own lines included, or the
+    // button proposes to make a second product with a name the app answers.
     if (query.isNotBlank() && visibleProducts.isEmpty() && visibleArchived.isEmpty() &&
-        visibleSuggestions.isEmpty()
+        visibleSuggestions.isEmpty() && !typedNameOnList
     ) {
         Text(
             text = stringResource(R.string.search_no_results),
@@ -402,7 +430,7 @@ private fun SearchPhase(
     } || suggestions.any {
         it.name.trim().equals(query.trim(), ignoreCase = true)
     }
-    val offerOneOff = query.isNotBlank() && !exactMatch
+    val offerOneOff = query.isNotBlank() && !exactMatch && !typedNameOnList
     // One answer list, not two sections: pantry products and remembered
     // one-offs sorted together by name — the forget X on a one-off's row is
     // what tells the kinds apart.
@@ -411,6 +439,11 @@ private fun SearchPhase(
         notOnThisList.forEach { add(SearchEntry.Pantry(it)) }
         visibleSuggestions.forEach { add(SearchEntry.OneOff(it)) }
     }.sortedWith { a, b -> collator.compare(a.sortName, b.sortName) }
+    // The bottom section's one-off notes, matching the query like the rows
+    // do (a blank query shows all of them).
+    val visiblePlannedOneOffs = onListOneOffNotes.values
+        .filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
+        .sortedWith { a, b -> collator.compare(a.name, b.name) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -465,11 +498,11 @@ private fun SearchPhase(
                 }
             }
         }
-        // Last, on purpose: it is not the answer most of the time — the pantry
-        // rows above are. Something already on the list is here to be tuned
-        // (amount up, note changed), not to be added again, and picking one
-        // still lands on the pre-filled amount step.
-        if (onThisList.isNotEmpty()) {
+        // Last, on purpose: it is not the answer most of the time — the rows
+        // above are. Something already on the list is here to be tuned (amount
+        // up, note changed), not to be added again; a product picks the
+        // pre-filled amount step, a one-off note is exactly that — a note.
+        if (onThisList.isNotEmpty() || visiblePlannedOneOffs.isNotEmpty()) {
             item(key = "on-this-list-header") {
                 Text(
                     text = stringResource(R.string.picker_on_this_list_section),
@@ -485,6 +518,30 @@ private fun SearchPhase(
                     onClick = { onSelect(product.id) },
                 )
             }
+            items(visiblePlannedOneOffs, key = { "planned-one-off-${it.name}" }) { note ->
+                PlannedOneOffRow(note)
+            }
+        }
+    }
+}
+
+/**
+ * A word that is already a line on the chosen list, shown in the bottom
+ * section. Pure information — no forget X (nothing was remembered here), no
+ * tap (there is no amount step for a one-off): the way off this line is the
+ * list itself, not the picker.
+ */
+@Composable
+private fun PlannedOneOffRow(planned: PlannedOneOff) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = listOfNotNull(decorationFor(planned.name), planned.name).joinToString(" "),
+                style = MaterialTheme.typography.titleMedium,
+            )
         }
     }
 }
@@ -538,6 +595,13 @@ private fun OneOffSuggestionRow(
         }
     }
 }
+
+/**
+ * A one-off line already on the chosen list, as the bottom section shows it:
+ * the display [name] of the word. Keyed by a normalized name in the maps that
+ * feed the search phase.
+ */
+private data class PlannedOneOff(val name: String)
 
 /**
  * One row of the picker's mixed results: a pantry product or a remembered
