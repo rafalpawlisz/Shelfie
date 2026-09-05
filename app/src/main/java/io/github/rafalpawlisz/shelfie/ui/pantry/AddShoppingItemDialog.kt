@@ -393,11 +393,13 @@ private fun SearchPhase(
     // Gated on an EXACT match, not on the search being empty: the search
     // matches substrings, so "mleko" finds "Mleko owsiane" and the one-off
     // route used to vanish for any name that merely occurs inside a product's.
-    // Repeats are the one-off's whole point, so only the product itself — the
-    // better answer — hides the offer. It rides at the end of the list rather
-    // than above it: an escape hatch belongs after the results, not in front
-    // of them.
+    // The offer is for words the picker has no answer to, so a name it already
+    // answers exactly — a product, or a remembered one-off whose row sits
+    // above — hides it. It rides at the end of the list rather than above it:
+    // an escape hatch belongs after the results, not in front of them.
     val exactMatch = (visibleProducts + visibleArchived).any {
+        it.name.trim().equals(query.trim(), ignoreCase = true)
+    } || suggestions.any {
         it.name.trim().equals(query.trim(), ignoreCase = true)
     }
     val offerOneOff = query.isNotBlank() && !exactMatch
