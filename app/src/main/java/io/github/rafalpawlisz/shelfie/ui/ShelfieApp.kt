@@ -89,9 +89,11 @@ fun ShelfieApp(
     // Ephemeral restock hint being acted on; deliberately not saved across
     // rotation — it's a suggestion, not state.
     var restockSuggestion by remember { mutableStateOf<LowStockSuggestion?>(null) }
-    // A row the picker just added; the shopping list scrolls it into view when
-    // it appears. One-shot, so a rotation losing it only costs a reveal.
-    var addedItemToReveal by remember { mutableStateOf<String?>(null) }
+    // The chips row's "hide empty lists" choice. Held here, not in the
+    // Shopping screen: the tab Crossfade disposes that screen's composition
+    // on every tab hop, and a rememberSaveable there would silently reset
+    // the choice back to the default each time.
+    var hideEmptyLists by rememberSaveable { mutableStateOf(true) }
 
     // Shows the low-stock snackbar; the Add action is offered only when there
     // is a list to add to. On action, opens the restock dialog.
@@ -161,17 +163,6 @@ fun ShelfieApp(
             )
             if (shown == SnackbarResult.ActionPerformed) {
                 viewModel.undoRemoveItem(removed)
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        // The picker can only add to the list being shown, so a mismatch means
-        // the user left it while the row was on its way — revealing there
-        // would scroll a list nobody is looking at.
-        viewModel.itemAddedEvents.collectLatest { added ->
-            if (viewModel.uiState.value.selectedListId == added.listId) {
-                addedItemToReveal = added.itemId
             }
         }
     }
@@ -277,10 +268,9 @@ fun ShelfieApp(
                             onCheckWithAmount = viewModel::checkWithAmount,
                             onMove = viewModel::moveShoppingItem,
                             onFinishShopping = viewModel::finishShopping,
-                            revealItemId = addedItemToReveal,
-                            onItemRevealed = { id ->
-                                if (addedItemToReveal == id) addedItemToReveal = null
-                            },
+                            itemAddedEvents = viewModel.itemAddedEvents,
+                            hideEmptyLists = hideEmptyLists,
+                            onToggleHideEmpty = { hideEmptyLists = !hideEmptyLists },
                         )
                         ShelfieTab.USE_UP -> UseUpScreen(
                             products = state.products,

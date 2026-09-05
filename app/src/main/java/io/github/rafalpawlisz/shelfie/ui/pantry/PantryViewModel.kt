@@ -83,10 +83,15 @@ data class RemovedShoppingItem(
  * it was already there; or a fresh one-off line). The UI scrolls it into view
  * once Room hands the list back — the sort may park the row anywhere, and an
  * add answered by nothing looks lost.
+ *
+ * [sentAtMillis] lets the screen drop replays: the event channel keeps events
+ * sent while the list was not on screen, and revealing one of those on return
+ * would scroll to a row the user added long ago.
  */
 data class AddedShoppingItem(
     val listId: String,
     val itemId: String,
+    val sentAtMillis: Long,
 )
 
 data class PantryUiState(
@@ -434,7 +439,9 @@ class PantryViewModel(
         val listId = selectedListId.value ?: return
         viewModelScope.launch {
             val itemId = planOnList(listId, productId, amount, note)
-            itemAddedChannel.send(AddedShoppingItem(listId, itemId))
+            itemAddedChannel.send(
+                AddedShoppingItem(listId, itemId, System.currentTimeMillis()),
+            )
         }
     }
 
@@ -754,7 +761,9 @@ class PantryViewModel(
                 listId, name, amount, unit, note, sectionEmoji,
             )
             if (itemId.isNotEmpty()) {
-                itemAddedChannel.send(AddedShoppingItem(listId, itemId))
+                itemAddedChannel.send(
+                    AddedShoppingItem(listId, itemId, System.currentTimeMillis()),
+                )
             }
         }
     }

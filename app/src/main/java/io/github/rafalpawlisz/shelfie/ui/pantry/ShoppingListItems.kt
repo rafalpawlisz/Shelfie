@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -50,6 +51,7 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import io.github.rafalpawlisz.shelfie.ui.DragHandleIcon
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -75,11 +77,12 @@ internal fun ListItems(
     // mirror holds the dropped order only for a move that will echo back.
     onMove: (fromIndex: Int, toIndex: Int) -> Boolean,
     onFinishShopping: () -> Unit,
-    // A row the picker just added on this list: scroll it into view once Room
-    // hands it back. One-shot — [onItemRevealed] tells the caller the reveal
-    // was claimed, so a stale target cannot fire twice.
-    revealItemId: String?,
-    onItemRevealed: (String) -> Unit,
+    // One-shot "a row was added from the picker" events; the row is scrolled
+    // into view once Room hands it back. Collected here — where the list is
+    // on screen — so a target dies with the composition: an add made while
+    // the list was not visible (low-stock view, another tab) cannot reveal
+    // later, and switching lists drops a pending reveal.
+    itemAddedEvents: Flow<AddedShoppingItem>,
 ) {
     val checkedCount = items.count { it.isChecked }
     var showFinishDialog by rememberSaveable { mutableStateOf(false) }
@@ -154,43 +157,71 @@ internal fun ListItems(
     }
 
     // One flat list feeds both headers and rows, so the reorderable state sees
-    // stable keys; built here (not inside the LazyColumn) so the reveal below
-    // walks the same grouping the list shows.
+    // stable keys; built once per composition rather than inside the
+    // LazyColumn. The reveal effect calls sectionedEntries itself (a captured
+    // build would be stale after its wait), and both derive the same grouping
+    // from the same live mirror.
     val headed = sectionedEntries(ordered)
 
     // The just-added row's highlight; set by the reveal effect once the row is
     // on screen, cleared by the effect below after it has had a beat to fade.
     var flashItemId by remember { mutableStateOf<String?>(null) }
 
+    // A row the picker just added on this list, waiting for its reveal.
+    // Local rather than hoisted: leaving this composition drops it, so a
+    // reveal can never fire on a list the user stopped looking at.
+    var revealItemId by remember { mutableStateOf<String?>(null) }
+    val shownListId by rememberUpdatedState(currentListId)
+    LaunchedEffect(itemAddedEvents) {
+        // Only events for THIS list arm a reveal, and only fresh ones: the
+        // channel keeps events sent while this screen was not composed (the
+        // picker stays reachable from the low-stock view), and replaying one
+        // on return would scroll to a row the user added long ago.
+        itemAddedEvents.collect { added ->
+            if (
+                added.listId == shownListId &&
+                System.currentTimeMillis() - added.sentAtMillis < REVEAL_FRESHNESS_MILLIS
+            ) {
+                revealItemId = added.itemId
+            }
+        }
+    }
+    LaunchedEffect(currentListId) {
+        // A pending reveal belongs to the list it was added to; switching
+        // lists mid-flight drops it instead of flashing the old list's row
+        // on the new one.
+        revealItemId = null
+    }
+
     // Reveal a row the picker just added: wait until the mirror holds it
-    // (Room's emission and the re-sync are a beat apart), then anchor the
-    // viewport to it. The anchor is the row, or its section header when the
-    // row opens the group — the reveal then lands with the aisle label above
-    // it, not a bare row under a cut-off header. Fires once per target; the
-    // caller clears the target when it fires.
+    // where the list shows it — present and unchecked, in its aisle. A row
+    // that is present but checked is a re-add that merged into a row still
+    // parked in the cart: the merge unchecks it a beat later, and anchoring
+    // to the cart slot would scroll to a row that has already flown back to
+    // its aisle. Then anchor the viewport to the row — or its section
+    // header, when the row opens the group, so the reveal lands with the
+    // aisle label above it. Cleared at the end, after the scroll: a null
+    // here restarts this effect (its key changed) and would cancel the
+    // animation mid-flight.
     LaunchedEffect(revealItemId) {
         val target = revealItemId ?: return@LaunchedEffect
-        snapshotFlow { ordered.indexOfFirst { it.id == target } }
+        snapshotFlow { ordered.indexOfFirst { it.id == target && !it.isChecked } }
             .first { it != -1 }
         val entries = sectionedEntries(ordered)
         val rowEntry = entries.indexOfFirst {
             it is HeaderOrItem.Row && it.item.id == target
         }
-        if (rowEntry == -1) return@LaunchedEffect
         val anchor = if (rowEntry > 0 && entries[rowEntry - 1] is HeaderOrItem.Header) {
             rowEntry - 1
         } else {
             rowEntry
         }
-        // Consumed only after the scroll: the caller clears the target on
-        // [onItemRevealed], which would restart this effect (its key changed)
-        // and cancel the animation before it moved anything.
         lazyListState.animateScrollToItem(anchor)
         // The scroll alone shows WHERE the row is; the tint says WHICH row is
         // new when the list barely moved (an item edited in place) or the row
         // was already on screen.
         flashItemId = target
-        onItemRevealed(target)
+        revealItemId = null
     }
 
     // Let the flash run its course. Keyed on the id: a second add mid-flash
@@ -530,3 +561,8 @@ private fun sectionedEntries(ordered: List<ShoppingListItem>): List<HeaderOrItem
 // color glides between resting and highlighted.
 private const val ADDED_ROW_FLASH_HOLD_MILLIS = 650L
 private const val ADDED_ROW_FLASH_FADE_MILLIS = 400
+// Oldest "item added" event this screen will arm a reveal for. A real add is
+// collected within milliseconds; anything older came out of the channel's
+// buffer after a gap (the picker stays reachable from the low-stock view),
+// and replaying it on return would scroll to a row added long ago.
+private const val REVEAL_FRESHNESS_MILLIS = 3_000L

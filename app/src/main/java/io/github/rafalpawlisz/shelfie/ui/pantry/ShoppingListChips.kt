@@ -54,6 +54,12 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 internal fun ListChipsRow(
     lists: List<ShoppingList>,
+    // Every list in position order, hidden ones included. Only the end of a
+    // drag needs it: the chip dropped after the row's last chip is placed
+    // before whatever follows that chip in the FULL order, so hidden lists
+    // trailing the row are not crossed (they would pop back up between the
+    // chips when they fill again).
+    allLists: List<ShoppingList>,
     archivedLists: List<ShoppingList>,
     selectedListId: String?,
     lowStockCount: Int,
@@ -141,11 +147,27 @@ internal fun ListChipsRow(
                         // The chips row may show a subset (empty lists hidden),
                         // so the drop is reported as "the chip now following
                         // the dragged one" — never by index, which would mean
-                        // a different list once some are filtered out.
+                        // a different list once some are filtered out. Dropped
+                        // past the last visible chip, the follower is whatever
+                        // comes after the chip now in front of the dragged one
+                        // in the full order — plain "end of everything" would
+                        // cross the hidden lists trailing the row, and they
+                        // would pop back up between the chips when they fill.
                         val from = lists.indexOfFirst { it.id == list.id }
                         val to = orderedLists.indexOfFirst { it.id == list.id }
                         if (from != -1 && to != -1 && from != to) {
-                            onMoveList(list.id, orderedLists.getOrNull(to + 1)?.id)
+                            val nextVisibleId = orderedLists.getOrNull(to + 1)?.id
+                            val beforeId = if (nextVisibleId != null) {
+                                nextVisibleId
+                            } else {
+                                val previousId = orderedLists.getOrNull(to - 1)?.id
+                                allLists
+                                    .dropWhile { it.id != previousId }
+                                    .drop(1)
+                                    .firstOrNull()
+                                    ?.id
+                            }
+                            onMoveList(list.id, beforeId)
                         }
                         draggingChip = false
                     },

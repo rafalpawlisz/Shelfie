@@ -19,6 +19,7 @@ import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
+import kotlinx.coroutines.flow.Flow
 
 @Composable
 fun ShoppingScreen(
@@ -52,10 +53,14 @@ fun ShoppingScreen(
     onRestockProduct: (Product) -> Unit,
     onAddAllLowStock: (listId: String) -> Unit,
     onFinishShopping: () -> Unit,
-    // The picker just added this row on the list being shown; scroll it into
-    // view once it appears. One-shot, see ListItems.
-    revealItemId: String?,
-    onItemRevealed: (String) -> Unit,
+    // One-shot "a row was added from the picker" events; ListItems reveals
+    // the row. Collected down there, where the list is on screen — a target
+    // armed in a parent would outlive the screen and could fire on a list
+    // nobody is looking at.
+    itemAddedEvents: Flow<AddedShoppingItem>,
+    // Held by ShelfieApp so hopping tabs does not reset the choice.
+    hideEmptyLists: Boolean,
+    onToggleHideEmpty: () -> Unit,
 ) {
     // Viewing the derived "low stock" pseudo-list; purely presentational, the
     // real list selection in the ViewModel stays untouched.
@@ -64,12 +69,10 @@ fun ShoppingScreen(
         if (lowStockProducts.isEmpty()) lowStockSelected = false
     }
 
-    // Session-scoped, on by default: empty lists leave the chips row until they
-    // hold something again. The list being viewed stays put — the chip is the
-    // "you are here" marker, and a just-created empty list must not vanish the
-    // moment it is created; it hides once the user leaves it.
-    var hideEmptyLists by rememberSaveable { mutableStateOf(true) }
     val visibleLists = if (hideEmptyLists) {
+        // The list being viewed stays put — the chip is the "you are here"
+        // marker, and a just-created empty list must not vanish the moment it
+        // is created; it hides once the user leaves it.
         lists.filterNot { it.id in emptyListIds && it.id != selectedListId }
     } else {
         lists
@@ -78,12 +81,15 @@ fun ShoppingScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         ListChipsRow(
             lists = visibleLists,
+            // Full order, hidden lists included: a drag dropped at the end of
+            // the visible row must not skip over the hidden lists trailing it.
+            allLists = lists,
             archivedLists = archivedLists,
             selectedListId = if (lowStockSelected) null else selectedListId,
             lowStockCount = lowStockProducts.size,
             lowStockSelected = lowStockSelected,
             hideEmptyLists = hideEmptyLists,
-            onToggleHideEmpty = { hideEmptyLists = !hideEmptyLists },
+            onToggleHideEmpty = onToggleHideEmpty,
             onSelectLowStock = { lowStockSelected = true },
             onSelectList = {
                 lowStockSelected = false
@@ -135,8 +141,7 @@ fun ShoppingScreen(
                 onCheckWithAmount = onCheckWithAmount,
                 onMove = onMove,
                 onFinishShopping = onFinishShopping,
-                revealItemId = revealItemId,
-                onItemRevealed = onItemRevealed,
+                itemAddedEvents = itemAddedEvents,
             )
         }
     }

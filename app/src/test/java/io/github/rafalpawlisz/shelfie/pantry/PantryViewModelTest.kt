@@ -334,9 +334,11 @@ class PantryViewModelTest {
 
         viewModel.addToShoppingList(id, amount = 2)
 
-        // The row id the list shows is the one the reveal must scroll to.
+        // The row id the list shows is the one the reveal must scroll to. The
+        // sentAtMillis stamp (what the freshness gate keys on) is real time.
         val itemId = viewModel.uiState.value.shoppingList.single().id
-        assertEquals(listOf(AddedShoppingItem(listId = "list-1", itemId = itemId)), added)
+        assertEquals(listOf("list-1" to itemId), added.map { it.listId to it.itemId })
+        assertTrue(added.single().sentAtMillis > 0)
     }
 
     @Test
@@ -354,7 +356,8 @@ class PantryViewModelTest {
         viewModel.addOneOffToShoppingList(name = "żarówka", amount = 2, unit = "szt")
 
         val itemId = viewModel.uiState.value.shoppingList.single().id
-        assertEquals(listOf(AddedShoppingItem(listId = "list-1", itemId = itemId)), added)
+        assertEquals(listOf("list-1" to itemId), added.map { it.listId to it.itemId })
+        assertTrue(added.single().sentAtMillis > 0)
     }
 
     @Test
@@ -380,12 +383,10 @@ class PantryViewModelTest {
         assertEquals(1, viewModel.uiState.value.shoppingList.size)
         assertEquals(3, viewModel.uiState.value.shoppingList.single().amount)
         assertEquals(
-            listOf(
-                AddedShoppingItem(listId = "list-1", itemId = rowId),
-                AddedShoppingItem(listId = "list-1", itemId = rowId),
-            ),
-            added,
+            listOf(rowId, rowId),
+            added.map { it.itemId },
         )
+        assertTrue(added.all { it.listId == "list-1" && it.sentAtMillis > 0 })
     }
 
     @Test
