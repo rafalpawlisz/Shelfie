@@ -408,7 +408,11 @@ private fun SearchPhase(
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         items(notOnThisList, key = { it.id }) { product ->
-            ProductListItem(product = product, onClick = { onSelect(product.id) })
+            ProductListItem(
+                product = product,
+                showQuantity = false,
+                onClick = { onSelect(product.id) },
+            )
         }
         if (visibleArchived.isNotEmpty()) {
             item(key = "archived-header") {
@@ -425,6 +429,7 @@ private fun SearchPhase(
                 ProductListItem(
                     product = product,
                     dimmed = true,
+                    showQuantity = false,
                     onClick = { onSelect(product.id) },
                 )
             }
@@ -473,7 +478,11 @@ private fun SearchPhase(
                 )
             }
             items(onThisList, key = { it.id }) { product ->
-                ProductListItem(product = product, onClick = { onSelect(product.id) })
+                ProductListItem(
+                    product = product,
+                    showQuantity = false,
+                    onClick = { onSelect(product.id) },
+                )
             }
         }
     }

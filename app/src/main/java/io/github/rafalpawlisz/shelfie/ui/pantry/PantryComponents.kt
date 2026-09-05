@@ -63,6 +63,9 @@ internal fun ProductListItem(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     dimmed: Boolean = false,
+    // The shopping picker shows products without their stock: the number
+    // there would read as the amount planned on the list.
+    showQuantity: Boolean = true,
     onClick: (() -> Unit)? = null,
     trailingContent: @Composable () -> Unit = {},
 ) {
@@ -83,21 +86,23 @@ internal fun ProductListItem(
                     style = MaterialTheme.typography.titleMedium,
                     color = textColor,
                 )
-                val baseQuantity = product.unit
-                    ?.let { stringResource(R.string.quantity_with_unit, product.quantity, it) }
-                    ?: product.quantity.toString()
-                // Below the minimum: highlight the stock and show the threshold.
-                val minQuantity = product.minQuantity
-                val isLow = !dimmed && minQuantity != null && product.quantity < minQuantity
-                Text(
-                    text = if (isLow) {
-                        stringResource(R.string.quantity_below_min, baseQuantity, minQuantity)
-                    } else {
-                        baseQuantity
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isLow) MaterialTheme.colorScheme.warning else textColor,
-                )
+                if (showQuantity) {
+                    val baseQuantity = product.unit
+                        ?.let { stringResource(R.string.quantity_with_unit, product.quantity, it) }
+                        ?: product.quantity.toString()
+                    // Below the minimum: highlight the stock and show the threshold.
+                    val minQuantity = product.minQuantity
+                    val isLow = !dimmed && minQuantity != null && product.quantity < minQuantity
+                    Text(
+                        text = if (isLow) {
+                            stringResource(R.string.quantity_below_min, baseQuantity, minQuantity)
+                        } else {
+                            baseQuantity
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isLow) MaterialTheme.colorScheme.warning else textColor,
+                    )
+                }
                 // Only when somebody wrote one down; most products have none.
                 if (product.expiresOn != null) {
                     val status = expiryStatusOf(product.expiresOn, rememberToday())
