@@ -473,6 +473,15 @@ class PantryViewModel(
         // this falls back to the selected list, as always.
         val listId = pickerListId.value ?: selectedListId.value ?: return
         viewModelScope.launch {
+            // The pinned list can die behind the full-screen dialog (deleted on
+            // the other device, applied by a sync pull) without the selection
+            // noticing — the reconciler only revalidates selectedListId. Writing
+            // into a list that is gone trips the foreign key and takes the app
+            // down; the same guard as undoRemoveItem.
+            if (!shoppingListRepository.listExists(listId)) {
+                messageChannel.send(R.string.undo_list_gone)
+                return@launch
+            }
             val itemId = planOnList(listId, productId, amount, note)
             itemAddedChannel.send(
                 AddedShoppingItem(listId, itemId, System.currentTimeMillis()),
@@ -792,6 +801,12 @@ class PantryViewModel(
         val listId = pickerListId.value ?: selectedListId.value ?: return
         if (name.isBlank()) return
         viewModelScope.launch {
+            // Same dead-pin guard as addToShoppingList: the captured list may
+            // have been deleted behind the dialog.
+            if (!shoppingListRepository.listExists(listId)) {
+                messageChannel.send(R.string.undo_list_gone)
+                return@launch
+            }
             val itemId = shoppingListRepository.addOneOffItem(
                 listId, name, amount, unit, note, sectionEmoji,
             )

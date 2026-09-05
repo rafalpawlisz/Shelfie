@@ -454,10 +454,12 @@ private fun SearchPhase(
         notOnThisList.forEach { add(SearchEntry.Pantry(it)) }
         visibleSuggestions.forEach { add(SearchEntry.OneOff(it)) }
     }.sortedWith { a, b -> collator.compare(a.sortName, b.sortName) }
-    // The bottom section's one-off notes, matching the query like the rows do
-    // (a blank query shows all of them).
-    val visiblePlannedOneOffs = onListOneOffNotes.values
-        .filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
+    // The bottom section's one-off notes answer by the same canonical word
+    // identity as the keys above: a spelled variant of an on-list word still
+    // finds its note instead of a blank dead end (a blank query shows all).
+    val visiblePlannedOneOffs = onListOneOffNotes
+        .filterKeys { query.isBlank() || it.contains(normalizedOneOffName(query)) }
+        .values
         .sortedWith { a, b -> collator.compare(a.name, b.name) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),

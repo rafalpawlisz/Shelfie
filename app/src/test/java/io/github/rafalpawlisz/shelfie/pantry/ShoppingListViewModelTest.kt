@@ -203,6 +203,37 @@ class ShoppingListViewModelTest {
             assertEquals("big tin", row.note)
         }
 
+    @Test
+    fun `a confirm is refused, not redirected, when the pinned list was deleted behind the dialog`() =
+        runTest {
+            // The full-screen picker outlives its list when the other device
+            // deletes it and the sync pull applies the removal: writing into a
+            // list that is gone used to trip the fake's foreign-key check — and
+            // crashes the real DAO — instead of warning.
+            val repository = FakeProductRepository()
+            repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+            val viewModel = makeViewModel(repository)
+            observe(viewModel)
+            val messages = mutableListOf<Int>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                viewModel.messages.collect { messages.add(it) }
+            }
+            val productId = viewModel.uiState.value.products.single().id
+            viewModel.createList("Lidl")
+            viewModel.createList("Auchan")
+            val lidl = viewModel.uiState.value.lists.first { it.name == "Lidl" }.id
+            viewModel.selectList(lidl)
+            viewModel.openShoppingListPicker()
+            viewModel.deleteList(lidl)
+
+            viewModel.addToShoppingList(productId, amount = 2)
+
+            assertEquals(listOf(R.string.undo_list_gone), messages)
+            // The reselected Auchan stays untouched: the add was refused, not
+            // silently moved to the list the dialog never showed.
+            assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+        }
+
     // --- Empty-list detection (feeds the "hide empty" filter) ---
 
     @Test
