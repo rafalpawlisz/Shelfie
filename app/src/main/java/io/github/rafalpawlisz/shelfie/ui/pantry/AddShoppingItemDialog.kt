@@ -61,6 +61,10 @@ import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
  * it's asked for at check-off). Picking a product that is already on the list
  * pre-fills its current amount and note, and confirming REPLACES them.
  *
+ * The pantry list shows only products that are NOT on the chosen list yet;
+ * the ones that already are gather under their own header at the bottom,
+ * where tapping one still pre-fills its current values and REPLACES them.
+ *
  * A one-off needs no second phase: it joins the list in one tap — bare, or
  * with an amount and unit typed into the search ("marchew 200 g"). Note and
  * section stay empty and are edited on the list if wanted.
@@ -134,6 +138,11 @@ fun AddShoppingItemDialog(
             selectedProductId = null
         }
     }
+
+    // Products already planned on the chosen list: the amount step pre-fills
+    // from their row, and the search phase groups them under their own header
+    // instead of offering them a second time among the pantry products.
+    val onListProductIds = items.mapNotNull { it.productId }.toSet()
 
     Dialog(
         onDismissRequest = goBack,
@@ -240,6 +249,7 @@ fun AddShoppingItemDialog(
                             SearchPhase(
                                 products = products,
                                 archivedProducts = archivedProducts,
+                                onListProductIds = onListProductIds,
                                 suggestions = suggestions,
                                 onSelect = { selectedProductId = it },
                                 onCreateProduct = onCreateProduct,
@@ -310,6 +320,9 @@ fun AddShoppingItemDialog(
 private fun SearchPhase(
     products: List<Product>,
     archivedProducts: List<Product>,
+    // Products that already sit on the chosen list; they leave the pantry
+    // list and gather at the bottom under their own header.
+    onListProductIds: Set<String>,
     suggestions: List<OneOffSuggestion>,
     onSelect: (productId: String) -> Unit,
     onCreateProduct: (name: String) -> Unit,
@@ -321,6 +334,10 @@ private fun SearchPhase(
     // pointing at another tab.
     var query by rememberSaveable { mutableStateOf("") }
     val visibleProducts = products.filterByName(query)
+    // Products already on the chosen list answer in the bottom section, never
+    // here — one place per product, so an add cannot look like a duplicate.
+    val onThisList = visibleProducts.filter { it.id in onListProductIds }
+    val notOnThisList = visibleProducts.filterNot { it.id in onListProductIds }
     // Archived matches only while searching: the archive is something to find
     // by name here, not to browse through on the way to the shopping list.
     val visibleArchived = if (query.isBlank()) emptyList() else archivedProducts.filterByName(query)
@@ -366,9 +383,9 @@ private fun SearchPhase(
     // matches substrings, so "mleko" finds "Mleko owsiane" and the one-off
     // route used to vanish for any name that merely occurs inside a product's.
     // Repeats are the one-off's whole point, so only the product itself — the
-    // better answer, listed above — hides the offer. It rides at the end of the
-    // list rather than above it: an escape hatch belongs after the results, not
-    // in front of them.
+    // better answer — hides the offer. It rides at the end of the list rather
+    // than above it: an escape hatch belongs after the results, not in front
+    // of them.
     val exactMatch = (visibleProducts + visibleArchived).any {
         it.name.trim().equals(query.trim(), ignoreCase = true)
     }
@@ -390,7 +407,7 @@ private fun SearchPhase(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
-        items(visibleProducts, key = { it.id }) { product ->
+        items(notOnThisList, key = { it.id }) { product ->
             ProductListItem(product = product, onClick = { onSelect(product.id) })
         }
         if (visibleArchived.isNotEmpty()) {
@@ -440,6 +457,23 @@ private fun SearchPhase(
                 ) {
                     Text(stringResource(R.string.picker_one_off, query.trim()))
                 }
+            }
+        }
+        // Last, on purpose: it is not the answer most of the time — the pantry
+        // rows above are. Something already on the list is here to be tuned
+        // (amount up, note changed), not to be added again, and picking one
+        // still lands on the pre-filled amount step.
+        if (onThisList.isNotEmpty()) {
+            item(key = "on-this-list-header") {
+                Text(
+                    text = stringResource(R.string.picker_on_this_list_section),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            items(onThisList, key = { it.id }) { product ->
+                ProductListItem(product = product, onClick = { onSelect(product.id) })
             }
         }
     }
