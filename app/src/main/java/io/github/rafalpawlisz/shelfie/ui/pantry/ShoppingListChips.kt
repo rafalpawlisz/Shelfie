@@ -90,6 +90,12 @@ internal fun ListChipsRow(
     // finger and snap the chip back. Keyed on the flag too, so the mirror
     // catches up the moment the gesture ends.
     var draggingChip by remember { mutableStateOf(false) }
+    // The dragged chip's position in the mirror when the gesture began. The
+    // drop is measured between this and the chip's mirror position at the end:
+    // the mirror freezes mid-drag while [lists] keeps flowing, and comparing a
+    // live index against a frozen one turned same-place drops into spurious
+    // moves (and wrong beforeIds) under a household emission.
+    var dragStartedAt by remember { mutableStateOf(-1) }
     val orderedLists = remember { mutableStateListOf<ShoppingList>().apply { addAll(lists) } }
     LaunchedEffect(lists, draggingChip) {
         if (!draggingChip && orderedLists != lists) {
@@ -141,6 +147,7 @@ internal fun ListChipsRow(
                 val handleModifier = Modifier.longPressDraggableHandle(
                     onDragStarted = {
                         draggingChip = true
+                        dragStartedAt = orderedLists.indexOfFirst { it.id == list.id }
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     },
                     onDragStopped = {
@@ -153,21 +160,36 @@ internal fun ListChipsRow(
                         // in the full order — plain "end of everything" would
                         // cross the hidden lists trailing the row, and they
                         // would pop back up between the chips when they fill.
-                        val from = lists.indexOfFirst { it.id == list.id }
                         val to = orderedLists.indexOfFirst { it.id == list.id }
-                        if (from != -1 && to != -1 && from != to) {
-                            val nextVisibleId = orderedLists.getOrNull(to + 1)?.id
-                            val beforeId = if (nextVisibleId != null) {
-                                nextVisibleId
-                            } else {
+                        // Start and end read from the same frozen mirror: a chip
+                        // back where it began is no move at all, whatever the
+                        // live [lists] did under the finger meanwhile.
+                        val atStart = to == -1 || to == dragStartedAt
+                        val nextVisibleId =
+                            if (atStart) null else orderedLists.getOrNull(to + 1)?.id
+                        when {
+                            atStart -> Unit // same-place drop: nothing to persist
+                            nextVisibleId != null -> onMoveList(list.id, nextVisibleId)
+                            else -> {
+                                // Dropped past the last visible chip: place it
+                                // before whatever follows the chip now in front
+                                // of it in the FULL order — plain "end of
+                                // everything" would cross the hidden lists
+                                // trailing the row, and they would pop back up
+                                // between the chips when they fill. A follower
+                                // of null means that chip is itself the last of
+                                // the full order, so "the end" IS the spot.
                                 val previousId = orderedLists.getOrNull(to - 1)?.id
-                                allLists
-                                    .dropWhile { it.id != previousId }
-                                    .drop(1)
-                                    .firstOrNull()
-                                    ?.id
+                                val previousIndex =
+                                    allLists.indexOfFirst { it.id == previousId }
+                                if (previousIndex != -1) {
+                                    onMoveList(list.id, allLists.getOrNull(previousIndex + 1)?.id)
+                                }
+                                // The chip in front vanished mid-drag (archived
+                                // by the household): the end of the row has no
+                                // anchor left — no move rather than a jump past
+                                // every hidden list.
                             }
-                            onMoveList(list.id, beforeId)
                         }
                         draggingChip = false
                     },

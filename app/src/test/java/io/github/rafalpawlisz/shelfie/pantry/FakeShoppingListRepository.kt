@@ -5,6 +5,7 @@ import io.github.rafalpawlisz.shelfie.data.local.sectionEmojiFor
 import io.github.rafalpawlisz.shelfie.model.PlannedEntry
 import io.github.rafalpawlisz.shelfie.model.ItemSlot
 import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
+import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.SectionOrder
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
@@ -142,7 +143,24 @@ class FakeShoppingListRepository(
         }
 
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
-        combine(items, products.observeProducts(), positions, lists) { list, active, pos, allLists ->
+        observeItemsWith(listId, products.observeProducts())
+
+    override fun observeItemsIncludingDormant(listId: String): Flow<List<ShoppingListItem>> =
+        observeItemsWith(
+            listId,
+            // Archived products join too: their rows are dormant (invisible on
+            // the list) but the picker still pre-fills from them.
+            combine(
+                products.observeProducts(),
+                products.observeArchivedProducts(),
+            ) { active, archived -> active + archived },
+        )
+
+    private fun observeItemsWith(
+        listId: String,
+        productSource: Flow<List<Product>>,
+    ): Flow<List<ShoppingListItem>> =
+        combine(items, productSource, positions, lists) { list, productList, pos, allLists ->
             // Mirrors the DAO's COALESCE: the product's slot, or a one-off's own
             // slot once dragged, or — for a one-off nobody placed — creation
             // order, which lands it at the end of the unchecked block.
@@ -158,7 +176,9 @@ class FakeShoppingListRepository(
             list.filter { it.listId == listId }
                 .mapNotNull { item ->
                     if (item.productId == null) return@mapNotNull item to null
-                    val product = active.firstOrNull { it.id == item.productId }
+                    // A product outside the source (archived, when only active
+                    // ones flow) drops the row — the real visibility filter.
+                    val product = productList.firstOrNull { it.id == item.productId }
                         ?: return@mapNotNull null
                     item to product
                 }
@@ -227,6 +247,12 @@ class FakeShoppingListRepository(
         amount: Int?,
         note: String?,
     ): String {
+        // Mirror the real DAO's foreign keys: Room throws for a list or
+        // product that does not exist (SQLiteConstraintException) instead of
+        // writing a ghost row — a fake that accepted one would pass tests the
+        // app would crash on.
+        check(lists.value.any { it.id == listId }) { "no such list: $listId" }
+        check(products.containsProduct(productId)) { "no such product: $productId" }
         ensurePosition(listId, productId)
         val cleanNote = note?.trim()?.ifBlank { null }
         val existing = items.value.firstOrNull { it.listId == listId && it.productId == productId }
@@ -279,6 +305,9 @@ class FakeShoppingListRepository(
         note: String?,
         sectionEmoji: String?,
     ): String {
+        // Same FK mirror as addItem: a one-off line writes into a list that
+        // must exist.
+        check(lists.value.any { it.id == listId }) { "no such list: $listId" }
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return ""
         // Mirrors the repository: the word is remembered even though the line

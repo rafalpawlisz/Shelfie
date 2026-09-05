@@ -3,6 +3,7 @@ package io.github.rafalpawlisz.shelfie.pantry
 import io.github.rafalpawlisz.shelfie.MainDispatcherRule
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.model.ProductCategory
+import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import io.github.rafalpawlisz.shelfie.ui.pantry.LowStockSuggestion
 import io.github.rafalpawlisz.shelfie.ui.pantry.PantryViewModel
 import io.github.rafalpawlisz.shelfie.ui.pantry.RemovedShoppingItem
@@ -121,6 +122,86 @@ class ShoppingListViewModelTest {
         assertEquals(state.lists.single().id, state.selectedListId)
         assertTrue(state.shoppingList.isEmpty())
     }
+
+    // --- The picker's pinned list (the dialog shows and writes against one list) ---
+
+    @Test
+    fun `addToShoppingList with the picker open writes to the pinned list, not the reselected one`() =
+        runTest {
+            val repository = FakeProductRepository()
+            repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+            val viewModel = makeViewModel(repository)
+            observe(viewModel)
+            val productId = viewModel.uiState.value.products.single().id
+            viewModel.createList("Lidl")
+            val lidl = viewModel.uiState.value.selectedListId!!
+            viewModel.createList("Auchan")
+            val auchan = viewModel.uiState.value.selectedListId!!
+
+            // The picker opened while Lidl was selected; a household change then
+            // moved the selection to Auchan behind the dialog.
+            viewModel.selectList(lidl)
+            viewModel.openShoppingListPicker()
+            viewModel.selectList(auchan)
+
+            viewModel.addToShoppingList(productId, amount = 2)
+
+            // The add lands on the list the dialog showed...
+            viewModel.selectList(lidl)
+            assertEquals(2, viewModel.uiState.value.shoppingList.single().amount)
+            // ...and the reselected list stays untouched.
+            viewModel.selectList(auchan)
+            assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+        }
+
+    @Test
+    fun `addToShoppingList follows the selected list again once the picker is closed`() = runTest {
+        val repository = FakeProductRepository()
+        repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+        val viewModel = makeViewModel(repository)
+        observe(viewModel)
+        val productId = viewModel.uiState.value.products.single().id
+        viewModel.createList("Lidl")
+        viewModel.openShoppingListPicker()
+        viewModel.closeShoppingListPicker()
+        viewModel.createList("Auchan")
+        val auchan = viewModel.uiState.value.selectedListId!!
+        val lidl = viewModel.uiState.value.lists.first { it.name == "Lidl" }.id
+
+        viewModel.addToShoppingList(productId, amount = 2)
+
+        assertEquals(2, viewModel.uiState.value.shoppingList.single().amount)
+        viewModel.selectList(lidl)
+        assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+    }
+
+    @Test
+    fun `pickerItems keep a dormant row's amount and note after its product was archived`() =
+        runTest {
+            val repository = FakeProductRepository()
+            repository.addProduct(name = "Milk", quantity = 0, unit = "l")
+            val viewModel = makeViewModel(repository)
+            observe(viewModel)
+            val picked = mutableListOf<List<ShoppingListItem>>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                viewModel.pickerItems.collect { picked.add(it) }
+            }
+            val productId = viewModel.uiState.value.products.single().id
+            viewModel.createList("Lidl")
+            viewModel.addToShoppingList(productId, amount = 3, note = "big tin")
+            viewModel.openShoppingListPicker()
+
+            // The list screen hides the row once its product is archived...
+            viewModel.archive(productId)
+            assertTrue(viewModel.uiState.value.shoppingList.isEmpty())
+
+            // ...but the picker still reads the dormant row, so a confirm from
+            // the archive pre-fills and round-trips these values instead of
+            // wiping them with empty fields.
+            val row = picked.last().single()
+            assertEquals(3, row.amount)
+            assertEquals("big tin", row.note)
+        }
 
     // --- Empty-list detection (feeds the "hide empty" filter) ---
 

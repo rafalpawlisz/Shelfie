@@ -52,6 +52,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.verticalScroll
 import io.github.rafalpawlisz.shelfie.R
 import io.github.rafalpawlisz.shelfie.data.nameCollator
+import io.github.rafalpawlisz.shelfie.data.normalizedOneOffName
 import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
 import io.github.rafalpawlisz.shelfie.model.Product
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
@@ -84,6 +85,9 @@ fun AddShoppingItemDialog(
     // exists there looked like a name that did not exist at all, and the only
     // way onwards was a form that offered to "create" it.
     archivedProducts: List<Product>,
+    // The pinned list's rows, dormant ones included (a row whose product was
+    // archived since is invisible on the list screen but still holds values
+    // the amount step must pre-fill and round-trip, not wipe).
     items: List<ShoppingListItem>,
     // Names bought once before, newest first; see OneOffSuggestion.
     suggestions: List<OneOffSuggestion>,
@@ -145,17 +149,20 @@ fun AddShoppingItemDialog(
     // from their row, and the search phase groups them under their own header
     // instead of offering them a second time among the pantry products.
     val onListProductIds = items.mapNotNull { it.productId }.toSet()
-    // One-off lines already on the list, normalized name -> the display name.
-    // Their words leave the suggestions and sit with the products under the
-    // same header — as plain notes, because a one-off row has no amount step
-    // to pre-fill.
+    // One-off lines already on the list, canonical identity -> the display
+    // name. Their words leave the suggestions and sit with the products under
+    // the same header — as plain notes, because a one-off row has no amount
+    // step to pre-fill. Keys use the same normalization the suggestion table
+    // dedupes by (normalizedOneOffName -> oneOffSuggestionId), so a line
+    // spelled "znicze  200 g" hides the remembered "znicze 200 g" — one word,
+    // however the phones wrote it down.
     val onListOneOffNotes = items
         .filter { it.productId == null }
-        .groupBy { it.productName.trim().lowercase() }
+        .groupBy { normalizedOneOffName(it.productName) }
         // A product row already answers for its name; a one-off line under the
         // same name is not worth a second note below the product.
         .filterKeys { name -> items.none {
-            it.productId != null && it.productName.trim().lowercase() == name
+            it.productId != null && normalizedOneOffName(it.productName) == name
         } }
         .mapValues { (_, lines) ->
             PlannedOneOff(name = lines.first().productName.trim())
@@ -365,9 +372,11 @@ private fun SearchPhase(
     val visibleArchived = if (query.isBlank()) emptyList() else archivedProducts.filterByName(query)
     // A typed word that is already a one-off line on the list is known too:
     // it answers in the bottom section, so no create button and no one-off
-    // offer for it either.
+    // offer for it either. Compared by the canonical word identity, like the
+    // keys above: "  Mleko  " typed against a line spelled differently is
+    // still the same word.
     val typedNameOnList =
-        query.isNotBlank() && onListOneOffNotes.containsKey(query.trim().lowercase())
+        query.isNotBlank() && onListOneOffNotes.containsKey(normalizedOneOffName(query))
     // A name that has since become a product belongs to the products: the
     // pantry is the better answer, and offering both would be offering a
     // choice with no meaning behind it.
@@ -377,7 +386,7 @@ private fun SearchPhase(
             (products + archivedProducts).any { it.name.trim().equals(suggestion.name, true) }
         }
         // Already a line on this list: the bottom section answers for it now.
-        .filterNot { it.name.trim().lowercase() in onListOneOffNotes }
+        .filterNot { normalizedOneOffName(it.name) in onListOneOffNotes }
 
     // Focus and keyboard up front: this screen exists to be typed into, and
     // coming back from the amount step lands here to search again. Scoped to
@@ -398,9 +407,12 @@ private fun SearchPhase(
             style = MaterialTheme.typography.bodyMedium,
         )
     }
-    // Offering to create is only honest when the name is unknown everywhere —
-    // archive, remembered one-offs and the list's own lines included, or the
-    // button proposes to make a second product with a name the app answers.
+    // Offering to create is only honest when the typed name is not itself an
+    // existing answer: a product or remembered one-off matching it (even by
+    // substring — those rows are pickable, so the picker answers the query),
+    // or a word already written on the list. Matches are by the WORD, not by
+    // occurrence: a longer line the name merely sits inside ("ttttt" for a
+    // typed "ttt") is a different word, and creating it duplicates nothing.
     if (query.isNotBlank() && visibleProducts.isEmpty() && visibleArchived.isEmpty() &&
         visibleSuggestions.isEmpty() && !typedNameOnList
     ) {
@@ -422,9 +434,12 @@ private fun SearchPhase(
     // matches substrings, so "mleko" finds "Mleko owsiane" and the one-off
     // route used to vanish for any name that merely occurs inside a product's.
     // The offer is for words the picker has no answer to, so a name it already
-    // answers exactly — a product, or a remembered one-off whose row sits
-    // above — hides it. It rides at the end of the list rather than above it:
-    // an escape hatch belongs after the results, not in front of them.
+    // answers exactly — a product, a remembered one-off whose row sits above,
+    // or a word already written on the list (typedNameOnList) — hides it.
+    // Substring neighbours are different words: with "ttttt" on the list,
+    // typing "ttt" still gets its offer. It rides at the end of the list
+    // rather than above it: an escape hatch belongs after the results, not in
+    // front of them.
     val exactMatch = (visibleProducts + visibleArchived).any {
         it.name.trim().equals(query.trim(), ignoreCase = true)
     } || suggestions.any {
@@ -439,8 +454,8 @@ private fun SearchPhase(
         notOnThisList.forEach { add(SearchEntry.Pantry(it)) }
         visibleSuggestions.forEach { add(SearchEntry.OneOff(it)) }
     }.sortedWith { a, b -> collator.compare(a.sortName, b.sortName) }
-    // The bottom section's one-off notes, matching the query like the rows
-    // do (a blank query shows all of them).
+    // The bottom section's one-off notes, matching the query like the rows do
+    // (a blank query shows all of them).
     val visiblePlannedOneOffs = onListOneOffNotes.values
         .filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
         .sortedWith { a, b -> collator.compare(a.name, b.name) }

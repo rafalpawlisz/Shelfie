@@ -69,6 +69,8 @@ fun ShelfieApp(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val household by authViewModel.household.collectAsStateWithLifecycle()
     val pendingUseUp by viewModel.pendingUseUp.collectAsStateWithLifecycle()
+    // The pinned list's rows for the add picker; empty when it is closed.
+    val pickerItems by viewModel.pickerItems.collectAsStateWithLifecycle()
     var currentTab by rememberSaveable { mutableStateOf(ShelfieTab.PRODUCTS) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var showAddToListDialog by rememberSaveable { mutableStateOf(false) }
@@ -205,7 +207,15 @@ fun ShelfieApp(
                 }
                 ShelfieTab.SHOPPING ->
                     if (state.selectedListId != null) {
-                        FloatingActionButton(onClick = { showAddToListDialog = true }) {
+                        FloatingActionButton(
+                            onClick = {
+                                // Pin the picker to this list before it opens:
+                                // a reselection behind the dialog (sync archive)
+                                // must not move where the confirm lands.
+                                viewModel.openShoppingListPicker()
+                                showAddToListDialog = true
+                            },
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = stringResource(R.string.add_to_shopping_list),
@@ -370,12 +380,13 @@ fun ShelfieApp(
         AddShoppingItemDialog(
             products = state.products,
             archivedProducts = state.archivedProducts,
-            items = state.shoppingList,
+            items = pickerItems,
             preselectProductId = newProductForListId,
             onConfirm = { productId, amount, note ->
                 viewModel.addToShoppingList(productId, amount, note)
                 showAddToListDialog = false
                 newProductForListId = null
+                viewModel.closeShoppingListPicker()
             },
             suggestions = state.oneOffSuggestions,
             onForgetSuggestion = viewModel::forgetOneOffSuggestion,
@@ -383,9 +394,11 @@ fun ShelfieApp(
                 viewModel.addOneOffToShoppingList(name, amount, unit, note, sectionEmoji)
                 showAddToListDialog = false
                 newProductForListId = null
+                viewModel.closeShoppingListPicker()
             },
             // Creating goes through the same full form as the Products tab —
-            // one meaning for "add a product". The picker steps aside for it.
+            // one meaning for "add a product". The picker steps aside for it
+            // but keeps its pinned list: the trip ends where it started.
             onCreateProduct = { name ->
                 showAddToListDialog = false
                 newProductForListName = name
@@ -393,6 +406,7 @@ fun ShelfieApp(
             onDismiss = {
                 showAddToListDialog = false
                 newProductForListId = null
+                viewModel.closeShoppingListPicker()
             },
         )
     }

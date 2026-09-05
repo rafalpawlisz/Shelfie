@@ -136,6 +136,38 @@ class PantryViewModel(
             if (id == null) flowOf(emptyList()) else shoppingListRepository.observeItems(id)
         }
 
+    // The list the app-level picker adds to, captured when it opens. The dialog
+    // is a full-screen window that stays up across sync pulls; a reselection
+    // behind it (the list was archived on the other device and the reconciler
+    // moved on) must not redirect the confirm to a list the user was not
+    // looking at — its "already on this list" rows and pre-fills would belong
+    // to one list and the merge would clobber another's.
+    private val pickerListId = MutableStateFlow<String?>(null)
+    val pickerItems: StateFlow<List<ShoppingListItem>> =
+        pickerListId.flatMapLatest { id ->
+            if (id == null) {
+                flowOf(emptyList())
+            } else {
+                // Dormant rows included: picking an archived product pre-fills
+                // from the row the list screen hides, so confirming round-trips
+                // its stored amount and note instead of wiping them.
+                shoppingListRepository.observeItemsIncludingDormant(id)
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
+
+    /** The Shopping tab's FAB: pin the picker to the currently selected list. */
+    fun openShoppingListPicker() {
+        if (pickerListId.value == null) pickerListId.value = selectedListId.value
+    }
+
+    fun closeShoppingListPicker() {
+        pickerListId.value = null
+    }
+
     // One-shot feedback for use-ups (tap or scan) on the Use up tab.
     private val useUpChannel = Channel<UseUpScanResult>(Channel.BUFFERED)
     val useUpEvents = useUpChannel.receiveAsFlow()
@@ -436,7 +468,10 @@ class PantryViewModel(
     }
 
     fun addToShoppingList(productId: String, amount: Int?, note: String? = null) {
-        val listId = selectedListId.value ?: return
+        // The picker's captured list wins over the live selection: the dialog
+        // shows and writes against one list. Outside the picker (no capture)
+        // this falls back to the selected list, as always.
+        val listId = pickerListId.value ?: selectedListId.value ?: return
         viewModelScope.launch {
             val itemId = planOnList(listId, productId, amount, note)
             itemAddedChannel.send(
@@ -746,7 +781,7 @@ class PantryViewModel(
     private fun sectionOf(item: ShoppingListItem): ProductCategory? =
         ProductCategory.fromEmoji(item.productEmoji)
 
-    /** A one-off onto the currently selected list; see [ShoppingListRepository.addOneOffItem]. */
+    /** A one-off onto the picker's captured list (or the selection); see [ShoppingListRepository.addOneOffItem]. */
     fun addOneOffToShoppingList(
         name: String,
         amount: Int?,
@@ -754,7 +789,7 @@ class PantryViewModel(
         note: String? = null,
         sectionEmoji: String? = null,
     ) {
-        val listId = selectedListId.value ?: return
+        val listId = pickerListId.value ?: selectedListId.value ?: return
         if (name.isBlank()) return
         viewModelScope.launch {
             val itemId = shoppingListRepository.addOneOffItem(

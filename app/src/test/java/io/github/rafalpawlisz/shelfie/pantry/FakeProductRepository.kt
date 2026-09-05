@@ -28,6 +28,11 @@ class FakeProductRepository : ProductRepository {
     override suspend fun getActiveProduct(id: String): Product? =
         entries.value.firstOrNull { !it.archived && it.product.id == id }?.product
 
+    // Any product, archived included — mirrors the products table row a
+    // shopping-list item's foreign key points at.
+    fun containsProduct(id: String): Boolean =
+        entries.value.any { it.product.id == id }
+
     override suspend fun addProduct(
         name: String,
         quantity: Int,

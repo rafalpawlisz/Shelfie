@@ -29,6 +29,11 @@ interface ShoppingListRepository {
     // Items within a given list
     fun observeItems(listId: String): Flow<List<ShoppingListItem>>
 
+    // The same rows as observeItems, dormant ones (product archived since)
+    // included — what the list screen shows must stay hideable, but the
+    // picker's amount step still reads a dormant row's stored amount and note.
+    fun observeItemsIncludingDormant(listId: String): Flow<List<ShoppingListItem>>
+
     // amount = null records the bare need ("just buy it"); the actual amount is
     // asked for when the item is checked off. note is a one-off shopping note
     // that dies with the item at checkout/removal.

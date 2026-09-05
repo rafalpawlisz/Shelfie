@@ -202,6 +202,27 @@ interface ShoppingListDao {
     // locale-aware Collator.
     fun observeItems(listId: String): Flow<List<ShoppingListItemRow>>
 
+    // The same rows as observeItems but WITHOUT the visibility filter: rows
+    // whose product was archived since still come, so the picker's amount step
+    // can pre-fill their stored values. Confirming a pick from the archive
+    // restores the product, and the merge must round-trip what the row held —
+    // empty pre-fill fields would otherwise replace (and wipe) it.
+    @Query(
+        "SELECT i.id AS id, i.productId AS productId, i.amount AS amount, i.note AS note, " +
+            "i.checkedAt AS checkedAt, COALESCE(p.name, i.name, '') AS productName, " +
+            "p.emoji AS productEmoji, " +
+            "COALESCE(p.unit, i.unit) AS productUnit, COALESCE(o.position, i.position, " +
+            "CASE WHEN i.productId IS NULL THEN i.createdAt * 1.0 END, 0.0) AS position, " +
+            "l.sectionOrder AS sectionOrder, " +
+            "i.sectionEmoji AS itemSectionEmoji " +
+            "FROM shopping_list_items i " +
+            "JOIN shopping_lists l ON l.id = i.listId " +
+            "LEFT JOIN products p ON p.id = i.productId " +
+            "LEFT JOIN product_list_order o ON o.listId = i.listId AND o.productId = i.productId " +
+            "WHERE i.listId = :listId"
+    )
+    fun observeItemsIncludingDormant(listId: String): Flow<List<ShoppingListItemRow>>
+
     @Query("SELECT * FROM shopping_list_items WHERE listId = :listId AND productId = :productId LIMIT 1")
     suspend fun findByProduct(listId: String, productId: String): ShoppingListItemEntity?
 

@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface OneOffSuggestionDao {
 
-    // Newest first: what was bought last month is a likelier guess than what was
-    // bought last year, and the picker shows only the head of this list.
+    // Newest first: what was bought last month is a likelier guess than what
+    // was bought last year.
     @Query("SELECT * FROM one_off_suggestions ORDER BY lastUsedAt DESC")
     fun observeAll(): Flow<List<OneOffSuggestionEntity>>
 

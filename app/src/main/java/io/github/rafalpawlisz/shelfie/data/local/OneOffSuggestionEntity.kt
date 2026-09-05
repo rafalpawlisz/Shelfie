@@ -2,9 +2,9 @@ package io.github.rafalpawlisz.shelfie.data.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import io.github.rafalpawlisz.shelfie.data.normalizedOneOffName
 import io.github.rafalpawlisz.shelfie.model.OneOffSuggestion
 import java.security.MessageDigest
-import java.util.Locale
 
 /**
  * A name once bought as a one-off, kept so the picker can offer it again.
@@ -43,15 +43,13 @@ fun OneOffSuggestionEntity.toDomain(): OneOffSuggestion = OneOffSuggestion(
 )
 
 /**
- * The identity of a one-off name: trimmed, lowercased, inner whitespace
- * collapsed, then digested. "Znicze", "znicze " and "znicze" are one entry;
- * anything more clever (stemming, diacritics) would merge words a person means
- * to keep apart.
+ * The id of a one-off name: the canonical [normalizedOneOffName] form,
+ * digested. "Znicze", "znicze " and "znicze" are one entry; anything more
+ * clever (stemming, diacritics) would merge words a person means to keep
+ * apart.
  */
 fun oneOffSuggestionId(name: String): String {
-    val normalized = name.trim().lowercase(Locale.ROOT).replace(WHITESPACE, " ")
+    val normalized = normalizedOneOffName(name)
     val digest = MessageDigest.getInstance("SHA-1").digest(normalized.toByteArray())
     return digest.joinToString("") { "%02x".format(it) }
 }
-
-private val WHITESPACE = Regex("\\s+")

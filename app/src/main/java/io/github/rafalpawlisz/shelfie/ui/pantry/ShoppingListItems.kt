@@ -112,10 +112,19 @@ internal fun ListItems(
     var awaitingDrop by remember { mutableStateOf(false) }
     val ordered = remember { mutableStateListOf<ShoppingListItem>().apply { addAll(items) } }
     val lazyListState = rememberLazyListState()
+    // True while the reveal's animateScrollToItem runs. The resync below
+    // re-requests the viewport on every content-changing emission; against an
+    // in-flight animation that call cancels it (requestScrollToItem throws
+    // through the scroll mutex), and the just-added row would sit off-screen
+    // with no flash — the exact "add answered by nothing" the reveal exists
+    // for. While it runs, the mirror still takes the new content, only the
+    // snap is skipped.
+    var revealInFlight by remember { mutableStateOf(false) }
     fun resyncFromUpstream() {
         if (ordered == items) return
         ordered.clear()
         ordered.addAll(items)
+        if (revealInFlight) return
         // Keep the viewport where it is. A keyed LazyColumn anchors scroll
         // to the first visible ITEM, so when checking off the top row sent
         // it to the bottom (checked items park there), the list obediently
@@ -186,11 +195,22 @@ internal fun ListItems(
             }
         }
     }
+    // The list this effect last cleared a reveal for. First composition must
+    // NOT clear: ListItems composes only once a list is on screen, so an add
+    // made while it was not (the list was empty and showed EmptyState, or the
+    // low-stock view was up) arrives buffered and is armed by the collect
+    // effect in this very frame — an unconditional null here, a beat later in
+    // the same frame, killed the reveal before the keyed effect ever saw the
+    // row. Only an actual list switch drops the pending reveal.
+    var revealClearedForList by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(currentListId) {
         // A pending reveal belongs to the list it was added to; switching
         // lists mid-flight drops it instead of flashing the old list's row
         // on the new one.
-        revealItemId = null
+        if (revealClearedForList != null && revealClearedForList != currentListId) {
+            revealItemId = null
+        }
+        revealClearedForList = currentListId
     }
 
     // Reveal a row the picker just added: wait until the mirror holds it
@@ -216,7 +236,12 @@ internal fun ListItems(
         } else {
             rowEntry
         }
-        lazyListState.animateScrollToItem(anchor)
+        revealInFlight = true
+        try {
+            lazyListState.animateScrollToItem(anchor)
+        } finally {
+            revealInFlight = false
+        }
         // The scroll alone shows WHERE the row is; the tint says WHICH row is
         // new when the list barely moved (an item edited in place) or the row
         // was already on screen.

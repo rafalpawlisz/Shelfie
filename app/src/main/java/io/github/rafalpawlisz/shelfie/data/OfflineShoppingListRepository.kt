@@ -115,36 +115,41 @@ class OfflineShoppingListRepository(
     }
 
     override fun observeItems(listId: String): Flow<List<ShoppingListItem>> =
-        dao.observeItems(listId).map { rows ->
-            val collator = nameCollator()
-            // Every row carries the same list's order; no rows, nothing to sort.
-            val order = SectionOrder.parse(rows.firstOrNull()?.sectionOrder)
-            // Unchecked (still to buy) first, walked store section by store
-            // section in the global aisle order; within a section the manual
-            // position, then name. Sectionless rows — one-offs, emoji from
-            // before sections, none — form the trailing group. Checked items
-            // sink to the bottom ordered by most-recently-checked, sections
-            // ignored: what is in the cart has no aisle anymore. Sorting on
-            // rows lets us read checkedAt (the domain model only keeps the flag).
-            rows.sortedWith { a, b ->
-                val aChecked = a.checkedAt != null
-                val bChecked = b.checkedAt != null
-                when {
-                    aChecked != bChecked -> if (aChecked) 1 else -1
-                    aChecked -> {
-                        val byTime = b.checkedAt!!.compareTo(a.checkedAt)
-                        if (byTime != 0) byTime else collator.compare(a.productName, b.productName)
-                    }
-                    else -> {
-                        val bySection = order.rankOf(a.section())
-                            .compareTo(order.rankOf(b.section()))
-                        if (bySection != 0) return@sortedWith bySection
-                        val byPosition = a.position.compareTo(b.position)
-                        if (byPosition != 0) byPosition else collator.compare(a.productName, b.productName)
-                    }
+        dao.observeItems(listId).map { rows -> sortedItems(rows) }
+
+    override fun observeItemsIncludingDormant(listId: String): Flow<List<ShoppingListItem>> =
+        dao.observeItemsIncludingDormant(listId).map { rows -> sortedItems(rows) }
+
+    private fun sortedItems(rows: List<ShoppingListItemRow>): List<ShoppingListItem> {
+        val collator = nameCollator()
+        // Every row carries the same list's order; no rows, nothing to sort.
+        val order = SectionOrder.parse(rows.firstOrNull()?.sectionOrder)
+        // Unchecked (still to buy) first, walked store section by store
+        // section in the global aisle order; within a section the manual
+        // position, then name. Sectionless rows — one-offs, emoji from
+        // before sections, none — form the trailing group. Checked items
+        // sink to the bottom ordered by most-recently-checked, sections
+        // ignored: what is in the cart has no aisle anymore. Sorting on
+        // rows lets us read checkedAt (the domain model only keeps the flag).
+        return rows.sortedWith { a, b ->
+            val aChecked = a.checkedAt != null
+            val bChecked = b.checkedAt != null
+            when {
+                aChecked != bChecked -> if (aChecked) 1 else -1
+                aChecked -> {
+                    val byTime = b.checkedAt!!.compareTo(a.checkedAt)
+                    if (byTime != 0) byTime else collator.compare(a.productName, b.productName)
                 }
-            }.map(ShoppingListItemRow::toDomain)
-        }
+                else -> {
+                    val bySection = order.rankOf(a.section())
+                        .compareTo(order.rankOf(b.section()))
+                    if (bySection != 0) return@sortedWith bySection
+                    val byPosition = a.position.compareTo(b.position)
+                    if (byPosition != 0) byPosition else collator.compare(a.productName, b.productName)
+                }
+            }
+        }.map(ShoppingListItemRow::toDomain)
+    }
 
     // Resolved the same way the row is shown, so a one-off sorts into the aisle
     // it displays — whether that was picked by hand or read from its name.
