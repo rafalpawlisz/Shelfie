@@ -1,5 +1,7 @@
 package io.github.rafalpawlisz.shelfie.ui.pantry
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +49,7 @@ import io.github.rafalpawlisz.shelfie.model.ProductCategory
 import io.github.rafalpawlisz.shelfie.model.ShoppingList
 import io.github.rafalpawlisz.shelfie.model.ShoppingListItem
 import io.github.rafalpawlisz.shelfie.ui.DragHandleIcon
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -154,6 +158,10 @@ internal fun ListItems(
     // walks the same grouping the list shows.
     val headed = sectionedEntries(ordered)
 
+    // The just-added row's highlight; set by the reveal effect once the row is
+    // on screen, cleared by the effect below after it has had a beat to fade.
+    var flashItemId by remember { mutableStateOf<String?>(null) }
+
     // Reveal a row the picker just added: wait until the mirror holds it
     // (Room's emission and the re-sync are a beat apart), then anchor the
     // viewport to it. The anchor is the row, or its section header when the
@@ -178,7 +186,18 @@ internal fun ListItems(
         // [onItemRevealed], which would restart this effect (its key changed)
         // and cancel the animation before it moved anything.
         lazyListState.animateScrollToItem(anchor)
+        // The scroll alone shows WHERE the row is; the tint says WHICH row is
+        // new when the list barely moved (an item edited in place) or the row
+        // was already on screen.
+        flashItemId = target
         onItemRevealed(target)
+    }
+
+    // Let the flash run its course. Keyed on the id: a second add mid-flash
+    // restarts the countdown and the older row simply stops flashing.
+    LaunchedEffect(flashItemId) {
+        delay(ADDED_ROW_FLASH_HOLD_MILLIS)
+        flashItemId = null
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -266,6 +285,7 @@ internal fun ListItems(
                     )
                     ShoppingListRow(
                         item = item,
+                        highlighted = item.id == flashItemId,
                         onToggle = {
                             if (!item.isChecked && item.amount == null && item.productId != null) {
                                 // No amount recorded — ask how many were bought,
@@ -364,6 +384,9 @@ internal fun ListItems(
 @Composable
 private fun ShoppingListRow(
     item: ShoppingListItem,
+    // True right after the picker added this row: the card keeps a highlight
+    // for a moment, then fades back to its resting color.
+    highlighted: Boolean,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onEditAmount: () -> Unit,
@@ -375,10 +398,23 @@ private fun ShoppingListRow(
     val textColor =
         if (item.isChecked) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
     val decoration = if (item.isChecked) TextDecoration.LineThrough else null
+    val containerColor by animateColorAsState(
+        targetValue = if (highlighted) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            CardDefaults.cardColors().containerColor
+        },
+        animationSpec = tween(ADDED_ROW_FLASH_FADE_MILLIS),
+        label = "addedRowFlash",
+    )
 
     // The checkbox toggles (its natural role, with a 48dp touch target); tapping
     // the rest of the row edits the amount.
-    Card(onClick = onEditAmount, modifier = Modifier.fillMaxWidth()) {
+    Card(
+        onClick = onEditAmount,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -489,3 +525,8 @@ private fun sectionedEntries(ordered: List<ShoppingListItem>): List<HeaderOrItem
             add(HeaderOrItem.Row(item))
         }
     }
+
+// How long the just-added row holds its highlight, and how fast the card's
+// color glides between resting and highlighted.
+private const val ADDED_ROW_FLASH_HOLD_MILLIS = 650L
+private const val ADDED_ROW_FLASH_FADE_MILLIS = 400
