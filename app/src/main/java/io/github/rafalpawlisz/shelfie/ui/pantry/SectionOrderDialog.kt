@@ -48,11 +48,11 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 /**
  * Drag the sections into the order this shop is walked in.
  *
- * Full-screen, like the product form: sixteen rows plus room to drag them is
+ * Full-screen, like the product form: every aisle plus the room to drag it is
  * not a decision that fits in a card, and dragging near the edge of a small
  * dialog is how you drop things by accident.
  *
- * All sixteen are listed, including the ones this list has nothing from today:
+ * Every section is listed, including the ones this list has nothing from today:
  * on the list itself a section only appears when it holds an item, so dragging
  * headers there could never reach the aisle you are not buying from right now —
  * which is exactly the aisle you want to place while you remember the shop.
@@ -68,9 +68,9 @@ internal fun SectionOrderDialog(
     onConfirm: (List<ProductCategory>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // Saveable across a configuration change: sixteen drags are too much work
-    // to lose to a rotation. Enums ride the bundle as their names, through the
-    // same forgiving parser the database column uses.
+    // Saveable across a configuration change: a finished rearrangement is too
+    // much work to lose to a rotation. Enums ride the bundle as their names,
+    // through the same forgiving parser the database column uses.
     val order = rememberSaveable(
         saver = listSaver(
             save = { it.map(ProductCategory::name) },

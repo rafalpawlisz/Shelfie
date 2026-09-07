@@ -21,6 +21,7 @@ enum class ProductCategory(val emoji: String, @param:StringRes val nameRes: Int)
     FROZEN("🧊", R.string.category_frozen),
     CANNED("🥫", R.string.category_canned),
     DRY_GOODS("🍝", R.string.category_dry_goods),
+    WORLD_FOODS("🌍", R.string.category_world_foods),
     SPICES("🧂", R.string.category_spices),
     SWEETS("🍫", R.string.category_sweets),
     // Before the drinks and after the sweets, which is where the shop puts it:

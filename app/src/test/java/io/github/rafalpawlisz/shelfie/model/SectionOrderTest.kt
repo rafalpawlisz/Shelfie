@@ -2,6 +2,7 @@ package io.github.rafalpawlisz.shelfie.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SectionOrderTest {
@@ -13,9 +14,19 @@ class SectionOrderTest {
     }
 
     @Test
+    fun `the world-food aisle walks between the baking and the seasonings`() {
+        // A store that keeps its exotic sauces next to its spices, and both
+        // next to the dry goods — a rearrangement that reads wrong here would
+        // read wrong in every walk, so the default order is pinned.
+        val order = ProductCategory.entries
+        assertTrue(order.indexOf(ProductCategory.DRY_GOODS) < order.indexOf(ProductCategory.WORLD_FOODS))
+        assertTrue(order.indexOf(ProductCategory.WORLD_FOODS) < order.indexOf(ProductCategory.SPICES))
+    }
+
+    @Test
     fun `a stored order leads, and everything else follows in declaration order`() {
         // What a real customisation looks like: two aisles pulled to the front,
-        // the remaining fourteen left alone.
+        // everything else left alone.
         val parsed = SectionOrder.parse("HYGIENE,BREAD")
 
         assertEquals(ProductCategory.HYGIENE, parsed[0])
