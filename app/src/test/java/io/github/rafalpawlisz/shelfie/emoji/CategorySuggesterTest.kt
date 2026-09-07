@@ -168,9 +168,11 @@ class CategorySuggesterTest {
 
     @Test
     fun `the batch of names that had no section at all`() {
-        // Eight reported together. Each is filed beside something already in the
-        // dictionary rather than somewhere new: the pickles for kimchi, the
-        // dried fruit for the freeze-dried, the stock for the bouillon.
+        // Reported together. Each was filed beside something already in the
+        // dictionary rather than somewhere new: the dried fruit for the
+        // freeze-dried, the stock for the bouillon. (kimchi and mirin left
+        // this batch for the world-food aisle when it arrived — the aisle's
+        // own test holds them now.)
         assertEquals(ProductCategory.SWEETS, CategorySuggester.suggest("owoce liofilizowane"))
         // The limit of the left-to-right rule, recorded rather than papered
         // over: "owoce" is not a word here, so the adjective decides — but name
@@ -178,9 +180,7 @@ class CategorySuggesterTest {
         // would mean letting a modifier outrank a head noun, which is the very
         // thing that sent red yeast rice to the pasta.
         assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("truskawki liofilizowane"))
-        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("kimchi"))
         assertEquals(ProductCategory.PRODUCE, CategorySuggester.suggest("liczi"))
-        assertEquals(ProductCategory.SPICES, CategorySuggester.suggest("mirin"))
         assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("pulpa z marakui"))
         assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("pulpa z papai"))
         assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("specjał mięsny"))
@@ -218,12 +218,49 @@ class CategorySuggesterTest {
     @Test
     fun `paper you eat is not paper you clean with`() {
         // Here the general word is worth keeping — "papier" alone really is the
-        // paper aisle — so the exception is a phrase, not a removal.
-        assertEquals(ProductCategory.DRY_GOODS, CategorySuggester.suggest("papier do sajgonek"))
-        assertEquals(ProductCategory.DRY_GOODS, CategorySuggester.suggest("papier ryżowy"))
+        // paper aisle — so the exception is a phrase, not a removal. The eating
+        // paper is sold in the world-food aisle; the cleaning cupboard keeps
+        // the plain word.
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("papier do sajgonek"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("papier ryżowy"))
         assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("papier"))
         assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("papier toaletowy"))
         assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("papier do pieczenia"))
+    }
+
+    @Test
+    fun `the world-food aisle owns the soy sauce and the oriental jars`() {
+        // The reassignment that shipped with the section: soy, mirin and rice
+        // paper had sat with the spices and the baking, kimchi and the oriental
+        // jars with the Polish preserves — three aisles splitting products that
+        // share one. The spice mix and the plain rice stayed behind: "curry" is
+        // still the seasonings, and only the jarred-paste phrase names this
+        // aisle.
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("sos sojowy"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("sos sojowy jasny"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("mirin"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("kimchi"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("tahini"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("ajvar"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("pesto"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("ramen"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("soba"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("udon"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("wasabi"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("sriracha"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("hoisin"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("teriyaki"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("pasta curry"))
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("mleczko kokosowe"))
+        // What stayed on the old shelves.
+        assertEquals(ProductCategory.SPICES, CategorySuggester.suggest("curry"))
+        assertEquals(ProductCategory.DRY_GOODS, CategorySuggester.suggest("ryż"))
+        assertEquals(ProductCategory.DRY_GOODS, CategorySuggester.suggest("kuskus"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("ogórki kiszone"))
+        assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("pulpa z marakui"))
+        // The phrases had to outrank the word that otherwise decides first:
+        // "curry" alone is the spice mix, "mleczko" alone the furniture polish.
+        assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("mleczko"))
     }
 
     @Test

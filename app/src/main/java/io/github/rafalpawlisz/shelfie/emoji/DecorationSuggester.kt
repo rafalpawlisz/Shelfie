@@ -223,7 +223,11 @@ object DecorationSuggester {
         "🧀" to listOf("mascarpone", "ricotta", "twarozek", "camembert", "brie"),
         "🫙" to listOf("kajmak", "ajvar", "pesto", "tahini"),
         "🥫" to listOf(
-            "sos sojowy", "mirin", "keczup", "ogorki kiszone", "kapusta kiszona", "kimchi",
+            // The bottled sauces and pastes of the world-food aisle, beside the
+            // soy they were added with; see CategorySuggester for the aisle.
+            "sos sojowy", "mirin", "keczup", "sriracha", "hoisin", "teriyaki",
+            "wasabi", "pasta curry",
+            "ogorki kiszone", "kapusta kiszona", "kimchi",
             "barszcz bialy", "chrzan", "cwikla", "fasolka po bretonsku",
             // Tinned things named by their head noun; see CategorySuggester.
             "pulpa", "specjal",
@@ -255,5 +259,11 @@ object DecorationSuggester {
             "plyn dentystyczny", "plyn do plukania ust", "plyn do plukania jamy ustnej",
             "plyn do ust", "listerine",
         ),
+
+        // The world-food aisle's own additions, worn for what they are rather
+        // than for the shelf they stand on: the noodles in a bowl, the coconut
+        // milk in its fruit.
+        "🍜" to listOf("ramen", "soba", "udon"),
+        "🥥" to listOf("mleczko kokosowe"),
     )
 }

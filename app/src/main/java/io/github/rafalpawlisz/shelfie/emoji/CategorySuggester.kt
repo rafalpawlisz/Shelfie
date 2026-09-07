@@ -121,21 +121,16 @@ object CategorySuggester {
             // Same word, other shelf: the rye starter is bottled among the
             // soups, not with the drinks.
             "zakwas na zurek", "zakwas zytni",
-            "ogorki kiszone", "kapusta kiszona", "kimchi", "barszcz bialy", "chrzan", "cwikla",
+            "ogorki kiszone", "kapusta kiszona", "barszcz bialy", "chrzan", "cwikla",
             // Head nouns, so the modifier never gets to decide: "pulpa" covers
             // marakuja and papaja alike, "specjal" covers the poultry tin as
             // well as the meat one, "bulion" joins the stock beside "rosol".
             "pulpa", "specjal", "bulion",
-            "fasolka po bretonsku", "kajmak", "ajvar", "pesto", "tahini",
+            "fasolka po bretonsku", "kajmak",
             "oliwki", "olives", "korniszony", "passata", "koncentrat",
         ),
         ProductCategory.DRY_GOODS to listOf(
             "maka", "flour", "kasza", "otreby", "zarno", "grys", "ryz", "rice",
-            // Rice paper, as phrases only. The bare word "papier" is a good bet
-            // for the cleaning aisle and stays there — unlike "pasta" below, it
-            // is not worth losing. "sajgonki" is not a word entry either: bought
-            // ready-made they are frozen, so the word alone would mislead.
-            "papier ryzowy", "papier do sajgonek",
             // No "pasta". On a Polish list that word is far more often a spread
             // than macaroni, and standing first it outranked the word that says
             // what is actually in the jar: "pasta z prażonych migdałów" came
@@ -150,6 +145,19 @@ object CategorySuggester {
             "drozdze", "soda", "zelatyna", "skrobia", "budyn w proszku", "proszek do pieczenia",
             "cukier", "puder", "wanilia", "aromat",
         ),
+        // The aisle walked between the baking and the seasonings. It took
+        // these over when it arrived: the soy sauce and mirin had sat with the
+        // spices, the rice paper with the baking, kimchi, tahini, ajvar and
+        // pesto with the Polish preserves. "curry" the spice mix and the plain
+        // rice still mean the old shelves; only the phrase "pasta curry" names
+        // this one, and "mleczko kokosowe" has to be a phrase to outrank the
+        // polish the cleaning aisle's "mleczko" stands for.
+        ProductCategory.WORLD_FOODS to listOf(
+            "sos sojowy", "mirin", "kimchi", "papier ryzowy", "papier do sajgonek",
+            "tahini", "ajvar", "pesto",
+            "ramen", "soba", "udon", "wasabi", "sriracha", "hoisin", "teriyaki",
+            "pasta curry", "mleczko kokosowe",
+        ),
         ProductCategory.SPICES to listOf(
             "sol", "salt", "przyprawa", "przyprawy", "pieprz", "papryka slodka",
             "oregano", "bazylia", "curry", "cynamon",
@@ -159,7 +167,7 @@ object CategorySuggester {
             // its own it is a can, not a thing — glass cleaner and deodorant are
             // sprays too, and guessing from it would file them here.
             "olej", "oliwa", "ocet", "oil", "tluszcz",
-            "sos", "ketchup", "keczup", "majonez", "musztarda", "sos sojowy", "mirin",
+            "sos", "ketchup", "keczup", "majonez", "musztarda",
         ),
         ProductCategory.SWEETS to listOf(
             "czekolada", "chocolate", "kakao", "baton", "batony", "sniadaniowa",

@@ -166,6 +166,19 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `the world aisle's new names wear what they are`() {
+        assertEquals("🍜", DecorationSuggester.suggest("ramen"))
+        assertEquals("🍜", DecorationSuggester.suggest("soba"))
+        assertEquals("🍜", DecorationSuggester.suggest("udon"))
+        assertEquals("🥥", DecorationSuggester.suggest("mleczko kokosowe"))
+        assertEquals("🥫", DecorationSuggester.suggest("wasabi"))
+        assertEquals("🥫", DecorationSuggester.suggest("sriracha"))
+        assertEquals("🥫", DecorationSuggester.suggest("hoisin"))
+        assertEquals("🥫", DecorationSuggester.suggest("teriyaki"))
+        assertEquals("🥫", DecorationSuggester.suggest("pasta curry"))
+    }
+
+    @Test
     fun `an unknown name simply has no decoration`() {
         assertNull(DecorationSuggester.suggest("zgrzeblarka"))
         assertNull(DecorationSuggester.suggest(""))
