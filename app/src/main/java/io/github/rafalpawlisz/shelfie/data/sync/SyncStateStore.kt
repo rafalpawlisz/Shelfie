@@ -16,9 +16,20 @@ interface SyncStateStore {
     var lastSyncedHouseholdId: String?
 
     /**
-     * Client-clock time of the last completed reconcile (0 if never). Compared
-     * only against locally written updatedAt values from the same device, so
-     * cross-device clock skew is irrelevant here.
+     * Client-clock time before which everything this device has written is
+     * known to be on the server (0 if never).
+     *
+     * The initial reconcile draws its line here: a row at or before it that is
+     * absent remotely was deleted there, one after it was written here and has
+     * not gone up yet. Only proof may move it — a server-confirmed snapshot
+     * whose pending writes have drained (see [DiffSyncEngine]) — never the mere
+     * start of a session. Rows pulled from another device carry that device's
+     * updatedAt, so a mark set on a schedule put the far side of a checkout on
+     * the protected side of the line: the push mirror wrote those rows back and
+     * a finished shopping trip reappeared.
+     *
+     * Compared against every local row's updatedAt, pulled ones included, so it
+     * has to come from the same corrected clock that stamps them ([SyncClock]).
      */
     var lastSyncedAt: Long
 

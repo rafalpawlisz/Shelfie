@@ -6,6 +6,7 @@ import io.github.rafalpawlisz.shelfie.data.local.ProductEntity
 import io.github.rafalpawlisz.shelfie.data.local.ProductListOrderEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -47,6 +48,13 @@ import kotlinx.coroutines.supervisorScope
  * cache re-pushed every local row, which resurrected rows another device had
  * deleted meanwhile. The cache is now seeded from the first server snapshot
  * (see [mirror]); the per-change echo is still outstanding.
+ *
+ * The reconcile's deletion arm is bounded by [SyncStateStore.lastSyncedAt]:
+ * rows at or before it are known to be on the server, so their absence may mean
+ * deletion, while rows after it were written here and have not provably gone up
+ * yet. The session moves that mark forward only on proof — a server-confirmed
+ * snapshot with nothing left in the SDK's write queue — which is the moment
+ * everything this device holds is on the server.
  */
 class DiffSyncEngine(
     private val householdIds: Flow<String?>,
@@ -147,17 +155,25 @@ class DiffSyncEngine(
         // 1) Initial snapshot per collection, awaited in parallel. Server-
         // confirmed only: a cache-served snapshot can be incomplete, and
         // reconcile deletes what it doesn't see.
+        val settleRequests = Channel<Unit>(Channel.CONFLATED)
         val initials = APPLY_ORDER
             .map { collection -> async { collection to streams.getValue(collection).firstFromServer() } }
             .awaitAll()
             .toMap()
 
+        // The initials are server-confirmed by construction, and the pull loops
+        // below never see them (firstFromServer takes them off the queue), so
+        // without this an idle household would never settle — the mark would
+        // sit wherever the last busy session left it.
+        settleRequests.trySend(Unit)
+
         // How much of the local content the reconcile is allowed to delete.
         // First session with a household: everything, which is the documented
-        // meaning of joining. Otherwise only rows from the last completed
-        // sync — anything newer was written here since (typically offline,
-        // where this session can wait for the server indefinitely) and has not
-        // provably reached the server, so deleting it would lose it.
+        // meaning of joining. Otherwise only rows the server has acknowledged
+        // (see lastSyncedAt's declaration) — anything newer was written here
+        // since (typically offline, where this session can wait for the server
+        // indefinitely) and has not provably reached the server, so deleting it
+        // would lose it.
         val firstSessionHere = syncState.lastSyncedHouseholdId != hid
         val syncedUpTo = if (firstSessionHere) Long.MAX_VALUE else syncState.lastSyncedAt
 
@@ -171,7 +187,6 @@ class DiffSyncEngine(
         // this device now knows the household, so later sessions must not
         // replace local content wholesale.
         syncState.lastSyncedHouseholdId = hid
-        syncState.lastSyncedAt = now()
         _status.value = SyncStatus.Online(now())
 
         // 2) Ongoing pull: drain each queue in arrival order, so deltas that
@@ -180,15 +195,46 @@ class DiffSyncEngine(
             launch {
                 for (snap in streams.getValue(collection)) {
                     applier.apply(collection, snap.upserts, snap.removedIds)
-                    // Server-confirmed snapshot = we are demonstrably in sync
-                    // now; a cache-only one means Firestore is working from
-                    // the local queue (typically: offline).
-                    _status.value = if (snap.fromCache) {
-                        SyncStatus.Offline((_status.value as? SyncStatus.Online)?.lastSyncAt)
+                    if (snap.fromCache) {
+                        // Working from the local queue (typically: offline).
+                        // Says nothing about what the server has.
+                        _status.value =
+                            SyncStatus.Offline((_status.value as? SyncStatus.Online)?.lastSyncAt)
                     } else {
-                        SyncStatus.Online(now())
+                        // Server-confirmed: we are demonstrably in sync now.
+                        _status.value = SyncStatus.Online(now())
+                        settleRequests.trySend(Unit)
                     }
                 }
+            }
+        }
+
+        // Moves the reconcile's line forward, but only on proof: a confirmed
+        // snapshot says the connection is live, and this wait returns only once
+        // the server has acknowledged everything handed to the SDK — so the
+        // moment it returns is the last moment this device was known to have
+        // nothing left to send. Rows written after it keep the protection that
+        // unsent work needs; rows before it are on the server, which is what
+        // lets their absence in a later reconcile mean deletion.
+        //
+        // The mark is taken AFTER the wait, deliberately: taken before, every
+        // row written while a queue drained — an outage's worth of shopping,
+        // which is exactly when rows pile up — would keep that protection, and
+        // the mirror would write them back once another device deleted them.
+        launch {
+            while (true) {
+                settleRequests.receive()
+                try {
+                    writer.awaitPendingWrites()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // A failed wait leaves the mark where it was, which costs
+                    // the next session a weaker deletion arm and nothing else.
+                    android.util.Log.w("SyncEngine", "waiting for pending writes failed", e)
+                    continue
+                }
+                syncState.lastSyncedAt = now()
             }
         }
 

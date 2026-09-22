@@ -11,6 +11,7 @@ import io.github.rafalpawlisz.shelfie.data.local.ShoppingListEntity
 import io.github.rafalpawlisz.shelfie.data.local.ShoppingListItemEntity
 import io.github.rafalpawlisz.shelfie.data.sync.DiffSyncEngine
 import io.github.rafalpawlisz.shelfie.data.sync.SyncApplier
+import io.github.rafalpawlisz.shelfie.data.sync.SyncClock
 import io.github.rafalpawlisz.shelfie.data.sync.SyncCollection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,6 +39,16 @@ class DiffSyncEngineTest {
         val remote = FakeRemoteSource()
         val store = FakeSyncLocalStore()
         val syncState = FakeSyncStateStore()
+
+        /**
+         * Test-controlled clock. The reconcile turns on which side of
+         * [FakeSyncStateStore.lastSyncedAt] a row's updatedAt falls, so a test
+         * that asserts about that line has to be able to place those
+         * timestamps deliberately — the wall clock places them all on the same
+         * side and proves nothing.
+         */
+        var now = 10_000L
+
         val engine = DiffSyncEngine(
             householdIds = householdIds,
             products = products,
@@ -50,6 +61,7 @@ class DiffSyncEngineTest {
             remote = remote,
             applier = SyncApplier(store),
             syncState = syncState,
+            clock = SyncClock { now },
             scope = CoroutineScope(
                 scope.backgroundScope.coroutineContext +
                     UnconfinedTestDispatcher(scope.testScheduler),
@@ -57,6 +69,20 @@ class DiffSyncEngineTest {
         )
 
         init {
+            // Room is one table for both directions, so a row the applier
+            // deletes has to leave the push-side flow too — otherwise a mirror
+            // would push a row Room no longer has.
+            store.onDelete = { collection, docId ->
+                when (collection) {
+                    SyncCollection.ITEMS ->
+                        items.value = items.value.filterNot { it.id == docId }
+
+                    SyncCollection.PRODUCTS ->
+                        products.value = products.value.filterNot { it.id == docId }
+
+                    else -> Unit
+                }
+            }
             engine.start()
         }
 
@@ -69,14 +95,16 @@ class DiffSyncEngineTest {
          * this class with no hint as to why.
          */
         suspend fun emitInitials(
-            products: List<io.github.rafalpawlisz.shelfie.data.sync.RemoteDoc> = emptyList(),
-            items: List<io.github.rafalpawlisz.shelfie.data.sync.RemoteDoc> = emptyList(),
+            products: List<RemoteDoc> = emptyList(),
+            lists: List<RemoteDoc> = emptyList(),
+            items: List<RemoteDoc> = emptyList(),
         ) {
             for (collection in SyncCollection.entries) {
                 remote.emitInitial(
                     collection,
                     when (collection) {
                         SyncCollection.PRODUCTS -> products
+                        SyncCollection.LISTS -> lists
                         SyncCollection.ITEMS -> items
                         else -> emptyList()
                     },
@@ -160,6 +188,109 @@ class DiffSyncEngineTest {
         h.items.value = emptyList()
         runCurrent()
 
+        assertTrue(
+            "the deleted row was written back: ${h.writer.sets}",
+            h.writer.sets.none { it.collection == SyncCollection.ITEMS },
+        )
+    }
+
+    @Test
+    fun `a row pulled from another device is not written back once that device finishes shopping`() = runTest {
+        // The same finished shopping trip as above, reported a second time —
+        // this is what the seeded push cache did not cover. B pulled the rows
+        // the other phone checked off, so B's copies carry that phone's
+        // updatedAt: newer than where B's last session started. The reconcile
+        // read them as B's own work not yet pushed, and once the other phone
+        // finished shopping the mirror wrote them back for the whole household.
+        val h = Harness(this)
+        h.syncState.lastSyncedHouseholdId = "h1"
+        h.syncState.lastSyncedAt = 100
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(products = listOf(remoteProduct("p1", "Milk", 50)), lists = listOf(remoteList("l1", "Shopping", 50)))
+        runCurrent()
+
+        // The other phone checks the item off; here it arrives as a pull.
+        h.now = 20_000
+        val checked = remoteItem("i1", "l1", "p1", updatedAt = 20_000)
+        h.remote.emitChange(
+            SyncCollection.ITEMS,
+            allDocs = listOf(checked),
+            upserts = listOf(checked),
+        )
+        h.items.value = listOf(item("i1", updatedAt = 20_000))
+        runCurrent()
+        h.writer.sets.clear()
+
+        // That phone finishes shopping and closes the app; B was not there to
+        // hear it, so all B learns is the server state it finds on returning.
+        h.now = 30_000
+        h.householdIds.value = null
+        runCurrent()
+        h.remote.emitInitial(SyncCollection.ITEMS, emptyList())
+        h.householdIds.value = "h1"
+        runCurrent()
+
+        assertTrue(
+            "the row the other phone deleted is still here: " +
+                "${h.store.ids(SyncCollection.ITEMS)}",
+            h.store.ids(SyncCollection.ITEMS).isEmpty(),
+        )
+        assertTrue(
+            "the deleted row was written back: ${h.writer.sets}",
+            h.writer.sets.none { it.collection == SyncCollection.ITEMS },
+        )
+    }
+
+    @Test
+    fun `a row written during an outage stops being protected once the server acknowledges it`() = runTest {
+        // The line has to sit where the server last confirmed the queue, not
+        // where the wait for that confirmation began. Checking things off with
+        // no signal piles rows up while a settle is already in flight; a mark
+        // taken at the wait's start would leave all of them on the protected
+        // side of the line, and a checkout on the other phone would be undone
+        // here the moment they came back into range.
+        val h = Harness(this)
+        h.syncState.lastSyncedHouseholdId = "h1"
+        h.syncState.lastSyncedAt = 100
+        h.writer.acknowledged.value = false
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(
+            products = listOf(remoteProduct("p1", "Milk", 50)),
+            lists = listOf(remoteList("l1", "Shopping", 50)),
+        )
+        runCurrent()
+
+        // No signal: the item is checked off and joins the queue.
+        h.now = 20_000
+        h.store.upsert(SyncCollection.ITEMS, "i1", remoteItem("i1", "l1", "p1", 20_000).data)
+        h.items.value = listOf(item("i1", updatedAt = 20_000))
+        runCurrent()
+        assertTrue(
+            "the row never reached the queue: ${h.writer.sets}",
+            h.writer.sets.any { it.docId == "i1" },
+        )
+        h.writer.sets.clear()
+
+        // Back in range: the queue drains.
+        h.now = 30_000
+        h.writer.acknowledged.value = true
+        runCurrent()
+
+        // ...and the other phone, done shopping, deletes the row meanwhile.
+        h.householdIds.value = null
+        runCurrent()
+        h.remote.emitInitial(SyncCollection.ITEMS, emptyList())
+        h.now = 40_000
+        h.householdIds.value = "h1"
+        runCurrent()
+
+        assertTrue(
+            "the row the other phone deleted is still here: " +
+                "${h.store.ids(SyncCollection.ITEMS)}",
+            h.store.ids(SyncCollection.ITEMS).isEmpty(),
+        )
         assertTrue(
             "the deleted row was written back: ${h.writer.sets}",
             h.writer.sets.none { it.collection == SyncCollection.ITEMS },
@@ -265,6 +396,38 @@ class DiffSyncEngineTest {
         assertTrue("stale synced row survived", "old" !in ids)
         // ...and the surviving local row gets pushed.
         assertTrue(h.writer.sets.any { it.docId == "offline" })
+    }
+
+    @Test
+    fun `a row written here survives the reconcile while the server has not acknowledged it`() = runTest {
+        // That protection has to come from proof of landing, never from a
+        // schedule. Rows written while the queue is unacknowledged are the
+        // offline case: a session that never got its writes out would otherwise
+        // have them deleted as "absent remotely" at the next start.
+        val h = Harness(this)
+        h.syncState.lastSyncedHouseholdId = "h1"
+        h.syncState.lastSyncedAt = 100
+        h.writer.acknowledged.value = false
+        h.store.upsert(SyncCollection.PRODUCTS, "here", remoteProduct("here", "Local", 500).data)
+        h.products.value = listOf(product("here", "Local", 500))
+        h.householdIds.value = "h1"
+        runCurrent()
+        h.emitInitials(products = listOf(remoteProduct("cloud", "Cloud", 200)))
+        runCurrent()
+
+        assertEquals("the mark moved without an acknowledgement", 100L, h.syncState.lastSyncedAt)
+
+        // A session later, still nothing acknowledged.
+        h.householdIds.value = null
+        runCurrent()
+        h.householdIds.value = "h1"
+        runCurrent()
+
+        assertTrue(
+            "a row the server never acknowledged was deleted: " +
+                "${h.store.ids(SyncCollection.PRODUCTS)}",
+            "here" in h.store.ids(SyncCollection.PRODUCTS),
+        )
     }
 
     @Test

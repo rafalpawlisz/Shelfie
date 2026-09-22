@@ -10,6 +10,8 @@ import io.github.rafalpawlisz.shelfie.data.sync.SyncWriter
 import io.github.rafalpawlisz.shelfie.data.sync.UpsertResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 
 /**
  * In-memory stand-in for RoomSyncLocalStore, with just enough FK awareness:
@@ -20,6 +22,14 @@ class FakeSyncLocalStore : SyncLocalStore {
 
     val rows = mutableMapOf<SyncCollection, MutableMap<String, Map<String, Any?>>>()
         .apply { SyncCollection.entries.forEach { put(it, mutableMapOf()) } }
+
+    /**
+     * Room is one table for both directions, but a harness has to split it into
+     * the pull-side store and the push-side flow; without this hook a row the
+     * applier deleted would still sit in the flow, and the mirror would push a
+     * row Room no longer has.
+     */
+    var onDelete: ((SyncCollection, String) -> Unit)? = null
 
     override suspend fun upsert(
         collection: SyncCollection,
@@ -44,6 +54,7 @@ class FakeSyncLocalStore : SyncLocalStore {
 
     override suspend fun delete(collection: SyncCollection, docId: String) {
         rows.getValue(collection).remove(docId)
+        onDelete?.invoke(collection, docId)
     }
 
     override suspend fun idsSyncedUpTo(
@@ -68,6 +79,17 @@ class RecordingSyncWriter : SyncWriter {
 
     val sets = mutableListOf<Write>()
     val deletes = mutableListOf<Write>()
+
+    /**
+     * What the fake server has acknowledged. Stays true unless a test is about
+     * a queue that never drains — the offline case, where
+     * [SyncWriter.awaitPendingWrites] must never return.
+     */
+    val acknowledged = MutableStateFlow(true)
+
+    override suspend fun awaitPendingWrites() {
+        acknowledged.first { it }
+    }
 
     override fun set(
         householdId: String,

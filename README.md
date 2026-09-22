@@ -121,7 +121,11 @@ All three suites run in CI on every push to `main`.
 
 Deletions are pushed straight through rather than through a durable outbox, so a
 process death between deleting something and the first sync session can lose the
-deletion (the row is gone locally, the other phone keeps it). The push diff
-cache is not seeded from pulled documents, which costs one redundant write per
-pulled change. Neither hurts two phones in one household; both are written down
-rather than pretended away.
+deletion (the row is gone locally, the other phone keeps it). A row written in
+the instant before such a death is in the same position from the other side: it
+never reaches the queue, and once the server confirms the queue has drained, the
+next session's reconcile reads its absence remotely as a deletion made elsewhere
+and drops it locally. The push diff cache is not seeded from pulled documents,
+which costs one redundant write per pulled change. None of these hurts two
+phones in one household; all of them are written down rather than pretended
+away.
