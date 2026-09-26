@@ -143,7 +143,7 @@ object DecorationSuggester {
         "🍺" to listOf("piwo", "beer"),
         "🍷" to listOf("wino", "wine"),
         "🥂" to listOf("prosecco", "szampan"),
-        "🥃" to listOf("whisky", "wodka", "rum", "gin", "nalewka", "likier"),
+        "🥃" to listOf("whisky", "wodka", "rum", "gin", "nalewka", "likier", "aperol"),
         "🍹" to listOf("drink", "cydr", "koktajl"),
         // Household and hygiene
         "🧻" to listOf("papier toaletowy", "papier", "reczniki papierowe", "chusteczki", "chusteczka"),

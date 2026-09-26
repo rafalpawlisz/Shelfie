@@ -214,6 +214,7 @@ object CategorySuggester {
         ProductCategory.ALCOHOL to listOf(
             "piwo", "beer", "wino", "wine", "prosecco", "szampan",
             "whisky", "wodka", "rum", "gin", "nalewka", "likier", "drink", "cydr", "koktajl",
+            "aperol",
         ),
         ProductCategory.CLEANING to listOf(
             "papier toaletowy", "papier", "reczniki papierowe", "chusteczki", "chusteczka",

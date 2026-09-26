@@ -152,6 +152,16 @@ class DecorationSuggesterTest {
     }
 
     @Test
+    fun `a branded aperitif wears the tumbler its liqueurs do`() {
+        // The face is the bottle on the shelf, not the spritz it is usually
+        // mixed into — an aperitif is a liqueur, and the mixed drinks two
+        // entries over keep 🍹.
+        assertEquals("🥃", DecorationSuggester.suggest("aperol"))
+        assertEquals("🥃", DecorationSuggester.suggest("aperol spritz"))
+        assertEquals("🍹", DecorationSuggester.suggest("koktajl"))
+    }
+
+    @Test
     fun `chanterelles wear a mushroom, turmeric keeps its spice jar`() {
         assertEquals("🍄", DecorationSuggester.suggest("kurki"))
         assertEquals("🧂", DecorationSuggester.suggest("kurkuma"))

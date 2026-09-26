@@ -470,6 +470,19 @@ class CategorySuggesterTest {
     }
 
     @Test
+    fun `a branded aperitif reaches the alcohol shelf, later inflections included`() {
+        // Reported from real shopping: "aperol" matched nothing at all. A plain
+        // gap rather than a wrong hit — the name is the bottle and nothing in
+        // it needed explaining, but no entry carried the word.
+        assertEquals(ProductCategory.ALCOHOL, CategorySuggester.suggest("aperol"))
+        assertEquals(ProductCategory.ALCOHOL, CategorySuggester.suggest("Aperol"))
+        // Which is how the genitive is written on a list, and the stemmer
+        // reaches the entry from it without a second form in the dictionary.
+        assertEquals(ProductCategory.ALCOHOL, CategorySuggester.suggest("aperolu"))
+        assertEquals(ProductCategory.ALCOHOL, CategorySuggester.suggest("aperol spritz"))
+    }
+
+    @Test
     fun `every category emoji is unique - it is the storage key`() {
         val emoji = ProductCategory.entries.map { it.emoji }
         assertEquals(emoji.size, emoji.toSet().size)
