@@ -150,13 +150,14 @@ object CategorySuggester {
         // spices, the rice paper with the baking, kimchi, tahini, ajvar and
         // pesto with the Polish preserves. "curry" the spice mix and the plain
         // rice still mean the old shelves; only the phrase "pasta curry" names
-        // this one, and "mleczko kokosowe" has to be a phrase to outrank the
-        // polish the cleaning aisle's "mleczko" stands for.
+        // this one, and the coconut milk is listed under both spellings as
+        // phrases — "mleko" alone is the dairy shelf and "mleczko" the
+        // furniture polish, so either word would otherwise decide first.
         ProductCategory.WORLD_FOODS to listOf(
             "sos sojowy", "mirin", "kimchi", "papier ryzowy", "papier do sajgonek",
             "tahini", "ajvar", "pesto",
             "ramen", "soba", "udon", "wasabi", "sriracha", "hoisin", "teriyaki",
-            "pasta curry", "mleczko kokosowe",
+            "pasta curry", "mleczko kokosowe", "mleko kokosowe",
         ),
         ProductCategory.SPICES to listOf(
             "sol", "salt", "przyprawa", "przyprawy", "pieprz", "papryka slodka",

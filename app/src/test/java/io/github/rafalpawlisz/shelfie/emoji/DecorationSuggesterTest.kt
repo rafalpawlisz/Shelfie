@@ -181,6 +181,7 @@ class DecorationSuggesterTest {
         assertEquals("🍜", DecorationSuggester.suggest("soba"))
         assertEquals("🍜", DecorationSuggester.suggest("udon"))
         assertEquals("🥥", DecorationSuggester.suggest("mleczko kokosowe"))
+        assertEquals("🥥", DecorationSuggester.suggest("mleko kokosowe"))
         assertEquals("🥫", DecorationSuggester.suggest("wasabi"))
         assertEquals("🥫", DecorationSuggester.suggest("sriracha"))
         assertEquals("🥫", DecorationSuggester.suggest("hoisin"))

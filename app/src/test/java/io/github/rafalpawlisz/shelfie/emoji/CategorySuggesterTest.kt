@@ -252,6 +252,8 @@ class CategorySuggesterTest {
         assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("teriyaki"))
         assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("pasta curry"))
         assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("mleczko kokosowe"))
+        // The sibling spelling on the can, or the dairy's "mleko" decides.
+        assertEquals(ProductCategory.WORLD_FOODS, CategorySuggester.suggest("mleko kokosowe"))
         // What stayed on the old shelves.
         assertEquals(ProductCategory.SPICES, CategorySuggester.suggest("curry"))
         assertEquals(ProductCategory.DRY_GOODS, CategorySuggester.suggest("ryż"))
@@ -259,7 +261,9 @@ class CategorySuggesterTest {
         assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("ogórki kiszone"))
         assertEquals(ProductCategory.CANNED, CategorySuggester.suggest("pulpa z marakui"))
         // The phrases had to outrank the word that otherwise decides first:
-        // "curry" alone is the spice mix, "mleczko" alone the furniture polish.
+        // "curry" alone is the spice mix, "mleczko" the furniture polish,
+        // "mleko" the dairy shelf.
+        assertEquals(ProductCategory.DAIRY, CategorySuggester.suggest("mleko"))
         assertEquals(ProductCategory.CLEANING, CategorySuggester.suggest("mleczko"))
     }
 

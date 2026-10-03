@@ -264,6 +264,6 @@ object DecorationSuggester {
         // than for the shelf they stand on: the noodles in a bowl, the coconut
         // milk in its fruit.
         "🍜" to listOf("ramen", "soba", "udon"),
-        "🥥" to listOf("mleczko kokosowe"),
+        "🥥" to listOf("mleczko kokosowe", "mleko kokosowe"),
     )
 }
