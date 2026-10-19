@@ -191,7 +191,7 @@ class FakeShoppingListRepository(
                     val bChecked = bItem.checkedAt != null
                     when {
                         aChecked != bChecked -> if (aChecked) 1 else -1
-                        aChecked -> bItem.checkedAt!!.compareTo(aItem.checkedAt!!)
+                        aChecked -> bItem.checkedAt!!.compareTo(aItem.checkedAt)
                         else -> {
                             val bySection = order.rankOf(
                                 sectionOf(
